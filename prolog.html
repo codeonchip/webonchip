@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Prolog Simulator (Multi-Goal)</title>
+  <style>
+    body {
+      font-family: monospace;
+      max-width: 800px;
+      margin: auto;
+      padding: 2rem;
+      background: #f0f0f0;
+    }
+    textarea {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1rem;
+      font-family: monospace;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 10px 20px;
+    }
+    pre {
+      background: #eee;
+      padding: 1rem;
+      white-space: pre-wrap;
+      margin-top: 1rem;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Simple Prolog Simulator</h1>
+
+  <h2>Facts</h2>
+  <textarea id="facts" rows="8">
+father(john, bob)
+father(bob, alice)
+mother(mary, bob)
+male(john)
+female(mary)
+  </textarea>
+
+  <h2>Query</h2>
+  <textarea id="query" rows="2">father(X, Y), male(X)</textarea>
+
+  <button onclick="runQuery()">Run Query</button>
+
+  <h2>Results</h2>
+  <pre id="output">No query yet.</pre>
+
+  <script>
+    function parseFact(line) {
+      const match = line.match(/^(\w+)\(([^()]+)\)$/);
+      if (!match) return null;
+      const name = match[1];
+      const args = match[2].split(',').map(s => s.trim());
+      return { name, args };
+    }
+
+    function unify(goal, fact, bindings) {
+      if (goal.name !== fact.name || goal.args.length !== fact.args.length)
+        return null;
+
+      const local = { ...bindings };
+
+      for (let i = 0; i < goal.args.length; i++) {
+        const g = goal.args[i];
+        const f = fact.args[i];
+
+        if (/^[A-Z_]/.test(g)) {
+          if (g in local) {
+            if (local[g] !== f) return null; // conflicting binding
+          } else {
+            local[g] = f;
+          }
+        } else if (g !== f) {
+          return null; // mismatch
+        }
+      }
+      return local;
+    }
+
+    function solve(goals, facts, bindings = {}, depth = 0) {
+      if (goals.length === 0) return [bindings]; // success
+
+      const [current, ...rest] = goals;
+      const matches = [];
+
+      for (const fact of facts) {
+        const unified = unify(current, fact, bindings);
+        if (unified) {
+          const sub = solve(rest, facts, unified, depth + 1);
+          matches.push(...sub);
+        }
+      }
+
+      return matches;
+    }
+
+    function runQuery() {
+      const factLines = document.getElementById("facts").value.trim().split('\n');
+      const queryLine = document.getElementById("query").value.trim();
+      const output = document.getElementById("output");
+
+      const facts = factLines.map(parseFact).filter(f => f);
+      const goals = queryLine
+        .split(',')
+        .map(s => parseFact(s.trim()))
+        .filter(g => g);
+
+      if (goals.length === 0) {
+        output.textContent = "❌ Invalid query.";
+        return;
+      }
+
+      const results = solve(goals, facts);
+
+      if (results.length === 0) {
+        output.textContent = "❌ No matching results.";
+      } else {
+        output.textContent = results
+          .map(bind => Object.entries(bind).map(([k, v]) => `${k} = ${v}`).join(', '))
+          .join('\n');
+      }
+    }
+  </script>
+</body>
+</html>
