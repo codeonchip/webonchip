@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>NE555 Timer Simulator (Astable Mode)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 1rem;
+      display: block;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      font-size: 1rem;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 10px 20px;
+      font-size: 1rem;
+    }
+    #results {
+      margin-top: 2rem;
+      background-color: #f4f4f4;
+      padding: 1rem;
+      border-radius: 6px;
+    }
+    canvas {
+      margin-top: 20px;
+      width: 100%;
+      height: 100px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>NE555 Timer Simulator</h1>
+
+  <label for="r1">R1 (Ohms):</label>
+  <input type="number" id="r1" value="1000" />
+
+  <label for="r2">R2 (Ohms):</label>
+  <input type="number" id="r2" value="1000" />
+
+  <label for="c1">C1 (Farads):</label>
+  <input type="number" id="c1" step="any" value="0.000001" />
+
+  <button onclick="simulate()">Simulate</button>
+
+  <div id="results"></div>
+  <canvas id="waveform" width="600" height="100"></canvas>
+
+  <script>
+    function simulate() {
+      const R1 = parseFloat(document.getElementById("r1").value);
+      const R2 = parseFloat(document.getElementById("r2").value);
+      const C1 = parseFloat(document.getElementById("c1").value);
+
+      if (isNaN(R1) || isNaN(R2) || isNaN(C1) || R1 <= 0 || R2 <= 0 || C1 <= 0) {
+        alert("Please enter valid positive numbers.");
+        return;
+      }
+
+      const tHigh = 0.693 * (R1 + R2) * C1;
+      const tLow = 0.693 * R2 * C1;
+      const tTotal = tHigh + tLow;
+      const freq = 1 / tTotal;
+      const duty = (tHigh / tTotal) * 100;
+
+      document.getElementById("results").innerHTML = `
+        <strong>Results:</strong><br/>
+        Frequency: ${freq.toFixed(2)} Hz<br/>
+        Duty Cycle: ${duty.toFixed(1)} %<br/>
+        Time High: ${tHigh.toFixed(6)} s<br/>
+        Time Low: ${tLow.toFixed(6)} s
+      `;
+
+      drawWaveform(tHigh, tLow);
+    }
+
+    function drawWaveform(tHigh, tLow) {
+      const canvas = document.getElementById("waveform");
+      const ctx = canvas.getContext("2d");
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const totalTime = tHigh + tLow;
+      const pixelsPerCycle = width / 3;
+      const pixelsHigh = (tHigh / totalTime) * pixelsPerCycle;
+      const pixelsLow = (tLow / totalTime) * pixelsPerCycle;
+
+      ctx.beginPath();
+      ctx.moveTo(0, height);
+      let x = 0;
+
+      for (let i = 0; i < 3; i++) {
+        ctx.lineTo(x, 0);
+        x += pixelsHigh;
+        ctx.lineTo(x, 0);
+        ctx.lineTo(x, height);
+        x += pixelsLow;
+        ctx.lineTo(x, height);
+      }
+
+      ctx.strokeStyle = "blue";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  </script>
+</body>
+</html>
