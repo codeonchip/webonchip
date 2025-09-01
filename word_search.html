@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Word Search Game</title>
+  <title>Word Search Game - CAT</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -15,46 +15,123 @@
       border-collapse: collapse;
     }
     td {
-      border: 1px solid #ccc;
-      padding: 10px;
+      border: 1px solid #999;
+      padding: 8px;
       width: 30px;
       height: 30px;
+      font-weight: bold;
       text-align: center;
       cursor: pointer;
       user-select: none;
+      font-size: 20px;
     }
     td.selected {
-      background-color: #add8e6;
+      background-color: lightblue;
+    }
+    td.correct {
+      background-color: lightgreen;
+    }
+    #status {
+      margin-top: 1rem;
+      font-size: 1.2rem;
+    }
+    button {
+      margin-top: 20px;
+      padding: 8px 16px;
     }
   </style>
 </head>
 <body>
   <h1>Word Search Game</h1>
   <p>Find the word: <strong>CAT</strong></p>
+  <div id="status">Click letters in order!</div>
   <table id="grid"></table>
+  <button onclick="resetGame()">Reset</button>
 
   <script>
-    const gridData = [
-      ['C', 'A', 'T', 'D', 'O', 'G'],
-      ['X', 'Y', 'Z', 'P', 'Q', 'R'],
-      ['M', 'N', 'O', 'L', 'K', 'J'],
-      ['E', 'F', 'G', 'H', 'I', 'J']
-    ];
+    const word = "CAT";
+    const rows = 6;
+    const cols = 6;
+    const grid = document.getElementById("grid");
+    const status = document.getElementById("status");
+    let selected = [];
+    let gridData = [];
 
-    const table = document.getElementById('grid');
+    function getRandomLetter() {
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      return letters[Math.floor(Math.random() * letters.length)];
+    }
 
-    gridData.forEach((row, rowIndex) => {
-      const tr = document.createElement('tr');
-      row.forEach((letter, colIndex) => {
-        const td = document.createElement('td');
-        td.textContent = letter;
-        td.addEventListener('click', () => {
-          td.classList.toggle('selected');
-        });
-        tr.appendChild(td);
-      });
-      table.appendChild(tr);
-    });
+    function placeWordInGrid() {
+      // Place CAT horizontally at random row
+      const row = Math.floor(Math.random() * rows);
+      const col = Math.floor(Math.random() * (cols - word.length));
+      for (let r = 0; r < rows; r++) {
+        gridData[r] = [];
+        for (let c = 0; c < cols; c++) {
+          gridData[r][c] = getRandomLetter();
+        }
+      }
+      for (let i = 0; i < word.length; i++) {
+        gridData[row][col + i] = word[i];
+      }
+      return { row, col };
+    }
+
+    function drawGrid(wordPos) {
+      grid.innerHTML = "";
+      for (let r = 0; r < rows; r++) {
+        const tr = document.createElement("tr");
+        for (let c = 0; c < cols; c++) {
+          const td = document.createElement("td");
+          td.textContent = gridData[r][c];
+          td.dataset.row = r;
+          td.dataset.col = c;
+          td.addEventListener("click", () => handleClick(td));
+          tr.appendChild(td);
+        }
+        grid.appendChild(tr);
+      }
+    }
+
+    function handleClick(td) {
+      if (td.classList.contains("correct")) return;
+
+      td.classList.toggle("selected");
+
+      const letter = td.textContent;
+      const row = td.dataset.row;
+      const col = td.dataset.col;
+      const key = `${row},${col}`;
+
+      if (td.classList.contains("selected")) {
+        selected.push({ letter, key, td });
+      } else {
+        selected = selected.filter(sel => sel.key !== key);
+      }
+
+      const formed = selected.map(s => s.letter).join("");
+
+      if (formed === word) {
+        selected.forEach(s => s.td.classList.add("correct"));
+        status.textContent = "✅ Correct! You found CAT!";
+      } else if (!word.startsWith(formed)) {
+        status.textContent = "❌ Wrong! Try again.";
+        selected.forEach(s => s.td.classList.remove("selected"));
+        selected = [];
+      } else {
+        status.textContent = "Keep going...";
+      }
+    }
+
+    function resetGame() {
+      selected = [];
+      status.textContent = "Click letters in order!";
+      const wordPos = placeWordInGrid();
+      drawGrid(wordPos);
+    }
+
+    resetGame();
   </script>
 </body>
 </html>
