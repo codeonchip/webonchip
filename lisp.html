@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LISP Interpreter</title>
+  <style>
+    body {
+      font-family: monospace;
+      max-width: 800px;
+      margin: auto;
+      padding: 2rem;
+      background: #f8f8f8;
+    }
+    h1 {
+      text-align: center;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      font-family: monospace;
+      font-size: 1rem;
+      padding: 1rem;
+    }
+    pre {
+      background: #eee;
+      padding: 1rem;
+      white-space: pre-wrap;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>LISP Interpreter (in JavaScript)</h1>
+
+  <textarea id="input" placeholder="Type your LISP code here...">(define square (lambda (x) (* x x)))
+(square 5)</textarea>
+  
+  <button onclick="runLisp()">Run</button>
+
+  <h2>Output</h2>
+  <pre id="output"></pre>
+
+  <script>
+    function tokenize(str) {
+      return str.replace(/\(/g, " ( ").replace(/\)/g, " ) ").trim().split(/\s+/);
+    }
+
+    function parse(tokens) {
+      if (tokens.length === 0) throw "Unexpected EOF";
+      let token = tokens.shift();
+      if (token === '(') {
+        const L = [];
+        while (tokens[0] !== ')') {
+          L.push(parse(tokens));
+        }
+        tokens.shift();
+        return L;
+      } else if (token === ')') {
+        throw "Unexpected ')'";
+      } else if (!isNaN(token)) {
+        return parseFloat(token);
+      } else {
+        return token;
+      }
+    }
+
+    function standardEnv() {
+      const env = {
+        '+': (...args) => args.reduce((a, b) => a + b, 0),
+        '-': (...args) => args.reduce((a, b) => a - b),
+        '*': (...args) => args.reduce((a, b) => a * b, 1),
+        '/': (...args) => args.reduce((a, b) => a / b),
+        '>': (a, b) => a > b,
+        '<': (a, b) => a < b,
+        '=': (a, b) => a === b,
+        'print': console.log,
+        'pi': Math.PI,
+        'abs': Math.abs
+      };
+      return env;
+    }
+
+    function evalLisp(x, env) {
+      if (typeof x === 'string') {
+        if (x in env) return env[x];
+        else throw `Undefined symbol: ${x}`;
+      } else if (typeof x === 'number') {
+        return x;
+      } else if (x[0] === 'define') {
+        const [, name, exp] = x;
+        env[name] = evalLisp(exp, env);
+        return `${name} defined`;
+      } else if (x[0] === 'lambda') {
+        const [, params, body] = x;
+        return function(...args) {
+          const local = Object.create(env);
+          params.forEach((p, i) => local[p] = args[i]);
+          return evalLisp(body, local);
+        };
+      } else if (x[0] === 'if') {
+        const [, test, conseq, alt] = x;
+        const result = evalLisp(test, env) ? conseq : alt;
+        return evalLisp(result, env);
+      } else {
+        const proc = evalLisp(x[0], env);
+        const args = x.slice(1).map(arg => evalLisp(arg, env));
+        return proc(...args);
+      }
+    }
+
+    function runLisp() {
+      const code = document.getElementById("input").value;
+      const lines = code.split(/\n/).filter(line => line.trim().length > 0);
+      const output = [];
+
+      try {
+        const env = standardEnv();
+        for (const line of lines) {
+          const tokens = tokenize(line);
+          const ast = parse(tokens);
+          const result = evalLisp(ast, env);
+          output.push(result);
+        }
+        document.getElementById("output").textContent = output.join('\n');
+      } catch (err) {
+        document.getElementById("output").textContent = "❌ Error: " + err;
+      }
+    }
+  </script>
+</body>
+</html>
