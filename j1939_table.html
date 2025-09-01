@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>J1939 CAN ID to PGN Table</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    input {
+      width: 150px;
+      padding: 6px;
+      font-size: 1rem;
+    }
+    button {
+      padding: 6px 12px;
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>J1939 PGN vs. 29-Bit CAN ID</h1>
+
+  <label for="canIdInput">CAN ID (hex):</label>
+  <input type="text" id="canIdInput" placeholder="e.g., 18FEEE17">
+  <button onclick="decodeCANID()">Decode</button>
+
+  <table id="resultTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>CAN ID</th><th>P</th><th>R</th><th>DP</th><th>PF</th><th>PS</th><th>SA</th><th>PGN</th><th>Label</th>
+      </tr>
+    </thead>
+    <tbody id="resultBody"></tbody>
+  </table>
+
+  <script>
+    function hexToInt(hex) {
+      return parseInt(hex, 16);
+    }
+
+    function padHex(value, length) {
+      return value.toString(16).toUpperCase().padStart(length, '0');
+    }
+
+    function decodeCANID() {
+      const input = document.getElementById("canIdInput").value.trim().replace(/^0x/i, '');
+      if (input.length === 0 || input.length > 8) {
+        alert("Please enter a valid 29-bit CAN ID (up to 8 hex digits).");
+        return;
+      }
+
+      const canId = parseInt(input, 16);
+      const P = (canId >> 26) & 0x7;
+      const R = (canId >> 25) & 0x1;
+      const DP = (canId >> 24) & 0x1;
+      const PF = (canId >> 16) & 0xFF;
+      const PS = (canId >> 8) & 0xFF;
+      const SA = canId & 0xFF;
+
+      let PGN;
+      if (PF < 240) {
+        PGN = ((DP << 16) | (PF << 8)); // PDU1: PGN = DP/PF/0
+      } else {
+        PGN = ((DP << 16) | (PF << 8) | PS); // PDU2: PGN = DP/PF/PS
+      }
+
+      // Stub PGN label map
+      const labelMap = {
+        0xF004: "Electronic Engine Controller 1",
+        0xFDA1: "Aftertreatment 1 Fuel Command",
+        0xF111: "Gaseous Fuel Pressure 3",
+        0xFE6C: "Tachograph",
+        0xFFA2: "Proprietary B"
+      };
+
+      const PGNHex = padHex(PGN, 4);
+      const label = labelMap[PGN] || "-";
+
+      const row = `
+        <tr>
+          <td>${padHex(canId, 8)}</td>
+          <td>${P}</td>
+          <td>${R}</td>
+          <td>${DP}</td>
+          <td>${padHex(PF, 2)}</td>
+          <td>${padHex(PS, 2)}</td>
+          <td>${padHex(SA, 2)}</td>
+          <td>${PGNHex}</td>
+          <td>${label}</td>
+        </tr>
+      `;
+
+      document.getElementById("resultBody").innerHTML = row;
+      document.getElementById("resultTable").style.display = "table";
+    }
+  </script>
+</body>
+</html>
