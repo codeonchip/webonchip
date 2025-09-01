@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>LISP Interpreter</title>
+  <title>LISP Interpreter (with begin, let, recursion)</title>
   <style>
     body {
       font-family: monospace;
@@ -16,8 +16,7 @@
     }
     textarea {
       width: 100%;
-      height: 150px;
-      font-family: monospace;
+      height: 180px;
       font-size: 1rem;
       padding: 1rem;
     }
@@ -34,11 +33,16 @@
   </style>
 </head>
 <body>
-  <h1>LISP Interpreter (in JavaScript)</h1>
+  <h1>LISP Interpreter (JS)</h1>
 
-  <textarea id="input" placeholder="Type your LISP code here...">(define square (lambda (x) (* x x)))
-(square 5)</textarea>
-  
+  <textarea id="input" placeholder="Type your LISP code here...">(define fact
+  (lambda (n)
+    (if (= n 0)
+        1
+        (* n (fact (- n 1))))))
+        
+(fact 5)</textarea>
+
   <button onclick="runLisp()">Run</button>
 
   <h2>Output</h2>
@@ -77,7 +81,7 @@
         '>': (a, b) => a > b,
         '<': (a, b) => a < b,
         '=': (a, b) => a === b,
-        'print': console.log,
+        'print': (...args) => console.log(...args),
         'pi': Math.PI,
         'abs': Math.abs
       };
@@ -87,7 +91,7 @@
     function evalLisp(x, env) {
       if (typeof x === 'string') {
         if (x in env) return env[x];
-        else throw `Undefined symbol: ${x}`;
+        throw `Undefined symbol: ${x}`;
       } else if (typeof x === 'number') {
         return x;
       } else if (x[0] === 'define') {
@@ -102,9 +106,22 @@
           return evalLisp(body, local);
         };
       } else if (x[0] === 'if') {
-        const [, test, conseq, alt] = x;
-        const result = evalLisp(test, env) ? conseq : alt;
-        return evalLisp(result, env);
+        const [, test, thenExp, elseExp] = x;
+        const testResult = evalLisp(test, env);
+        return evalLisp(testResult ? thenExp : elseExp, env);
+      } else if (x[0] === 'begin') {
+        let result;
+        for (let i = 1; i < x.length; i++) {
+          result = evalLisp(x[i], env);
+        }
+        return result;
+      } else if (x[0] === 'let') {
+        const [, bindings, body] = x;
+        const local = Object.create(env);
+        bindings.forEach(([name, valExp]) => {
+          local[name] = evalLisp(valExp, env);
+        });
+        return evalLisp(body, local);
       } else {
         const proc = evalLisp(x[0], env);
         const args = x.slice(1).map(arg => evalLisp(arg, env));
@@ -114,18 +131,17 @@
 
     function runLisp() {
       const code = document.getElementById("input").value;
-      const lines = code.split(/\n/).filter(line => line.trim().length > 0);
       const output = [];
-
+      const env = standardEnv();
       try {
-        const env = standardEnv();
+        const lines = code.split(/\n/).filter(line => line.trim().length > 0);
         for (const line of lines) {
           const tokens = tokenize(line);
           const ast = parse(tokens);
           const result = evalLisp(ast, env);
           output.push(result);
         }
-        document.getElementById("output").textContent = output.join('\n');
+        document.getElementById("output").textContent = output.join("\n");
       } catch (err) {
         document.getElementById("output").textContent = "❌ Error: " + err;
       }
