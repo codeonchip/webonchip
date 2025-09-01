@@ -6,7 +6,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 700px;
+      max-width: 800px;
       margin: auto;
       padding: 2rem;
     }
@@ -29,7 +29,7 @@
       padding: 10px 20px;
       font-size: 1rem;
     }
-    #output {
+    .section {
       margin-top: 2rem;
       padding: 1rem;
       background-color: #f9f9f9;
@@ -46,50 +46,90 @@
 <body>
   <h1>BLDC Motor Control Simulator</h1>
 
-  <label for="voltage">Supply Voltage (V):</label>
-  <input type="number" id="voltage" value="24" min="0" step="0.1">
+  <div class="section">
+    <h2>Control Inputs</h2>
+    <label for="voltage">Supply Voltage (V):</label>
+    <input type="number" id="voltage" value="24">
 
-  <label for="duty">PWM Duty Cycle (%):</label>
-  <input type="number" id="duty" value="50" min="0" max="100" step="1">
+    <label for="duty">PWM Duty Cycle (%):</label>
+    <input type="number" id="duty" value="50" min="0" max="100">
 
-  <label for="load">Load Torque (Nm):</label>
-  <input type="number" id="load" value="0.5" min="0" step="0.1">
+    <label for="load">Load Torque (Nm):</label>
+    <input type="number" id="load" value="0.5" min="0">
+  </div>
+
+  <div class="section">
+    <h2>Motor Parameters</h2>
+
+    <label for="poles">Pole Pairs:</label>
+    <input type="number" id="poles" value="7">
+
+    <label for="kv">Kv (RPM/V):</label>
+    <input type="number" id="kv" value="1000">
+
+    <label for="resistance">Phase Resistance R (Ω):</label>
+    <input type="number" id="resistance" value="0.2" step="0.01">
+
+    <label for="inductance">Phase Inductance L (mH):</label>
+    <input type="number" id="inductance" value="0.5" step="0.01">
+
+    <label for="inertia">Inertia J (kg·m²):</label>
+    <input type="number" id="inertia" value="0.0005" step="0.0001">
+  </div>
 
   <button onclick="simulate()">Simulate</button>
 
-  <div id="output">
+  <div class="section">
     <h2>Simulation Results</h2>
     <p id="rpm">Speed: -</p>
     <p id="current">Current: -</p>
     <p id="torque">Torque: -</p>
   </div>
 
-  <h2>Motor Speed Waveform</h2>
+  <h2>Speed Waveform</h2>
   <canvas id="speedCanvas" width="600" height="100"></canvas>
 
-  <h2>3-Phase Commutation (6-Step)</h2>
+  <h2>3-Phase Commutation</h2>
   <canvas id="phaseCanvas" width="600" height="120"></canvas>
 
   <script>
     function simulate() {
       const voltage = parseFloat(document.getElementById("voltage").value);
       const duty = parseFloat(document.getElementById("duty").value);
-      const load = parseFloat(document.getElementById("load").value);
+      const loadTorque = parseFloat(document.getElementById("load").value);
 
-      const baseSpeed = 4000;
-      const speed = baseSpeed * (voltage / 24) * (duty / 100) * (1 - load / 10);
-      const torque = 0.1 * duty - 0.05 * load;
-      const current = (duty / 100) * 2 + load * 0.3;
+      const polePairs = parseFloat(document.getElementById("poles").value);
+      const kv = parseFloat(document.getElementById("kv").value);
+      const R = parseFloat(document.getElementById("resistance").value);
+      const L = parseFloat(document.getElementById("inductance").value) / 1000; // mH to H
+      const J = parseFloat(document.getElementById("inertia").value);
 
-      document.getElementById("rpm").innerText = `Speed: ${speed.toFixed(0)} RPM`;
-      document.getElementById("torque").innerText = `Torque: ${torque.toFixed(2)} Nm`;
+      // Back-EMF voltage estimate (based on kv)
+      const backEMF_V = voltage * (duty / 100);
+      const noLoadRPM = kv * backEMF_V;
+
+      // Estimate torque constant (Kt = 60 / (2π * Kv))
+      const kt = 60 / (2 * Math.PI * kv); // Nm/A
+
+      // Approximate acceleration torque (ignoring time step)
+      const torqueGenerated = kt * (voltage * (duty / 100) - loadTorque * R);
+      const accel = torqueGenerated / J;
+
+      // Estimated speed under load (simplified)
+      const rpm = Math.max(0, noLoadRPM - loadTorque * 50);
+
+      // Current = Torque / Kt
+      const current = torqueGenerated / kt;
+
+      document.getElementById("rpm").innerText = `Speed: ${rpm.toFixed(0)} RPM`;
+      document.getElementById("torque").innerText = `Torque: ${torqueGenerated.toFixed(2)} Nm`;
       document.getElementById("current").innerText = `Current: ${current.toFixed(2)} A`;
 
-      drawSpeedWaveform(speed);
+      drawSpeedWaveform(rpm);
       drawPhaseCommutation();
     }
 
-    function drawSpeedWaveform(speed) {
+    function drawSpeedWaveform(rpm) {
       const canvas = document.getElementById("speedCanvas");
       const ctx = canvas.getContext("2d");
       const width = canvas.width;
@@ -97,7 +137,7 @@
 
       ctx.clearRect(0, 0, width, height);
 
-      const waveCount = Math.min(5, Math.max(1, speed / 1000));
+      const waveCount = Math.max(1, rpm / 1000);
       const waveLength = width / waveCount;
 
       ctx.beginPath();
@@ -122,7 +162,7 @@
       ctx.clearRect(0, 0, width, height);
 
       const steps = 6;
-      const stepWidth = width / (steps * 2); // draw 2 full cycles
+      const stepWidth = width / (steps * 2);
 
       const waveforms = {
         A: [1, 1, 0, 0, 0, 1],
@@ -130,11 +170,7 @@
         C: [0, 0, 0, 1, 1, 1]
       };
 
-      const yBase = {
-        A: 0,
-        B: 40,
-        C: 80
-      };
+      const yBase = { A: 0, B: 40, C: 80 };
 
       for (const [phase, states] of Object.entries(waveforms)) {
         ctx.beginPath();
