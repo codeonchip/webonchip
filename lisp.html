@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>LISP Interpreter (with begin, let, recursion)</title>
+  <title>LISP Interpreter with Syntax Highlighting</title>
+  <link href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism.css" rel="stylesheet" />
   <style>
     body {
       font-family: monospace;
@@ -11,19 +12,25 @@
       padding: 2rem;
       background: #f8f8f8;
     }
-    h1 {
+    h1, h2 {
       text-align: center;
     }
-    textarea {
-      width: 100%;
-      height: 180px;
-      font-size: 1rem;
+    .editor {
+      border: 1px solid #ccc;
+      background: #272822;
+      color: white;
       padding: 1rem;
+      font-family: monospace;
+      overflow: auto;
+      white-space: pre;
+      outline: none;
+      min-height: 150px;
     }
-    pre {
+    pre#output {
       background: #eee;
       padding: 1rem;
       white-space: pre-wrap;
+      margin-top: 1rem;
     }
     button {
       padding: 10px 20px;
@@ -33,20 +40,22 @@
   </style>
 </head>
 <body>
-  <h1>LISP Interpreter (JS)</h1>
+  <h1>LISP Interpreter (with Highlighting)</h1>
 
-  <textarea id="input" placeholder="Type your LISP code here...">(define fact
-  (lambda (n)
-    (if (= n 0)
-        1
-        (* n (fact (- n 1))))))
-        
-(fact 5)</textarea>
+  <pre id="input" class="editor language-lisp" contenteditable="true">
+(define square (lambda (x) (* x x)))
+(square 6)
+  </pre>
 
   <button onclick="runLisp()">Run</button>
 
   <h2>Output</h2>
   <pre id="output"></pre>
+
+  <!-- Prism.js -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-clike.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-lisp.min.js"></script>
 
   <script>
     function tokenize(str) {
@@ -61,7 +70,7 @@
         while (tokens[0] !== ')') {
           L.push(parse(tokens));
         }
-        tokens.shift();
+        tokens.shift(); // remove ')'
         return L;
       } else if (token === ')') {
         throw "Unexpected ')'";
@@ -81,7 +90,7 @@
         '>': (a, b) => a > b,
         '<': (a, b) => a < b,
         '=': (a, b) => a === b,
-        'print': (...args) => console.log(...args),
+        'print': console.log,
         'pi': Math.PI,
         'abs': Math.abs
       };
@@ -91,7 +100,7 @@
     function evalLisp(x, env) {
       if (typeof x === 'string') {
         if (x in env) return env[x];
-        throw `Undefined symbol: ${x}`;
+        else throw `Undefined symbol: ${x}`;
       } else if (typeof x === 'number') {
         return x;
       } else if (x[0] === 'define') {
@@ -100,28 +109,15 @@
         return `${name} defined`;
       } else if (x[0] === 'lambda') {
         const [, params, body] = x;
-        return function(...args) {
+        return function (...args) {
           const local = Object.create(env);
           params.forEach((p, i) => local[p] = args[i]);
           return evalLisp(body, local);
         };
       } else if (x[0] === 'if') {
-        const [, test, thenExp, elseExp] = x;
-        const testResult = evalLisp(test, env);
-        return evalLisp(testResult ? thenExp : elseExp, env);
-      } else if (x[0] === 'begin') {
-        let result;
-        for (let i = 1; i < x.length; i++) {
-          result = evalLisp(x[i], env);
-        }
-        return result;
-      } else if (x[0] === 'let') {
-        const [, bindings, body] = x;
-        const local = Object.create(env);
-        bindings.forEach(([name, valExp]) => {
-          local[name] = evalLisp(valExp, env);
-        });
-        return evalLisp(body, local);
+        const [, test, conseq, alt] = x;
+        const result = evalLisp(test, env) ? conseq : alt;
+        return evalLisp(result, env);
       } else {
         const proc = evalLisp(x[0], env);
         const args = x.slice(1).map(arg => evalLisp(arg, env));
@@ -130,11 +126,12 @@
     }
 
     function runLisp() {
-      const code = document.getElementById("input").value;
+      const raw = document.getElementById("input").innerText;
+      const lines = raw.split(/\n/).filter(line => line.trim().length > 0);
       const output = [];
       const env = standardEnv();
+
       try {
-        const lines = code.split(/\n/).filter(line => line.trim().length > 0);
         for (const line of lines) {
           const tokens = tokenize(line);
           const ast = parse(tokens);
@@ -145,7 +142,12 @@
       } catch (err) {
         document.getElementById("output").textContent = "❌ Error: " + err;
       }
+
+      Prism.highlightElement(document.getElementById("input"));
     }
+
+    // Initial syntax highlight
+    window.onload = () => Prism.highlightElement(document.getElementById("input"));
   </script>
 </body>
 </html>
