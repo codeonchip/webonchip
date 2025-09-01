@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>J1939 Convert Tool</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-weight: bold;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      font-size: 1rem;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #result {
+      margin-top: 2rem;
+      font-size: 1.1rem;
+      background: #f8f8f8;
+      padding: 1rem;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>J1939 Convert Tool</h1>
+
+  <label for="pgn">PGN (hex):</label>
+  <input type="text" id="pgn" placeholder="e.g. 0xFEF1" />
+
+  <label for="sa">Source Address (hex):</label>
+  <input type="text" id="sa" placeholder="e.g. 0x80" />
+
+  <label for="priority">Priority (0-7):</label>
+  <input type="number" id="priority" value="6" min="0" max="7" />
+
+  <button onclick="convertToCANID()">Convert to CAN ID</button>
+
+  <div id="result"></div>
+
+  <script>
+    function convertToCANID() {
+      const pgnHex = document.getElementById('pgn').value.trim();
+      const saHex = document.getElementById('sa').value.trim();
+      const priority = parseInt(document.getElementById('priority').value);
+
+      const pgn = parseInt(pgnHex, 16);
+      const sa = parseInt(saHex, 16);
+
+      if (isNaN(pgn) || isNaN(sa) || isNaN(priority)) {
+        document.getElementById('result').innerText = '❌ Invalid input!';
+        return;
+      }
+
+      const can_id = ((priority & 0x7) << 26) | ((pgn & 0x3FFFF) << 8) | (sa & 0xFF);
+      const can_id_hex = '0x' + can_id.toString(16).toUpperCase().padStart(8, '0');
+
+      document.getElementById('result').innerHTML = `
+        ✅ <strong>CAN ID:</strong> ${can_id_hex}<br/>
+        Binary: ${can_id.toString(2).padStart(29, '0')}
+      `;
+    }
+  </script>
+</body>
+</html>
