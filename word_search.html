@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Word Search Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 2rem;
+    }
+    table {
+      margin: auto;
+      border-collapse: collapse;
+    }
+    td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 30px;
+      height: 30px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    td.selected {
+      background-color: #add8e6;
+    }
+  </style>
+</head>
+<body>
+  <h1>Word Search Game</h1>
+  <p>Find the word: <strong>CAT</strong></p>
+  <table id="grid"></table>
+
+  <script>
+    const gridData = [
+      ['C', 'A', 'T', 'D', 'O', 'G'],
+      ['X', 'Y', 'Z', 'P', 'Q', 'R'],
+      ['M', 'N', 'O', 'L', 'K', 'J'],
+      ['E', 'F', 'G', 'H', 'I', 'J']
+    ];
+
+    const table = document.getElementById('grid');
+
+    gridData.forEach((row, rowIndex) => {
+      const tr = document.createElement('tr');
+      row.forEach((letter, colIndex) => {
+        const td = document.createElement('td');
+        td.textContent = letter;
+        td.addEventListener('click', () => {
+          td.classList.toggle('selected');
+        });
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+  </script>
+</body>
+</html>
