@@ -3,51 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LISP Interpreter with Syntax Highlighting</title>
+  <title>LISP Interpreter (Offline)</title>
   <style>
-    :root { --bg:#f8f8f8; --panel:#ffffff; --ink:#222; --muted:#666; --code-bg:#272822; }
+    :root {
+      --bg:#f8f8f8; --panel:#ffffff; --ink:#222; --muted:#666; --code-bg:#eaf2ff; --border:#e4e4e4; --btn-bg:#f5f5f5; --out-bg:#fafafa;
+    }
     * { box-sizing: border-box; }
     body {
-      font-family: "Fira Code", "Source Code Pro", Consolas, "Courier New", monospace;
+      font-family: "Fira Code", "Source Code Pro", Consolas, monospace;
       max-width: 900px; margin: 0 auto; padding: 24px; background: var(--bg); color: var(--ink);
     }
     h1 { text-align:center; margin: 0 0 16px; font-size: 1.6rem; font-family: "Inter", Arial, sans-serif; }
     .toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:center; margin: 8px 0 16px; }
     button {
-      padding: 10px 16px; font-size: 0.95rem; border: 1px solid #ccc; background: #f5f5f5; border-radius: 8px; cursor: pointer;
+      padding: 10px 16px; font-size: 0.95rem; border: 1px solid #ccc; background: var(--btn-bg); border-radius: 8px; cursor: pointer;
       font-family: "Inter", Arial, sans-serif;
     }
     button:active { transform: translateY(1px); }
-    .panel { background: var(--panel); border: 1px solid #e4e4e4; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
     .editor-wrap { overflow: hidden; }
-    pre.editor { margin:0; background: var(--code-bg); border-radius: 12px 12px 0 0; }
-    pre.editor code { display:block; min-height: 220px; outline: none; white-space: pre; font-family: "Fira Code", "Source Code Pro", monospace; }
+    pre.editor { margin:0; background: var(--code-bg); border-radius: 12px 12px 0 0; color:#003366; }
+    pre.editor code { display:block; min-height: 220px; outline: none; white-space: pre; font-family: "Fira Code", "Source Code Pro", monospace; color:#003366; }
     .hint { color: var(--muted); font-size: 0.9rem; text-align:center; margin: 8px 0 16px; font-family: "Inter", Arial, sans-serif; }
-    .output { padding: 16px; border-top: 1px solid #eee; max-height: 320px; overflow:auto; border-radius: 0 0 12px 12px; background:#fafafa; font-family: "Fira Code", "Source Code Pro", monospace; }
+    .output { padding: 16px; border-top: 1px solid #eee; max-height: 320px; overflow:auto; border-radius: 0 0 12px 12px; background:var(--out-bg); font-family: "Fira Code", "Source Code Pro", monospace; }
     .row { display:grid; gap:16px; grid-template-columns: 1fr; }
     @media (min-width: 860px) { .row { grid-template-columns: 1fr; } }
     .status { font-size: .9rem; color: var(--muted); text-align:center; margin-top:8px; font-family: "Inter", Arial, sans-serif; }
-      /* Light/Dark theme variables */
-    :root {
-      --bg:#f8f8f8; --panel:#ffffff; --ink:#222; --muted:#666; --code-bg:#272822; --border:#e4e4e4; --btn-bg:#f5f5f5; --out-bg:#fafafa;
-    }
-    [data-theme="dark"] {
-      --bg:#0e0f13; --panel:#14161b; --ink:#e6e8ef; --muted:#9aa3b2; --code-bg:#1e1f22; --border:#23262b; --btn-bg:#1a1c21; --out-bg:#0f1115;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme]), :root[data-theme="auto"] { 
-        --bg:#0e0f13; --panel:#14161b; --ink:#e6e8ef; --muted:#9aa3b2; --code-bg:#1e1f22; --border:#23262b; --btn-bg:#1a1c21; --out-bg:#0f1115;
-      }
-    }
   </style>
 </head>
 <body>
-  <h1>LISP Interpreter (with Highlighting)</h1>
+  <h1>LISP Interpreter (Offline)</h1>
   <div class="hint">Type code below and press <strong>Run</strong> or <kbd>Ctrl/⌘ + Enter</kbd>.</div>
 
   <div class="panel editor-wrap">
-    <pre class="editor"><code id="input" class="language-lisp" contenteditable="true">; Sample program
+    <pre class="editor"><code id="input" contenteditable="true">; Sample program
 (define square (lambda (x) (* x x)))
 (define fact
   (lambda (n)
@@ -65,10 +54,8 @@
 </code></pre>
     <div class="toolbar" role="group" aria-label="actions">
       <button id="runBtn" onclick="runLisp()">Run</button>
-      <button onclick="formatAndHighlight()">Re-highlight</button>
       <button onclick="resetProgram()">Reset</button>
       <button onclick="copyOutput()">Copy Output</button>
-      <button id="themeBtn" onclick="toggleTheme()" title="Toggle dark/light">🌗 Toggle Theme</button>
     </div>
     <div class="output" id="output" aria-live="polite"></div>
   </div>
@@ -82,7 +69,6 @@
     }
 
     function tokenize(str) {
-      // strip ; comments to EOL, then space parens
       str = str.replace(/;.*$/gm, '');
       return str.replace(/\(/g, ' ( ').replace(/\)/g, ' ) ').trim().split(/\s+/).filter(Boolean);
     }
@@ -94,33 +80,30 @@
         const L = [];
         while (tokens.length && tokens[0] !== ')') L.push(parse(tokens));
         if (!tokens.length) throw "Missing ')'";
-        tokens.shift(); // remove ')'
+        tokens.shift();
         return L;
       } else if (token === ')') {
         throw "Unexpected ')'";
       } else if (!isNaN(token)) {
         return Number(token);
       } else {
-        return token; // symbol
+        return token;
       }
     }
 
     function standardEnv() {
       const env = Object.create(null);
-      // arithmetic & comparisons with proper unary handling
       env['+'] = (...a) => a.reduce((x,y)=>x+y, 0);
       env['-'] = (...a) => a.length===1 ? -a[0] : a.slice(1).reduce((x,y)=>x-y, a[0]);
       env['*'] = (...a) => a.reduce((x,y)=>x*y, 1);
       env['/'] = (...a) => a.length===1 ? 1/a[0] : a.slice(1).reduce((x,y)=>x/y, a[0]);
-      env['>'] = (a,b)=>a>b;   env['<']=(a,b)=>a<b;   env['>=']=(a,b)=>a>=b;   env['<=']=(a,b)=>a<=b;   env['=']=(a,b)=>a===b;
-      // list ops
+      env['>'] = (a,b)=>a>b; env['<']=(a,b)=>a<b; env['>=']=(a,b)=>a>=b; env['<=']=(a,b)=>a<=b; env['=']=(a,b)=>a===b;
       env['list'] = (...xs)=> xs;
       env['car']  = (xs)=> xs[0];
       env['cdr']  = (xs)=> xs.slice(1);
       env['cons'] = (x, xs)=> [x, ...xs];
       env['length'] = (xs)=> xs.length;
       env['map'] = (f, xs)=> xs.map(v=> f(v));
-      // misc
       env['print'] = (x)=>{ appendOut(String(x)); return x; };
       env['pi'] = Math.PI; env['abs'] = Math.abs;
       return env;
@@ -132,9 +115,7 @@
         throw `Undefined symbol: ${x}`;
       }
       if (typeof x === 'number') return x;
-
       const [op, ...rest] = x;
-
       if (op === 'define') {
         const [name, exp] = rest;
         env[name] = evalLisp(exp, env);
@@ -173,7 +154,6 @@
         for (const form of body) val = evalLisp(form, local);
         return val;
       }
-
       const proc = evalLisp(op, env);
       const args = rest.map(a => evalLisp(a, env));
       return proc(...args);
@@ -200,86 +180,15 @@
       }
     }
 
-    function formatAndHighlight(){ Prism.highlightElement(document.getElementById('input')); }
-    function resetProgram(){
-      document.getElementById('output').textContent='';
-      setStatus('');
-      formatAndHighlight();
-    }
+    function resetProgram(){ document.getElementById('output').textContent=''; setStatus(''); }
     function copyOutput(){
       const out = document.getElementById('output').textContent;
       navigator.clipboard.writeText(out).then(()=> setStatus('Output copied')).catch(()=> setStatus('Copy failed'));
     }
 
-    // Keybinding: Ctrl/Cmd + Enter to Run
     document.addEventListener('keydown', (e)=>{
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault(); runLisp();
-      }
+      if ((e.ctrlKey||e.metaKey) && e.key==='Enter') { e.preventDefault(); runLisp(); }
     });
-
-    // Initial syntax highlight
-    window.addEventListener('load', ()=>{
-      formatAndHighlight();
-    });
-      function applyTheme(theme){
-      const root = document.documentElement;
-      const light = document.getElementById('prismLight');
-      const dark = document.getElementById('prismDark');
-      if (theme === 'dark') {
-        root.setAttribute('data-theme','dark');
-        if (light) light.disabled = true; if (dark) dark.disabled = false;
-      } else if (theme === 'light') {
-        root.setAttribute('data-theme','light');
-        if (light) light.disabled = false; if (dark) dark.disabled = true;
-      } else { // auto
-        root.setAttribute('data-theme','auto');
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (light) light.disabled = prefersDark; if (dark) dark.disabled = !prefersDark;
-      }
-      localStorage.setItem('theme', theme);
-      setStatus(`Theme: ${theme}`);
-    }
-
-    function toggleTheme(){
-      const current = localStorage.getItem('theme') || 'auto';
-      const next = current === 'light' ? 'dark' : current === 'dark' ? 'auto' : 'light';
-      applyTheme(next);
-      formatAndHighlight();
-    }
-
-    // React to system theme changes when in auto mode
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)=>{
-      const saved = localStorage.getItem('theme') || 'auto';
-      if (saved === 'auto') applyTheme('auto');
-    });
-
-    // Initial syntax highlight + theme init
-    window.addEventListener('load', ()=>{
-      const saved = localStorage.getItem('theme') || 'auto';
-      applyTheme(saved);
-      formatAndHighlight();
-    });
-  </script>
-  <script>
-    // Offline build: override highlighting with no-op and simplify theme handling
-    function formatAndHighlight(){ /* no-op (offline build, no Prism) */ }
-    (function(){
-      const origApply = window.applyTheme;
-      window.applyTheme = function(theme){
-        const root = document.documentElement;
-        if (theme === 'dark') root.setAttribute('data-theme','dark');
-        else if (theme === 'light') root.setAttribute('data-theme','light');
-        else root.setAttribute('data-theme','auto');
-        localStorage.setItem('theme', theme);
-        if (typeof setStatus === 'function') setStatus(`Theme: ${theme}`);
-      };
-      window.toggleTheme = function(){
-        const current = localStorage.getItem('theme') || 'auto';
-        const next = current === 'light' ? 'dark' : current === 'dark' ? 'auto' : 'light';
-        window.applyTheme(next);
-      };
-    })();
   </script>
 </body>
 </html>
