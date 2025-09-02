@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prolog Interpreter (Offline, No Dependencies)</title>
+  <style>
+    :root {
+      --bg:#f8f8f8; --panel:#ffffff; --ink:#222; --muted:#666; --border:#e4e4e4; --btn-bg:#f5f5f5; --code-bg:#0b2a4a0f; --code-ink:#0b3a7a;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: "Fira Code", "Source Code Pro", Consolas, monospace; background:var(--bg); color:var(--ink); margin:0; }
+    main { max-width: 1000px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 12px; text-align:center; font-family: Inter, Arial, sans-serif; }
+    .grid { display:grid; grid-template-columns: 1fr; gap:16px; }
+    @media (min-width: 980px){ .grid { grid-template-columns: 1fr 1fr; } }
+    .card { background: var(--panel); border:1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.05); overflow:hidden; }
+    .card h2 { margin:0; padding: 10px 14px; border-bottom:1px solid var(--border); font-family: Inter, Arial, sans-serif; font-size:1rem; background:#fafafa; }
+    .editor { padding: 0; }
+    textarea { width:100%; min-height: 260px; border:0; outline: none; resize: vertical; padding: 12px 14px; background: var(--code-bg); color: var(--code-ink); font-family: "Fira Code", "Source Code Pro", Consolas, monospace; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; padding: 12px; border-top:1px solid var(--border); background:#fafafa; }
+    button { padding: 10px 14px; font-size:.95rem; border:1px solid var(--border); border-radius:8px; background: var(--btn-bg); cursor: pointer; }
+    .output { padding: 12px; min-height: 180px; white-space: pre-wrap; font-family: "Fira Code", "Source Code Pro", Consolas, monospace; }
+    .muted { color: var(--muted); font-size:.9rem; text-align:center; margin-top:4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Prolog Interpreter (Offline)</h1>
+    <div class="grid">
+      <section class="card editor">
+        <h2>Program</h2>
+        <textarea id="program">% Sample knowledge base
+parent(john, mary).
+parent(mary, susan).
+parent(susan, alice).
+
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+% Lists demo (built-ins also provided):
+likes(alice, [apples, bananas]).
+        </textarea>
+        <div class="controls">
+          <button onclick="loadExample('family')">Family Example</button>
+          <button onclick="loadExample('list')">List Example</button>
+          <span class="muted">End each clause with a dot (.)</span>
+        </div>
+      </section>
+
+      <section class="card editor">
+        <h2>Query</h2>
+        <textarea id="query">% Example queries (one at a time)
+?- ancestor(john, Who).
+?- member(X, [a,b,c]).
+        </textarea>
+        <div class="controls">
+          <button onclick="runQuery()">Run</button>
+          <button onclick="nextSolution()">Next Solution</button>
+          <button onclick="resetOutput()">Reset</button>
+          <button onclick="copyOutput()">Copy Output</button>
+        </div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1;">
+        <h2>Output</h2>
+        <div id="output" class="output"></div>
+        <div class="muted" id="status"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    // ===== Utilities =====
+    const statusEl = ()=> document.getElementById('status');
+    const outEl = ()=> document.getElementById('output');
+    function setStatus(msg){ statusEl().textContent = msg||''; }
+    function printLine(s){ outEl().textContent += (outEl().textContent?"\n":"") + s; }
+    function resetOutput(){ outEl().textContent = ''; setStatus(''); solutions=[]; solIndex=0; }
+    function copyOutput(){ navigator.clipboard.writeText(outEl().textContent).then(()=>setStatus('Output copied')).catch(()=>setStatus('Copy failed')); }
+
+    // ===== Tokenizer =====
+    function tokenize(src){
+      // Remove % line comments
+      src = src.replace(/%.*$/gm,'');
+      // Normalize ?- queries by removing prefix if present (we keep query separate anyway)
+      // Split into tokens
+      const tokens=[]; let i=0;
+      while(i < src.length){
+        const c = src[i];
+        if (/\s/.test(c)) { i++; continue; }
+        if (c===':' && src[i+1]==='-'){ tokens.push(":-"); i+=2; continue; }
+        if (c==='?' && src[i+1]==='-'){ tokens.push('?-'); i+=2; continue; }
+        if (",.()[]|".includes(c)) { tokens.push(c); i++; continue; }
+        if (c==='\' && src[i+1]==='+'){ tokens.push('not_op'); i+=2; continue; }
+        if (c==='\' && src[i+1]==='\' && src[i+2]==='+'){ tokens.push('not_op'); i+=3; continue; }
+        if (c==='\' && src[i+1]===''''){ // ignore, not_op variant won't appear normally
+          i++; continue;
+        }
+        if (c==='\''){
+          // quoted atom 'like this'
+          i++; let s=''; while(i<src.length && src[i]!=="'"){ s += src[i++]; }
+          i++; tokens.push({type:'atom', value:s}); continue;
+        }
+        if (/[0-9]/.test(c)){
+          let s=''; while(i<src.length && /[0-9]/.test(src[i])) s+=src[i++];
+          tokens.push({type:'num', value:parseInt(s,10)}); continue;
+        }
+        if (/[A-Z_]/.test(c)){
+          let s=''; while(i<src.length && /[A-Za-z0-9_]/.test(src[i])) s+=src[i++];
+          tokens.push({type:'var', value:s}); continue;
+        }
+        if (/[a-z]/.test(c)){
+          let s=''; while(i<src.length && /[A-Za-z0-9_]/.test(src[i])) s+=src[i++];
+          tokens.push({type:'atom', value:s}); continue;
+        }
+        // fallback single char token
+        tokens.push(c); i++;
+      }
+      return tokens;
+    }
+
+    // ===== AST Terms =====
+    function Var(name, id){ return {type:'var', name, id}; }
+    function Atom(name){ return {type:'atom', name}; }
+    function Num(n){ return {type:'num', value:n}; }
+    function Comp(functor, args){ return {type:'comp', functor, args}; }
+
+    // ===== Parser =====
+    function parseProgram(text){
+      const tokens = tokenize(text);
+      let pos=0; const next=()=>tokens[pos++]; const peek=()=>tokens[pos]; const has=()=>pos<tokens.length;
+      const clauses=[];
+      while(has()){
+        skipDots(); if(!has()) break;
+        const clause = parseClause();
+        expect('.');
+        clauses.push(clause);
+      }
+      return clauses;
+
+      function skipDots(){ while(has() && peek()==='.') pos++; }
+      function expect(tok){ const t=next(); if(!eqTok(t,tok)) throw `Expected ${tok} but found ${tokStr(t)}`; }
+      function eqTok(t, s){ return (typeof t==='string' && t===s); }
+      function tokStr(t){ return typeof t==='string'? t : JSON.stringify(t); }
+
+      function parseClause(){
+        const vmap = new Map();
+        const head = parseTerm(vmap);
+        if (peek()===':-'){ next(); // consume
+          const body = parseGoals(vmap);
+          return {head, body};
+        } else {
+          return {head, body:[]};
+        }
+      }
+
+      function parseGoals(vmap){
+        const goals=[parseTerm(vmap)];
+        while(peek()===','){ next(); goals.push(parseTerm(vmap)); }
+        return goals;
+      }
+
+      function parseTerm(vmap){
+        const t = next();
+        if (!t) throw 'Unexpected EOF while parsing term';
+        if (t==='(') { const inner = parseTerm(vmap); expect(')'); return inner; }
+        if (t==='[') { return parseList(vmap); }
+        if (isTok(t,'num')) return Num(t.value);
+        if (isTok(t,'var')) return getVar(vmap, t.value);
+        if (isTok(t,'atom')){
+          const name = t.value;
+          if (peek()==='('){
+            next(); // '('
+            const args = [];
+            if (peek()!==')'){
+              args.push(parseTerm(vmap));
+              while(peek()===','){ next(); args.push(parseTerm(vmap)); }
+            }
+            expect(')');
+            return Comp(name, args);
+          } else {
+            return Atom(name);
+          }
+        }
+        throw `Unexpected token in term: ${tokStr(t)}`;
+      }
+
+      function parseList(vmap){
+        if (peek()===']'){ next(); return Atom('[]'); }
+        const first = parseTerm(vmap);
+        if (peek()==='|'){
+          next(); const tail = parseTerm(vmap); expect(']');
+          return Comp('.', [first, tail]);
+        }
+        const items=[first];
+        while(peek()===','){ next(); items.push(parseTerm(vmap)); }
+        expect(']');
+        // build cons chain
+        let list = Atom('[]');
+        for (let i=items.length-1;i>=0;i--) list = Comp('.', [items[i], list]);
+        return list;
+      }
+
+      function getVar(vmap, name){
+        if (!vmap.has(name)) vmap.set(name, Var(name, freshVarId()));
+        return vmap.get(name);
+      }
+
+      function isTok(t, type){ return typeof t==='object' && t.type===type; }
+    }
+
+    function parseQuery(text){
+      // accept optional ?- prefix; only parse first query in the box
+      const m = text.match(/\?-[\s\S]*?\./);
+      const qtext = m ? m[0].replace(/^\?-\s*/, '') : text;
+      const clauses = parseProgram(qtext); // reuse parser for a body ending with '.'
+      if (!clauses.length) throw 'Empty query';
+      if (clauses.length>1) setStatus('Parsed first query only.');
+      const goals = clauses[0].head && clauses[0].body.length===0 ? [clauses[0].head] : clauses[0].body.length? clauses[0].body : [clauses[0].head];
+      // collect variables used in goals
+      const vset = new Map();
+      function collect(t){
+        t = t; if (!t) return;
+        if (t.type==='var'){ vset.set(t.name, t); }
+        else if (t.type==='comp'){ t.args.forEach(collect); }
+      }
+      goals.forEach(collect);
+      return {goals, qvars:[...vset.entries()]};
+    }
+
+    // ===== Fresh variables =====
+    let __varCounter = 0; function freshVarId(){ return ++__varCounter; }
+
+    // ===== Substitutions and Unification =====
+    function deref(t, subst){
+      while (t && t.type==='var' && subst.has(t.id)) t = subst.get(t.id);
+      return t;
+    }
+    function occurs(id, t, subst){ t = deref(t, subst); if (t.type==='var') return t.id===id; if (t.type==='comp') return t.args.some(a=>occurs(id,a,subst)); return false; }
+    function unify(a, b, subst){
+      a = deref(a, subst); b = deref(b, subst);
+      if (a.type==='var') return bindVar(a, b, subst);
+      if (b.type==='var') return bindVar(b, a, subst);
+      if (a.type!==b.type) return null;
+      if (a.type==='atom') return (a.name===b.name)? subst : null;
+      if (a.type==='num') return (a.value===b.value)? subst : null;
+      if (a.type==='comp'){
+        if (a.functor!==b.functor || a.args.length!==b.args.length) return null;
+        for (let i=0;i<a.args.length;i++){
+          subst = unify(a.args[i], b.args[i], subst);
+          if (!subst) return null;
+        }
+        return subst;
+      }
+      return null;
+    }
+    function bindVar(v, t, subst){
+      t = deref(t, subst);
+      if (t.type==='var' && t.id===v.id) return subst;
+      if (occurs(v.id, t, subst)) return null; // occurs-check
+      const s2 = new Map(subst); s2.set(v.id, t); return s2;
+    }
+
+    // ===== Freshen (rename variables in a clause) =====
+    function freshen(term, vmap=new Map()){
+      if (term.type==='var'){
+        if (!vmap.has(term.id)) vmap.set(term.id, Var(term.name, freshVarId()));
+        return vmap.get(term.id);
+      }
+      if (term.type==='atom' || term.type==='num') return term;
+      if (term.type==='comp') return Comp(term.functor, term.args.map(a=>freshen(a, vmap)));
+    }
+
+    function freshenClause(cl){
+      const m=new Map();
+      return { head: freshen(cl.head, m), body: cl.body.map(g=>freshen(g, m)) };
+    }
+
+    // ===== Built-ins =====
+    function isBuiltin(goal){ return goal.type==='atom' || (goal.type==='comp' && (goal.functor==='=' || goal.functor==='true' || goal.functor==='fail' || goal.functor==='not')); }
+
+    function proveBuiltin(goal, restGoals, subst){
+      // returns array of {goals, subst} branches
+      const branches=[];
+      if (goal.type==='atom'){
+        if (goal.name==='true'){ branches.push({goals: restGoals, subst}); }
+        else if (goal.name==='fail'){ /* no branches */ }
+        else { /* not a builtin atom */ }
+        return branches;
+      }
+      if (goal.functor==='='){
+        if (goal.args.length!==2) return branches;
+        const s2 = unify(goal.args[0], goal.args[1], subst);
+        if (s2) branches.push({goals: restGoals, subst: s2});
+        return branches;
+      }
+      if (goal.functor==='not'){
+        // negation as failure: succeed if subgoal fails
+        const g = goal.args[0];
+        const res = proveAll([g], subst, 1); // try to find at most 1 solution
+        if (res.length===0) branches.push({goals: restGoals, subst});
+        return branches;
+      }
+      return branches;
+    }
+
+    // ===== Prover (DFS, collect all up to a cap) =====
+    const SOL_CAP = 200; // safety cap
+    function proveAll(goals, subst, cap=SOL_CAP){
+      const results=[];
+      function dfs(goals, subst){
+        if (results.length>=cap) return;
+        if (goals.length===0){ results.push(subst); return; }
+        const [g0, ...rest] = goals;
+        // Builtins
+        if (isBuiltin(g0)){
+          const branches = proveBuiltin(g0, rest, subst);
+          for (const br of branches) dfs(br.goals, br.subst);
+          return;
+        }
+        // user-defined clauses
+        const name = (g0.type==='comp')? g0.functor : g0.name;
+        const arity = (g0.type==='comp')? g0.args.length : 0;
+        for (const cl of DB){
+          const h = cl.head;
+          if (h.type==='comp' && h.functor===name && h.args.length===arity){
+            const fresh = freshenClause(cl);
+            const s2 = unify(g0, fresh.head, subst);
+            if (s2){ dfs([...fresh.body, ...rest], s2); }
+          }
+        }
+      }
+      dfs(goals, subst);
+      return results;
+    }
+
+    // ===== Pretty printing =====
+    function termToString(t, subst){
+      t = deref(t, subst);
+      switch(t.type){
+        case 'var': return t.name || ('_' + t.id);
+        case 'atom': return t.name;
+        case 'num': return String(t.value);
+        case 'comp':
+          if (t.functor==='.' && t.args.length===2) return listToString(t, subst);
+          return t.functor + '(' + t.args.map(a=>termToString(a, subst)).join(', ') + ')';
+      }
+    }
+    function listToString(t, subst){
+      const items=[]; let cur=t;
+      while (cur.type==='comp' && cur.functor==='.' && cur.args.length===2){
+        items.push(termToString(cur.args[0], subst));
+        cur = deref(cur.args[1], subst);
+      }
+      if (cur.type==='atom' && cur.name==='[]') return '['+items.join(', ')+']';
+      return '['+items.join(', ')+' | '+termToString(cur, subst)+']';
+    }
+
+    // ===== Prelude (library rules) =====
+    const PRELUDE_SRC = `
+% member/2
+member(X, [X|_]).
+member(X, [_|T]) :- member(X, T).
+
+% append/3
+append([], L, L).
+append([H|T], L2, [H|R]) :- append(T, L2, R).
+
+% true/0 and fail/0 provided as built-ins. negation: not/1 (negation as failure)
+`;
+
+    // ===== Global DB and solutions =====
+    let DB = [];
+    let solutions = [];
+    let solIndex = 0;
+    let queryVars = [];
+
+    function buildDB(){
+      const programText = document.getElementById('program').value;
+      DB = [...parseProgram(PRELUDE_SRC), ...parseProgram(programText)];
+    }
+
+    function runQuery(){
+      try {
+        resetOutput();
+        buildDB();
+        const {goals, qvars} = parseQuery(document.getElementById('query').value);
+        queryVars = qvars; // array of [name, Var]
+        solutions = proveAll(goals, new Map());
+        solIndex = 0;
+        if (solutions.length===0){ printLine('false.'); setStatus('No solutions'); return; }
+        printSolution(0);
+        setStatus(`${solutions.length} solution(s) found. Use Next Solution.`);
+      } catch (e){ printLine('❌ Error: '+e); setStatus('Error'); }
+    }
+
+    function nextSolution(){
+      if (!solutions.length){ setStatus('No solutions'); return; }
+      solIndex = (solIndex + 1) % solutions.length;
+      printSolution(solIndex);
+    }
+
+    function printSolution(idx){
+      const subst = solutions[idx];
+      if (queryVars.length===0){ printLine('true.'); return; }
+      const parts = queryVars.map(([name, v])=> name + ' = ' + termToString(v, subst));
+      printLine(parts.join(', ') + '.');
+    }
+
+    // Examples loader
+    function loadExample(which){
+      if (which==='family'){
+        document.getElementById('program').value = `parent(john, mary).
+parent(mary, susan).
+parent(susan, alice).
+ancestor(X,Y) :- parent(X,Y).
+ancestor(X,Y) :- parent(X,Z), ancestor(Z,Y).
+`;
+        document.getElementById('query').value = `?- ancestor(john, Who).`;
+      } else if (which==='list'){
+        document.getElementById('program').value = `likes(alice, [apples, bananas]).`;
+        document.getElementById('query').value = `?- member(X, [a,b,c]).\n?- append([1,2],[3,4], R).`;
+      }
+      resetOutput();
+    }
+
+    // Keybinding: Ctrl/Cmd+Enter to Run
+    document.addEventListener('keydown', (e)=>{ if ((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); runQuery(); } });
+  </script>
+</body>
+</html>
