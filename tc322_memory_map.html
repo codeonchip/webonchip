@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TC33x / TC32x Memory Map Visualizer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #fafafa; color: #222; }
+    h1 { font-size: 20px; margin-bottom: 10px; }
+    .section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; border-radius: 8px; background: #fff; }
+    .bar { display: flex; height: 20px; margin: 6px 0; }
+    .block { flex: 1; border: 1px dashed #666; background: #ddd; }
+    .reserved { background: #999; }
+    .legend { font-size: 12px; margin-top: 8px; }
+    select { margin-left: 10px; }
+    .info { font-size: 12px; color: #555; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>TC33x / TC32x Memory Map Visualizer</h1>
+
+  <!-- PFlash -->
+  <div class="section">
+    <h2>PFlash (Program Flash)</h2>
+    <label>Variant:
+      <select id="pflashSelect">
+        <option value="2MB">2 MB</option>
+        <option value="1_5MB">1.5 MB</option>
+        <option value="1MB">1 MB</option>
+      </select>
+    </label>
+    <div id="pflashBar" class="bar"></div>
+    <div class="legend">Gray = Available, Dark Gray = Reserved</div>
+    <div id="pflashInfo" class="info"></div>
+  </div>
+
+  <!-- DFlash -->
+  <div class="section">
+    <h2>DFlash (EEPROM Emulation)</h2>
+    <label>Variant:
+      <select id="dflashSelect">
+        <option value="128KB">128 KB</option>
+        <option value="96KB">96 KB</option>
+      </select>
+    </label>
+    <div id="dflashBar" class="bar"></div>
+    <div class="legend">Gray = Available, Dark Gray = Reserved</div>
+    <div id="dflashInfo" class="info"></div>
+  </div>
+
+  <script>
+    // --------- Configs ----------
+    const PFLASH = {
+      "2MB": { total: 128, reserved: 0 },
+      "1_5MB": { total: 96, reserved: 32 },
+      "1MB": { total: 64, reserved: 64 }
+    };
+
+    const DFLASH = {
+      "128KB": { total: 32, reserved: 0 },
+      "96KB": { total: 24, reserved: 8 }
+    };
+
+    // --------- Helpers ----------
+    function renderBar(container, total, reserved) {
+      container.innerHTML = "";
+      for (let i = 0; i < total + reserved; i++) {
+        const div = document.createElement("div");
+        div.className = "block" + (i >= total ? " reserved" : "");
+        container.appendChild(div);
+      }
+    }
+
+    function updatePFlash() {
+      const variant = document.getElementById("pflashSelect").value;
+      const cfg = PFLASH[variant];
+      renderBar(document.getElementById("pflashBar"), cfg.total, cfg.reserved);
+      document.getElementById("pflashInfo").innerText =
+        `Sectors: ${cfg.total} available / ${cfg.total + cfg.reserved} total`;
+    }
+
+    function updateDFlash() {
+      const variant = document.getElementById("dflashSelect").value;
+      const cfg = DFLASH[variant];
+      renderBar(document.getElementById("dflashBar"), cfg.total, cfg.reserved);
+      document.getElementById("dflashInfo").innerText =
+        `Sectors: ${cfg.total} available / ${cfg.total + cfg.reserved} total`;
+    }
+
+    // --------- Init ----------
+    document.getElementById("pflashSelect").addEventListener("change", updatePFlash);
+    document.getElementById("dflashSelect").addEventListener("change", updateDFlash);
+    updatePFlash();
+    updateDFlash();
+  </script>
+</body>
+</html>
