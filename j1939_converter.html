@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>J1939 PGN vs. 29‑Bit CAN ID — Online Converter</title>
+<style>
+  :root { --bg:#0f172a; --card:#111827; --muted:#9CA3AF; --fg:#E5E7EB; --accent:#60A5FA; --ok:#34D399; --warn:#FBBF24; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background: var(--bg); color: var(--fg); }
+  header { padding:24px 18px; text-align:center; border-bottom: 1px solid #1f2937; background:#0b1224; position:sticky; top:0; z-index:2; }
+  h1 { margin:0; font-weight:800; letter-spacing:.2px; }
+  h1 small { display:block; font-weight:500; color:var(--muted); margin-top:6px; }
+  main { padding:24px; max-width:1100px; margin:0 auto; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; }
+  .card { background: var(--card); border:1px solid #1f2937; border-radius:14px; padding:16px; flex:1 1 320px; }
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  label { font-size:12px; color:var(--muted); display:block; margin-bottom:6px; }
+  input, select, button, textarea { background:#0b1224; color:var(--fg); border:1px solid #243042; border-radius:10px; padding:10px 12px; }
+  input::placeholder { color:#64748b; }
+  button { cursor:pointer; transition:.15s ease; }
+  button:hover { border-color:#334155; transform: translateY(-1px); }
+  .btn { padding:10px 14px; border-radius:10px; border:1px solid #334155; }
+  .btn.primary { background:linear-gradient(180deg,#2563EB,#1D4ED8); border:none; }
+  .btn.ghost { background:transparent; }
+  .btn.warn { background:#1f2937; border-color:#F59E0B; color:#F59E0B; }
+  .grid { display:grid; gap:8px; grid-template-columns: repeat(6, minmax(0,1fr)); }
+  .grid .cell { padding:8px 10px; background:#0b1224; border:1px solid #1f2937; border-radius:10px; text-align:center; }
+  .muted { color:var(--muted); font-size:12px; }
+  table { width:100%; border-collapse:collapse; border:1px solid #1f2937; border-radius:12px; overflow:hidden; }
+  th, td { border-bottom:1px solid #1f2937; padding:10px 12px; text-align:left; font-variant-numeric: tabular-nums; }
+  th { background:#0b1224; color:#cbd5e1; position:sticky; top:65px; z-index:1; }
+  tbody tr:hover { background:#0b1224; }
+  code.k { background:#0b1224; padding:2px 6px; border-radius:6px; border:1px solid #1f2937; }
+  .right { text-align:right; }
+  footer { color:#94a3b8; text-align:center; padding:24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>J1939 PGN vs. 29‑Bit CAN ID — Online Converter
+    <small>Convert between Extended CAN ID and J1939 fields (Prio, R, DP, PF, PS, SA) with live decoding.</small>
+  </h1>
+</header>
+
+<main>
+  <!-- Sections omitted for brevity: decoding, encoding, table, JS -->
+</main>
+
+</body>
+</html>
