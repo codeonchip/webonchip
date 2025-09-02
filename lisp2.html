@@ -4,29 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LISP Interpreter with Syntax Highlighting</title>
-  <link href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism.css" rel="stylesheet" />
   <style>
     :root { --bg:#f8f8f8; --panel:#ffffff; --ink:#222; --muted:#666; --code-bg:#272822; }
     * { box-sizing: border-box; }
     body {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: "Fira Code", "Source Code Pro", Consolas, "Courier New", monospace;
       max-width: 900px; margin: 0 auto; padding: 24px; background: var(--bg); color: var(--ink);
     }
-    h1 { text-align:center; margin: 0 0 16px; font-size: 1.6rem; }
+    h1 { text-align:center; margin: 0 0 16px; font-size: 1.6rem; font-family: "Inter", Arial, sans-serif; }
     .toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:center; margin: 8px 0 16px; }
     button {
       padding: 10px 16px; font-size: 0.95rem; border: 1px solid #ccc; background: #f5f5f5; border-radius: 8px; cursor: pointer;
+      font-family: "Inter", Arial, sans-serif;
     }
     button:active { transform: translateY(1px); }
     .panel { background: var(--panel); border: 1px solid #e4e4e4; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
     .editor-wrap { overflow: hidden; }
     pre.editor { margin:0; background: var(--code-bg); border-radius: 12px 12px 0 0; }
-    pre.editor code { display:block; min-height: 220px; outline: none; white-space: pre; }
-    .hint { color: var(--muted); font-size: 0.9rem; text-align:center; margin: 8px 0 16px; }
-    .output { padding: 16px; border-top: 1px solid #eee; max-height: 320px; overflow:auto; border-radius: 0 0 12px 12px; background:#fafafa; }
+    pre.editor code { display:block; min-height: 220px; outline: none; white-space: pre; font-family: "Fira Code", "Source Code Pro", monospace; }
+    .hint { color: var(--muted); font-size: 0.9rem; text-align:center; margin: 8px 0 16px; font-family: "Inter", Arial, sans-serif; }
+    .output { padding: 16px; border-top: 1px solid #eee; max-height: 320px; overflow:auto; border-radius: 0 0 12px 12px; background:#fafafa; font-family: "Fira Code", "Source Code Pro", monospace; }
     .row { display:grid; gap:16px; grid-template-columns: 1fr; }
     @media (min-width: 860px) { .row { grid-template-columns: 1fr; } }
-    .status { font-size: .9rem; color: var(--muted); text-align:center; margin-top:8px; }
+    .status { font-size: .9rem; color: var(--muted); text-align:center; margin-top:8px; font-family: "Inter", Arial, sans-serif; }
+      /* Light/Dark theme variables */
+    :root {
+      --bg:#f8f8f8; --panel:#ffffff; --ink:#222; --muted:#666; --code-bg:#272822; --border:#e4e4e4; --btn-bg:#f5f5f5; --out-bg:#fafafa;
+    }
+    [data-theme="dark"] {
+      --bg:#0e0f13; --panel:#14161b; --ink:#e6e8ef; --muted:#9aa3b2; --code-bg:#1e1f22; --border:#23262b; --btn-bg:#1a1c21; --out-bg:#0f1115;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme]), :root[data-theme="auto"] { 
+        --bg:#0e0f13; --panel:#14161b; --ink:#e6e8ef; --muted:#9aa3b2; --code-bg:#1e1f22; --border:#23262b; --btn-bg:#1a1c21; --out-bg:#0f1115;
+      }
+    }
   </style>
 </head>
 <body>
@@ -38,7 +51,7 @@
 (define square (lambda (x) (* x x)))
 (define fact
   (lambda (n)
-    (if (&lt;= n 1)
+    (if (<= n 1)
         1
         (* n (fact (- n 1))))))
 
@@ -55,15 +68,11 @@
       <button onclick="formatAndHighlight()">Re-highlight</button>
       <button onclick="resetProgram()">Reset</button>
       <button onclick="copyOutput()">Copy Output</button>
+      <button id="themeBtn" onclick="toggleTheme()" title="Toggle dark/light">🌗 Toggle Theme</button>
     </div>
     <div class="output" id="output" aria-live="polite"></div>
   </div>
   <div class="status" id="status"></div>
-
-  <!-- Prism.js -->
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-core.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-clike.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-lisp.min.js"></script>
 
   <script>
     function setStatus(msg){ document.getElementById('status').textContent = msg || ''; }
@@ -213,6 +222,64 @@
     window.addEventListener('load', ()=>{
       formatAndHighlight();
     });
+      function applyTheme(theme){
+      const root = document.documentElement;
+      const light = document.getElementById('prismLight');
+      const dark = document.getElementById('prismDark');
+      if (theme === 'dark') {
+        root.setAttribute('data-theme','dark');
+        if (light) light.disabled = true; if (dark) dark.disabled = false;
+      } else if (theme === 'light') {
+        root.setAttribute('data-theme','light');
+        if (light) light.disabled = false; if (dark) dark.disabled = true;
+      } else { // auto
+        root.setAttribute('data-theme','auto');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (light) light.disabled = prefersDark; if (dark) dark.disabled = !prefersDark;
+      }
+      localStorage.setItem('theme', theme);
+      setStatus(`Theme: ${theme}`);
+    }
+
+    function toggleTheme(){
+      const current = localStorage.getItem('theme') || 'auto';
+      const next = current === 'light' ? 'dark' : current === 'dark' ? 'auto' : 'light';
+      applyTheme(next);
+      formatAndHighlight();
+    }
+
+    // React to system theme changes when in auto mode
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)=>{
+      const saved = localStorage.getItem('theme') || 'auto';
+      if (saved === 'auto') applyTheme('auto');
+    });
+
+    // Initial syntax highlight + theme init
+    window.addEventListener('load', ()=>{
+      const saved = localStorage.getItem('theme') || 'auto';
+      applyTheme(saved);
+      formatAndHighlight();
+    });
+  </script>
+  <script>
+    // Offline build: override highlighting with no-op and simplify theme handling
+    function formatAndHighlight(){ /* no-op (offline build, no Prism) */ }
+    (function(){
+      const origApply = window.applyTheme;
+      window.applyTheme = function(theme){
+        const root = document.documentElement;
+        if (theme === 'dark') root.setAttribute('data-theme','dark');
+        else if (theme === 'light') root.setAttribute('data-theme','light');
+        else root.setAttribute('data-theme','auto');
+        localStorage.setItem('theme', theme);
+        if (typeof setStatus === 'function') setStatus(`Theme: ${theme}`);
+      };
+      window.toggleTheme = function(){
+        const current = localStorage.getItem('theme') || 'auto';
+        const next = current === 'light' ? 'dark' : current === 'dark' ? 'auto' : 'light';
+        window.applyTheme(next);
+      };
+    })();
   </script>
 </body>
 </html>
