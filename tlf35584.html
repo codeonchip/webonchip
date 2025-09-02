@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TLF35584 PMIC Simulator (Educational)</title>
+  <style>
+    :root{
+      --bg:#0f1220; --panel:#171b2e; --ink:#e6e9f4; --muted:#a9b0c6; --accent:#6ee7ff; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --chip:#22263d;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    h1{font-size:20px;margin:0 0 8px 0}
+    h2{font-size:16px;margin:14px 0 8px}
+    .app{display:grid;grid-template-columns:320px 1fr;gap:14px;padding:16px;min-height:100%}
+    .panel{background:var(--panel);border:1px solid #2a2f4a;border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+    .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+    .row > label{min-width:110px;color:var(--muted)}
+    .chip{background:var(--chip);border-radius:16px;padding:10px 12px;margin:6px 0}
+    .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-weight:600}
+    .pill.ok{background:#13321d;color:#a3f3b9;border:1px solid #1e7f3b}
+    .pill.warn{background:#33290f;color:#ffd598;border:1px solid #8b6500}
+    .pill.err{background:#3b1517;color:#ffb1b6;border:1px solid #a11722}
+    input[type="range"]{width:100%}
+    input[type="number"]{width:100px;background:#0e1121;color:var(--ink);border:1px solid #333a5d;border-radius:8px;padding:6px}
+    input[type="text"], textarea{width:100%;background:#0e1121;color:var(--ink);border:1px solid #333a5d;border-radius:8px;padding:8px}
+    textarea{min-height:120px;resize:vertical}
+    button{background:#1b2140;color:var(--ink);border:1px solid #394371;border-radius:10px;padding:8px 10px;cursor:pointer}
+    button:hover{filter:brightness(1.1)}
+    button:active{transform:translateY(1px)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .kv{display:flex;justify-content:space-between;gap:10px}
+    .kv .k{color:var(--muted)}
+    .meter{height:14px;background:#0b0e1c;border:1px solid #2b3154;border-radius:999px;overflow:hidden}
+    .meter > i{display:block;height:100%;background:linear-gradient(90deg,#4aa3ff,#2afadb);width:0%}
+    .pins{display:flex;gap:8px;flex-wrap:wrap}
+    .pin{min-width:70px;border:1px solid #38406b;border-radius:10px;padding:6px 8px}
+    .pin .name{color:var(--muted);font-size:12px}
+    .pin .val{font-weight:700}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #2a2f4a;padding:6px 8px;text-align:left}
+    th{color:#cdd5f2}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .log{height:180px;overflow:auto;background:#0e1121;border:1px solid #333a5d;border-radius:8px;padding:8px;font-family:ui-monospace,Consolas,monospace}
+    .spark{height:36px;width:100%;display:block;border:1px solid #2b3154;border-radius:8px;background:#0b0e1c}
+    .foot{opacity:.8;font-size:12px;margin-top:8px}
+    .badge{font-size:12px;padding:3px 7px;border-radius:999px;border:1px solid #394371;background:#121735}
+    .muted{color:var(--muted)}
+    .hint{font-size:12px;color:#8aa1e6;margin-top:4px}
+    .danger{border-color:#7a2530}
+    .success{border-color:#1e7f3b}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+    .divider{height:1px;background:#2a2f4a;margin:10px 0}
+    .small{font-size:12px}
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- LEFT: Controls -->
+  <aside class="panel" id="controls">
+    <h1>TLF35584 PMIC Simulator</h1>
+    <div class="row"><span class="badge">Educational • Not a precise electrical model</span></div>
+
+    <h2>Power Input</h2>
+    <div class="row"><label>VBAT (V)</label><input id="vbatSlider" type="range" min="0" max="16" step="0.1" value="12"><span id="vbatVal" class="mono">12.0 V</span></div>
+    <div class="toolbar">
+      <button id="btnCrank">Crank Droop (9→5.5 V, 400 ms)</button>
+      <button id="btnRipple">Toggle Ripple</button>
+      <button id="btnBrownout">Brownout (to 4.8 V, 250 ms)</button>
+    </div>
+
+    <h2>Enables & Modes</h2>
+    <div class="grid3">
+      <label class="row"><input type="checkbox" id="enPre" checked> Pre-Reg 5V</label>
+      <label class="row"><input type="checkbox" id="en33" checked> LDO 3.3V</label>
+      <label class="row"><input type="checkbox" id="en125" checked> LDO 1.25V</label>
+    </div>
+    <div class="grid3">
+      <label class="row"><input type="checkbox" id="enWdog"> Watchdog</label>
+      <label class="row"><input type="checkbox" id="autoKick"> MCU Auto-Kick</label>
+      <label class="row"><input type="checkbox" id="standby"> Standby</label>
+    </div>
+    <div class="row">
+      <label>WD Window (ms)</label>
+      <input id="wdMin" type="number" value="80"> – <input id="wdMax" type="number" value="200">
+    </div>
+    <div class="toolbar">
+      <button id="btnKick">Kick Watchdog</button>
+      <button id="btnWDEarly">Kick Early (fault)</button>
+      <button id="btnWDLate">Kick Late (fault)</button>
+    </div>
+
+    <h2>Fault Injection</h2>
+    <div class="grid3">
+      <label class="row"><input type="checkbox" id="injOvTemp"> Over-Temp</label>
+      <label class="row"><input type="checkbox" id="injClkFail"> Clock Fail</label>
+      <label class="row"><input type="checkbox" id="injSpiCrc"> SPI CRC Err</label>
+    </div>
+    <div class="row"><label>UV Thresh 5V</label><input id="uv5" type="range" min="4.5" max="5.0" step="0.01" value="4.75"><span id="uv5Val" class="mono">4.75 V</span></div>
+    <div class="row"><label>UV Thresh 3V3</label><input id="uv33" type="range" min="3.0" max="3.3" step="0.01" value="3.05"><span id="uv33Val" class="mono">3.05 V</span></div>
+    <div class="row"><label>UV Thresh 1V25</label><input id="uv125" type="range" min="1.10" max="1.25" step="0.005" value="1.15"><span id="uv125Val" class="mono">1.15 V</span></div>
+
+    <h2>SPI (Simplified)</h2>
+    <div class="hint">Use commands like <span class="mono">wr 0x01 0x001B</span> or <span class="mono">rd 0x10</span>. Multiple lines allowed.</div>
+    <textarea id="spiCmd" placeholder="wr 0x01 0x001B\nrd 0x10"></textarea>
+    <div class="toolbar">
+      <button id="btnSpiSend">Send</button>
+      <button id="btnSpiDemo">Demo: Enable rails + WD</button>
+      <button id="btnClearFaults">Clear Faults</button>
+    </div>
+
+    <div class="divider"></div>
+    <div class="toolbar">
+      <button id="btnReset">Soft Reset</button>
+      <button id="btnDefaults">Factory Defaults</button>
+      <button id="btnExport">Export JSON</button>
+      <button id="btnImport">Import JSON</button>
+    </div>
+    <input id="fileImport" type="file" accept="application/json" style="display:none" />
+
+    <p class="foot muted">Tip: Values persist in your browser (localStorage). Built for quick what‑if testing and teaching.</p>
+  </aside>
+
+  <!-- RIGHT: Chip + Telemetry -->
+  <main class="panel">
+    <div class="grid2">
+      <section>
+        <h2>Chip State</h2>
+        <div class="chip">
+          <div class="row kv"><span class="k">Mode</span><span id="modePill" class="pill ok">INIT</span></div>
+          <div class="row kv"><span class="k">Tick</span><span id="tick" class="mono">0 ms</span></div>
+        </div>
+
+        <h2>Rails</h2>
+        <div class="row kv"><span class="k">Pre-Reg 5V</span><span id="v5" class="mono">5.00 V</span></div>
+        <div class="meter"><i id="m5"></i></div>
+        <canvas id="sp5" class="spark"></canvas>
+
+        <div class="row kv"><span class="k">LDO 3.3V</span><span id="v33" class="mono">3.30 V</span></div>
+        <div class="meter"><i id="m33"></i></div>
+        <canvas id="sp33" class="spark"></canvas>
+
+        <div class="row kv"><span class="k">LDO 1.25V</span><span id="v125" class="mono">1.25 V</span></div>
+        <div class="meter"><i id="m125"></i></div>
+        <canvas id="sp125" class="spark"></canvas>
+
+        <h2>Pins</h2>
+        <div class="pins">
+          <div class="pin"><div class="name">FSO</div><div id="pinFSO" class="val">LOW</div></div>
+          <div class="pin"><div class="name">INTn</div><div id="pinINT" class="val">HIGH</div></div>
+          <div class="pin"><div class="name">RSTn</div><div id="pinRST" class="val">HIGH</div></div>
+        </div>
+
+        <h2>Event Log</h2>
+        <div id="log" class="log mono"></div>
+      </section>
+
+      <section>
+        <h2>Registers (toy map)</h2>
+        <table class="mono" id="regTable">
+          <thead><tr><th>Addr</th><th>Name</th><th>Value</th><th>Fields</th></tr></thead>
+          <tbody></tbody>
+        </table>
+
+        <h2>Latched Status</h2>
+        <div class="grid3 small">
+          <div>UV5V: <b id="stUV5">0</b></div>
+          <div>UV3V3: <b id="stUV33">0</b></div>
+          <div>UV1V25: <b id="stUV125">0</b></div>
+          <div>OV: <b id="stOV">0</b></div>
+          <div>OT: <b id="stOT">0</b></div>
+          <div>WD_FAIL: <b id="stWD">0</b></div>
+          <div>CLK_FAIL: <b id="stCLK">0</b></div>
+        </div>
+
+        <h2>Power-Good</h2>
+        <div class="grid3 small">
+          <div>PG_5V: <b id="pg5">0</b></div>
+          <div>PG_3V3: <b id="pg33">0</b></div>
+          <div>PG_1V25: <b id="pg125">0</b></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+// =============================
+// TLF35584 PMIC (Educational)
+// =============================
+// This is NOT an electrical model; it emulates high-level behavior for teaching + quick what-if.
+
+const ui = {
+  vbatSlider: qs('#vbatSlider'), vbatVal: qs('#vbatVal'),
+  uv5: qs('#uv5'), uv5Val: qs('#uv5Val'), uv33: qs('#uv33'), uv33Val: qs('#uv33Val'), uv125: qs('#uv125'), uv125Val: qs('#uv125Val'),
+  enPre: qs('#enPre'), en33: qs('#en33'), en125: qs('#en125'),
+  enWdog: qs('#enWdog'), autoKick: qs('#autoKick'), standby: qs('#standby'),
+  wdMin: qs('#wdMin'), wdMax: qs('#wdMax'),
+  btnKick: qs('#btnKick'), btnWDEarly: qs('#btnWDEarly'), btnWDLate: qs('#btnWDLate'),
+  injOvTemp: qs('#injOvTemp'), injClkFail: qs('#injClkFail'), injSpiCrc: qs('#injSpiCrc'),
+  btnRipple: qs('#btnRipple'), btnCrank: qs('#btnCrank'), btnBrownout: qs('#btnBrownout'),
+  btnReset: qs('#btnReset'), btnDefaults: qs('#btnDefaults'), btnExport: qs('#btnExport'), btnImport: qs('#btnImport'), fileImport: qs('#fileImport'),
+  spiCmd: qs('#spiCmd'), btnSpiSend: qs('#btnSpiSend'), btnSpiDemo: qs('#btnSpiDemo'), btnClearFaults: qs('#btnClearFaults'),
+  v5: qs('#v5'), v33: qs('#v33'), v125: qs('#v125'),
+  m5: qs('#m5'), m33: qs('#m33'), m125: qs('#m125'),
+  sp5: qs('#sp5'), sp33: qs('#sp33'), sp125: qs('#sp125'),
+  pinFSO: qs('#pinFSO'), pinINT: qs('#pinINT'), pinRST: qs('#pinRST'),
+  tick: qs('#tick'), modePill: qs('#modePill'),
+  log: qs('#log'), regTable: qs('#regTable tbody'),
+  stUV5: qs('#stUV5'), stUV33: qs('#stUV33'), stUV125: qs('#stUV125'), stOV: qs('#stOV'), stOT: qs('#stOT'), stWD: qs('#stWD'), stCLK: qs('#stCLK'),
+  pg5: qs('#pg5'), pg33: qs('#pg33'), pg125: qs('#pg125'),
+};
+
+// --- Simulation state ---
+const state = {
+  tickMs: 0,
+  dt: 20,                         // physics tick (ms)
+  rippleOn: false,
+  vbat: 12.0,
+  prereg: { en:true, v:5.0, dropout:0.3 },
+  ldo33:   { en:true, v:3.3, dropout:0.15 },
+  ldo125:  { en:true, v:1.25, dropout:0.10 },
+  th: { uv5:4.75, uv33:3.05, uv125:1.15 },
+  pins: { FSO:0, INTn:1, RSTn:1 },
+  pg: { v5:0, v33:0, v125:0 },
+  latched: { uv5:0, uv33:0, uv125:0, ov:0, ot:0, wd:0, clk:0 },
+  mode: 'INIT',                  // INIT → NORMAL, FAILSAFE, STANDBY
+  wd: { en:false, tMin:80, tMax:200, lastKickAt:0, windowOpenAt:0, windowCloseAt:0, armed:false },
+  spi: { crcErr:false },
+  timers: { rstPulse:0, crank:0, brown:0 },
+  spark: { v5:[], v33:[], v125:[] },
+};
+
+const REG = new Map();
+const REG_DEF = {
+  0x00:{name:'DEV_ID', ro:true, val:0x35584},
+  0x01:{name:'CTRL1',  ro:false, val:0x000B}, // bit0 PREREG_EN, bit1 LDO33_EN, bit2 LDO125_EN, bit3 WD_EN, bit4 FSO_PULSE, bit5 STBY_EN
+  0x02:{name:'WD_CFG', ro:false, val:(200<<8)|80}, // [15:8] tMax, [7:0] tMin (ms)
+  0x03:{name:'INT_MASK', ro:false, val:0x0000},
+  0x04:{name:'FSO_CFG', ro:false, val:0x0001},
+  0x10:{name:'STAT1', ro:true, val:0},
+  0x11:{name:'STAT2', ro:true, val:0}, // PG bits
+  0x12:{name:'CLR_LATCH', ro:false, val:0},
+};
+
+function resetRegs(){ REG.clear(); for (const [a,d] of Object.entries(REG_DEF)) REG.set(+a,{...d}); }
+
+// --- Helpers ---
+function qs(s){return document.querySelector(s)}
+function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
+function rnd(n){return Math.random()*n}
+function log(msg, level='info'){
+  const t = (state.tickMs/1000).toFixed(3).padStart(8,' ');
+  const line = `[${t}s] ${msg}`;
+  const el = document.createElement('div');
+  el.textContent = line;
+  if(level==='warn') el.style.color = '#ffd599';
+  if(level==='err') el.style.color = '#ffb1b6';
+  ui.log.prepend(el);
+}
+
+// --- Persistence ---
+const SAVE_KEY = 'tlf35584_sim_v1';
+function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify({state, regs:[...REG.entries()]})); }
+function load(){
+  try{ const o = JSON.parse(localStorage.getItem(SAVE_KEY)||''); if(!o) return;
+    Object.assign(state, o.state);
+    REG.clear(); for(const [k,v] of o.regs) REG.set(+k, v);
+  }catch(e){/* ignore */}
+}
+
+// --- UI bindings ---
+function bind(){
+  ui.vbatSlider.addEventListener('input', ()=>{state.vbat=+ui.vbatSlider.value; ui.vbatVal.textContent=state.vbat.toFixed(1)+' V'});
+  for(const [el, key, fmt] of [
+    [ui.uv5,'uv5',v=>v.toFixed(2)+' V'], [ui.uv33,'uv33',v=>v.toFixed(2)+' V'], [ui.uv125,'uv125',v=>v.toFixed(2)+' V']
+  ]){
+    el.addEventListener('input',()=>{state.th[key]=+el.value; ui[key+'Val'].textContent=fmt(+el.value)})
+  }
+  ui.enPre.onchange = ()=> setBit(0x01,0, ui.enPre.checked);
+  ui.en33.onchange  = ()=> setBit(0x01,1, ui.en33.checked);
+  ui.en125.onchange = ()=> setBit(0x01,2, ui.en125.checked);
+  ui.enWdog.onchange= ()=> setBit(0x01,3, ui.enWdog.checked);
+  ui.standby.onchange=()=> setBit(0x01,5, ui.standby.checked);
+
+  ui.wdMin.onchange = ()=> wr(0x02, ((REG.get(0x02).val>>8)&0xff)<<8 | (+ui.wdMin.value & 0xff));
+  ui.wdMax.onchange = ()=> wr(0x02, ((+ui.wdMax.value & 0xff)<<8) | (REG.get(0x02).val & 0xff));
+
+  ui.btnKick.onclick = ()=> kick('normal');
+  ui.btnWDEarly.onclick = ()=> kick('early');
+  ui.btnWDLate.onclick = ()=> kick('late');
+
+  ui.btnRipple.onclick = ()=>{ state.rippleOn=!state.rippleOn; log(`Input ripple ${state.rippleOn?'EN':'DIS'}abled`)};
+  ui.btnCrank.onclick = ()=>{ state.timers.crank = 400; log('Crank droop injected (9→5.5V for 400ms)','warn') };
+  ui.btnBrownout.onclick = ()=>{ state.timers.brown = 250; log('Brownout injected (→4.8V for 250ms)','warn') };
+
+  ui.btnReset.onclick = softReset;
+  ui.btnDefaults.onclick = factoryDefaults;
+  ui.btnExport.onclick = exportJSON;
+  ui.btnImport.onclick = ()=> ui.fileImport.click();
+  ui.fileImport.onchange = importJSON;
+
+  ui.btnSpiSend.onclick = sendSpi;
+  ui.btnSpiDemo.onclick = ()=>{ ui.spiCmd.value = 'wr 0x01 0x000F\nwr 0x02 0xC850\nrd 0x10'; sendSpi(); } // enable rails+WD, WD tMax=200,tMin=80
+  ui.btnClearFaults.onclick = ()=>{ clearLatches(); log('Latched faults cleared'); };
+
+  ui.injOvTemp.onchange = ()=>{ state.latched.ot = ui.injOvTemp.checked?1:0; };
+  ui.injClkFail.onchange = ()=>{ state.latched.clk = ui.injClkFail.checked?1:0; };
+  ui.injSpiCrc.onchange = ()=>{ state.spi.crcErr = ui.injSpiCrc.checked; };
+}
+
+// --- SPI emulation (toy) ---
+function sendSpi(){
+  const lines = ui.spiCmd.value.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+  for(const ln of lines){
+    const [op,a,d] = ln.split(/\s+/);
+    if(!op){continue}
+    if(state.spi.crcErr){ log(`SPI frame dropped (CRC error)`, 'warn'); continue; }
+    if(op.toLowerCase()==='wr'){
+      const addr = parseInt(a); const val = parseInt(d);
+      wr(addr,val);
+    }else if(op.toLowerCase()==='rd'){
+      const addr = parseInt(a);
+      const v = rd(addr);
+      log(`SPI RD  ${hex(addr)} → ${hex(v,4)}`);
+    }else{
+      log(`SPI ? '${ln}'`, 'warn');
+    }
+  }
+  renderRegs(); save();
+}
+
+function wr(addr,val){
+  const r = REG.get(addr);
+  if(!r){ log(`WR ${hex(addr)}: invalid address`, 'err'); return; }
+  if(r.ro){ log(`WR ${hex(addr)}: read-only`, 'warn'); return; }
+  r.val = val & 0xFFFF;
+  // Side effects
+  if(addr===0x01){
+    const enPre = !!(val & (1<<0)); const en33=!!(val&(1<<1)); const en125=!!(val&(1<<2));
+    const wdEn  = !!(val & (1<<3)); const stby=!!(val&(1<<5));
+    state.prereg.en = enPre; state.ldo33.en = en33; state.ldo125.en = en125; state.wd.en = wdEn; state.mode = stby? 'STANDBY' : state.mode;
+    ui.enPre.checked=enPre; ui.en33.checked=en33; ui.en125.checked=en125; ui.enWdog.checked=wdEn; ui.standby.checked=stby;
+    log(`CTRL1 set: PRE=${enPre} L33=${en33} L125=${en125} WD=${wdEn} STBY=${stby}`);
+  }
+  if(addr===0x02){ state.wd.tMin = r.val & 0xff; state.wd.tMax = (r.val>>8)&0xff; ui.wdMin.value=state.wd.tMin; ui.wdMax.value=state.wd.tMax; log(`WD tMin=${state.wd.tMin}ms tMax=${state.wd.tMax}ms`); }
+  if(addr===0x12){ // clear-on-write bits
+    const m = r.val;
+    if(m & 1) state.latched.uv5=0;
+    if(m & 2) state.latched.uv33=0;
+    if(m & 4) state.latched.uv125=0;
+    if(m & 8) state.latched.ov=0;
+    if(m & 16) state.latched.ot=0;
+    if(m & 32) state.latched.wd=0;
+    if(m & 64) state.latched.clk=0;
+    REG.get(0x12).val=0; // self-clear
+  }
+}
+function rd(addr){
+  const r = REG.get(addr); if(!r){ log(`RD ${hex(addr)}: invalid address`, 'err'); return 0; }
+  if(addr===0x10){ // STAT1
+    let v=0; if(state.latched.uv5) v|=1; if(state.latched.uv33) v|=2; if(state.latched.uv125) v|=4; if(state.latched.ov) v|=8; if(state.latched.ot) v|=16; if(state.latched.wd) v|=32; if(state.latched.clk) v|=64; r.val = v;
+  }
+  if(addr===0x11){ // STAT2 (PG)
+    let v=0; if(state.pg.v5) v|=1; if(state.pg.v33) v|=2; if(state.pg.v125) v|=4; r.val = v;
+  }
+  return r.val & 0xFFFF;
+}
+function setBit(addr,bit,on){ const r=REG.get(addr); if(!r||r.ro) return; const before=r.val; r.val = on ? (r.val | (1<<bit)) : (r.val & ~(1<<bit)); wr(addr,r.val); if(before!==r.val) renderRegs(); save(); }
+function hex(v,w=3){ return '0x'+(v>>>0).toString(16).toUpperCase().padStart(w,'0') }
+
+function clearLatches(){ wr(0x12, 0x7F); }
+
+// --- Watchdog ---
+function kick(kind){
+  if(!state.wd.en){ log('Kick ignored: WD disabled','warn'); return; }
+  const now = state.tickMs;
+  if(kind==='early'){
+    // force an early kick before window open
+    state.wd.windowOpenAt = now + 9999; // ensure not open
+  }
+  if(kind==='late'){
+    // force a late kick by making window already closed
+    state.wd.windowCloseAt = now - 1;
+  }
+
+  const allowed = (now>=state.wd.windowOpenAt && now<=state.wd.windowCloseAt);
+  if(!allowed){ wdFault('Kick outside window'); return; }
+  state.wd.lastKickAt = now; scheduleWdWindow(); log('Watchdog serviced');
+}
+function scheduleWdWindow(){
+  const base = state.wd.lastKickAt || state.tickMs; // in NORMAL we arm after last kick
+  state.wd.windowOpenAt = base + state.wd.tMin;
+  state.wd.windowCloseAt = base + state.wd.tMax;
+  state.wd.armed = true;
+}
+function wdTick(){
+  if(!state.wd.en) return;
+  // Auto-kick with jitter
+  if(ui.autoKick.checked){
+    const jitter = -10 + rnd(20); // ±10ms
+    if(state.tickMs >= state.wd.windowOpenAt + jitter && state.tickMs <= state.wd.windowCloseAt + jitter){
+      state.wd.lastKickAt = state.tickMs; scheduleWdWindow(); log('Auto-kick');
+    }
+  }
+  // Late fault
+  if(state.wd.armed && state.tickMs > state.wd.windowCloseAt + 5){ wdFault('Watchdog timeout'); }
+}
+function wdFault(why){
+  state.latched.wd = 1; pulseReset(); faultLine('wd', why);
+}
+
+// --- Reset/Fail-safe ---
+function pulseReset(){
+  state.pins.RSTn = 0; ui.pinRST.textContent='LOW';
+  state.timers.rstPulse = 30; // 30ms
+  log('RSTn asserted (low)');
+}
+function faultLine(kind, why){
+  state.pins.FSO = 1; state.pins.INTn = 0; // active fault
+  log(`FAULT: ${kind.toUpperCase()} – ${why}`,'err');
+}
+
+// --- Physics-ish model ---
+function physics(){
+  // VBAT source, with optional dynamic events
+  let vbat = state.vbat;
+  if(state.rippleOn){ vbat += Math.sin(state.tickMs/18)*0.15; }
+  if(state.timers.crank>0){ // linear drop & recover
+    const t = state.timers.crank; vbat = 5.5 + (t/400)*(9-5.5); state.timers.crank -= state.dt;
+  }
+  if(state.timers.brown>0){ vbat = 4.8; state.timers.brown -= state.dt; }
+
+  // Pre-reg: simple buck/boost to 5V if enabled, with headroom requirements
+  const preEn = state.prereg.en && !ui.standby.checked;
+  let v5 = preEn ? 5.0 : 0.0;
+  if(preEn){
+    if(vbat < 5.7){ // insufficient input → droops towards vbat - dropout
+      v5 = clamp(vbat - state.prereg.dropout, 0, 5.0);
+    }
+  }
+
+  // LDO33 from v5
+  const l33En = state.ldo33.en && preEn && !ui.standby.checked;
+  let v33 = l33En ? 3.3 : 0.0;
+  if(l33En){
+    if(v5 < 3.45){ v33 = clamp(v5 - state.ldo33.dropout, 0, 3.3); }
+  }
+
+  // LDO1.25 from v5
+  const l125En = state.ldo125.en && preEn && !ui.standby.checked;
+  let v125 = l125En ? 1.25 : 0.0;
+  if(l125En){
+    if(v5 < 1.35){ v125 = clamp(v5 - state.ldo125.dropout, 0, 1.25); }
+  }
+
+  // Update rails (slew towards target for visual smoothness)
+  state.prereg.v = slew(state.prereg.v, v5, 0.2);
+  state.ldo33.v   = slew(state.ldo33.v,   v33, 0.2);
+  state.ldo125.v  = slew(state.ldo125.v,  v125,0.2);
+
+  // PG detection
+  state.pg.v5   = (state.prereg.v >= Math.max(4.95, state.th.uv5+0.05))?1:0;
+  state.pg.v33  = (state.ldo33.v   >= Math.max(3.25, state.th.uv33+0.05))?1:0;
+  state.pg.v125 = (state.ldo125.v  >= Math.max(1.22, state.th.uv125+0.02))?1:0;
+
+  // Fault detection (undervoltage + injected faults)
+  if(preEn && state.prereg.v   < state.th.uv5  ){ state.latched.uv5=1; }
+  if(l33En && state.ldo33.v    < state.th.uv33){ state.latched.uv33=1; }
+  if(l125En && state.ldo125.v  < state.th.uv125){ state.latched.uv125=1; }
+  if(ui.injOvTemp.checked) state.latched.ot = 1;
+  if(ui.injClkFail.checked) state.latched.clk = 1;
+
+  // Derive mode + pins
+  let anyFault = Object.values(state.latched).some(x=>x===1);
+  if(ui.standby.checked){ state.mode='STANDBY'; }
+  else if(anyFault){ state.mode='FAILSAFE'; }
+  else if(state.pg.v5 && state.pg.v33 && state.pg.v125){ state.mode='NORMAL'; }
+  else { state.mode='INIT'; }
+
+  // Pins behavior
+  state.pins.FSO = anyFault?1:0;
+  state.pins.INTn = anyFault?0:1;
+  if(state.timers.rstPulse>0){ state.timers.rstPulse -= state.dt; if(state.timers.rstPulse<=0){ state.pins.RSTn=1; log('RSTn released (high)'); }}
+
+  // Update STAT registers
+  rd(0x10); rd(0x11);
+
+  // Store samples for sparkline
+  pushSample('v5', state.prereg.v, 0, 5.2);
+  pushSample('v33', state.ldo33.v, 0, 3.5);
+  pushSample('v125', state.ldo125.v, 0, 1.3);
+
+  // Watchdog scheduling on INIT→NORMAL
+  if(state.mode==='NORMAL' && state.wd.en && !state.wd.armed){ state.wd.lastKickAt = state.tickMs; scheduleWdWindow(); log('WD armed'); }
+}
+
+function slew(x, target, k){ return x + (target - x) * k; }
+
+function pushSample(key, v, min, max){
+  const arr = state.spark[key];
+  arr.push(v);
+  if(arr.length>120) arr.shift();
+  const c = ui['sp'+(key==='v5'?'5':key==='v33'?'33':'125')];
+  drawSpark(c, arr, min, max);
+}
+function drawSpark(canvas, data, min, max){
+  const w = canvas.width = canvas.clientWidth; const h = canvas.height = canvas.clientHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle = '#65e7ff'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for(let i=0;i<data.length;i++){
+    const x = (i/(data.length-1))* (w-4) + 2;
+    const y = h - 2 - ((data[i]-min)/(max-min))* (h-4);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+}
+
+// --- Render ---
+function render(){
+  ui.tick.textContent = `${state.tickMs|0} ms`;
+  ui.vbatVal.textContent = state.vbat.toFixed(1)+' V';
+
+  ui.v5.textContent   = state.prereg.v.toFixed(2)+' V';
+  ui.v33.textContent  = state.ldo33.v.toFixed(2)+' V';
+  ui.v125.textContent = state.ldo125.v.toFixed(2)+' V';
+
+  ui.m5.style.width   = `${(state.prereg.v/5.0)*100}%`;
+  ui.m33.style.width  = `${(state.ldo33.v/3.3)*100}%`;
+  ui.m125.style.width = `${(state.ldo125.v/1.25)*100}%`;
+
+  ui.pinFSO.textContent = state.pins.FSO?'HIGH':'LOW';
+  ui.pinINT.textContent = state.pins.INTn?'HIGH':'LOW';
+  ui.pinRST.textContent = state.pins.RSTn?'HIGH':'LOW';
+
+  ui.pg5.textContent = state.pg.v5; ui.pg33.textContent = state.pg.v33; ui.pg125.textContent = state.pg.v125;
+  ui.stUV5.textContent = state.latched.uv5; ui.stUV33.textContent = state.latched.uv33; ui.stUV125.textContent = state.latched.uv125; ui.stOV.textContent = state.latched.ov; ui.stOT.textContent = state.latched.ot; ui.stWD.textContent = state.latched.wd; ui.stCLK.textContent = state.latched.clk;
+
+  // Mode pill styling
+  const mp = ui.modePill; mp.textContent = state.mode;
+  mp.classList.remove('ok','warn','err');
+  if(state.mode==='NORMAL') mp.classList.add('ok');
+  else if(state.mode==='INIT'||state.mode==='STANDBY') mp.classList.add('warn');
+  else mp.classList.add('err');
+
+  renderRegs();
+}
+
+function renderRegs(){
+  const tbody = ui.regTable; tbody.innerHTML = '';
+  for(const [addr, r] of REG.entries()){
+    const tr = document.createElement('tr');
+    const fields = describeFields(addr, r.val);
+    tr.innerHTML = `<td>${hex(addr)}</td><td>${r.name}${r.ro?'<span class="muted"> (RO)</span>':''}</td><td>${hex(r.val,4)}</td><td class="small">${fields}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+function describeFields(addr, v){
+  if(addr===0x01){ // CTRL1
+    return `PRE=${(v>>0)&1} L33=${(v>>1)&1} L125=${(v>>2)&1} WD=${(v>>3)&1} FSO_PULSE=${(v>>4)&1} STBY=${(v>>5)&1}`;
+  }
+  if(addr===0x02){ return `tMax=${(v>>8)&0xFF}ms tMin=${v&0xFF}ms`; }
+  if(addr===0x10){ return `UV5=${(v>>0)&1} UV33=${(v>>1)&1} UV125=${(v>>2)&1} OV=${(v>>3)&1} OT=${(v>>4)&1} WD_FAIL=${(v>>5)&1} CLK_FAIL=${(v>>6)&1}`; }
+  if(addr===0x11){ return `PG_5=${(v>>0)&1} PG_3.3=${(v>>1)&1} PG_1.25=${(v>>2)&1}`; }
+  if(addr===0x12){ return `Write 1s to clear STAT1 bits (mask: [UV5,UV33,UV125,OV,OT,WD,CLK])`; }
+  return '';
+}
+
+// --- High-level controls ---
+function softReset(){
+  log('Soft reset');
+  pulseReset();
+  // clear runtime, keep latches per many PMICs (we keep unless CLR requested)
+  state.wd.armed=false; state.mode='INIT';
+}
+function factoryDefaults(){
+  log('Factory defaults loaded');
+  resetRegs();
+  Object.assign(state, {
+    ...state,
+    vbat:12.0, rippleOn:false,
+    prereg:{en:true, v:5.0, dropout:0.3}, ldo33:{en:true,v:3.3,dropout:0.15}, ldo125:{en:true,v:1.25,dropout:0.10},
+    th:{uv5:4.75, uv33:3.05, uv125:1.15},
+    pins:{FSO:0, INTn:1, RSTn:1}, pg:{v5:0,v33:0,v125:0},
+    latched:{uv5:0, uv33:0, uv125:0, ov:0, ot:0, wd:0, clk:0},
+    mode:'INIT', wd:{en:false, tMin:80, tMax:200, lastKickAt:0, windowOpenAt:0, windowCloseAt:0, armed:false},
+    timers:{rstPulse:0, crank:0, brown:0},
+  });
+  // reflect UI
+  ui.vbatSlider.value = state.vbat; ui.vbatVal.textContent = state.vbat.toFixed(1)+' V';
+  ui.uv5.value=state.th.uv5; ui.uv5Val.textContent=state.th.uv5.toFixed(2)+' V';
+  ui.uv33.value=state.th.uv33; ui.uv33Val.textContent=state.th.uv33.toFixed(2)+' V';
+  ui.uv125.value=state.th.uv125; ui.uv125Val.textContent=state.th.uv125.toFixed(2)+' V';
+  ui.enPre.checked=true; ui.en33.checked=true; ui.en125.checked=true; ui.enWdog.checked=false; ui.standby.checked=false; ui.autoKick.checked=false;
+  ui.wdMin.value=80; ui.wdMax.value=200;
+  ui.injOvTemp.checked=false; ui.injClkFail.checked=false; ui.injSpiCrc.checked=false;
+  render(); save();
+}
+
+function exportJSON(){
+  const blob = new Blob([JSON.stringify({state, regs:[...REG.entries()]}, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tlf35584_sim.json'; a.click(); URL.revokeObjectURL(a.href);
+}
+function importJSON(e){
+  const f = e.target.files[0]; if(!f) return; const r = new FileReader();
+  r.onload = () => { try{ const o = JSON.parse(r.result);
+    Object.assign(state,o.state); REG.clear(); for(const [k,v] of o.regs) REG.set(+k,v); render(); log('Imported config'); save(); } catch(err){ log('Import failed','err'); }
+  }; r.readAsText(f);
+}
+
+// --- Main loop ---
+function loop(){
+  state.tickMs += state.dt;
+  physics();
+  wdTick();
+  render();
+  save();
+}
+
+// --- Init ---
+function init(){
+  load(); if(REG.size===0) resetRegs();
+  bind();
+  // Ensure CTRL1 reflects current enables
+  const ctrl = (state.prereg.en?1:0) | (state.ldo33.en?2:0) | (state.ldo125.en?4:0) | (state.wd.en?8:0) | (ui.standby.checked?32:0);
+  REG.get(0x01).val = ctrl;
+  ui.vbatSlider.value = state.vbat; ui.vbatVal.textContent = state.vbat.toFixed(1)+' V';
+  ui.uv5Val.textContent = state.th.uv5.toFixed(2)+' V'; ui.uv33Val.textContent = state.th.uv33.toFixed(2)+' V'; ui.uv125Val.textContent = state.th.uv125.toFixed(2)+' V';
+  ui.uv5.value=state.th.uv5; ui.uv33.value=state.th.uv33; ui.uv125.value=state.th.uv125;
+  render();
+  log('Simulator ready');
+  setInterval(loop, state.dt);
+}
+
+init();
+</script>
+</body>
+</html>
