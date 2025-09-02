@@ -1,314 +1,233 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TC33x / TC32x Memory Map Visualizer</title>
-  <!-- React & Babel via CDN -->
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-  <style>
-    body { font-family: sans-serif; margin: 20px; }
-    .reserved { background: #aaa; }
-    .available { background: #ddd; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PFlash Memory Map – 2MB / 1.5MB / 1MB</title>
+<style>
+  :root{
+    --bg:#0b1020;            /* dark canvas */
+    --card:#11172e;          /* panel bg */
+    --ink:#e6ecff;           /* text */
+    --muted:#9fb0ff;         /* subtle text */
+    --accent:#6aa1ff;        /* accents */
+    --ok:#20c997;            /* available */
+    --reserved:#f03e3e;      /* reserved */
+    --ps0:#845ef7;           /* PS0 color band */
+    --ps1:#22b8cf;           /* PS1 color band */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,Segoe UI,Roboto,Ubuntu,Apple Color Emoji,Segoe UI Emoji}
+  .wrap{max-width:1200px;margin:24px auto;padding:16px}
+  header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px}
+  h1{font-size:clamp(20px,3vw,28px);margin:0;font-weight:700}
+  .controls{display:flex;gap:12px;flex-wrap:wrap}
+  select,button{background:#0e1530;color:var(--ink);border:1px solid #223059;border-radius:10px;padding:10px 12px;font-weight:600}
+  .card{background:var(--card);border:1px solid #223059;border-radius:16px;padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 0}
+  .legend .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:#0e1530;border:1px solid #223059}
+  .dot{inline-size:14px;block-size:14px;border-radius:50%}
+  .dot.ok{background:var(--ok)}
+  .dot.res{background:var(--reserved)}
+  .dot.ps0{background:var(--ps0)}
+  .dot.ps1{background:var(--ps1)}
+
+  .grid{display:grid;grid-template-columns: 1fr minmax(220px, 260px); gap:16px; align-items:start}
+
+  /* Tall visual map */
+  .map{position:relative; height:900px; border-radius:14px; overflow:hidden; border:1px solid #223059; background:linear-gradient(180deg, rgba(132,94,247,.12), rgba(34,184,207,.12));}
+  .band{position:absolute; inset-inline:0;}
+  .band.ps0{inset-block-start:0; inset-block-end:50%; background:linear-gradient(180deg, rgba(132,94,247,.18), transparent)}
+  .band.ps1{inset-block-start:50%; inset-block-end:0; background:linear-gradient(180deg, transparent, rgba(34,184,207,.18))}
+
+  .sector{position:absolute; inset-inline:0; border-top:1px dashed rgba(230,236,255,.18);}
+  .sector .row{display:flex; align-items:center; justify-content:space-between; padding:0 10px;}
+  .sector .labels{display:flex; gap:12px; align-items:center}
+  .tag{font:600 12px/1 system-ui; color:var(--muted); background:#0e1530; border:1px solid #223059; border-radius:6px; padding:4px 6px}
+  .pill{font:700 11px/1 system-ui; padding:5px 8px; border-radius:999px;}
+  .pill.ok{color:#06281e; background:var(--ok)}
+  .pill.res{color:#2b0b0b; background:var(--reserved)}
+
+  .sidebar .title{font-weight:700;margin-bottom:8px}
+  .table{border:1px solid #223059; border-radius:12px; overflow:hidden}
+  table{width:100%; border-collapse:collapse;}
+  th,td{padding:10px 12px; border-bottom:1px solid #223059}
+  th{background:#0e1530; color:var(--muted); text-align:left; font-size:13px}
+  td.addr{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  tr.res td{opacity:.55}
+
+  footer{margin-top:14px;color:var(--muted);font-size:13px}
+  a{color:var(--accent)}
+  .note{font-size:13px;color:var(--muted)}
+
+  @media (max-width: 900px){
+    .grid{grid-template-columns:1fr}
+    .map{height:700px}
+  }
+</style>
 </head>
 <body>
-  <h1>Memory Map</h1>
-  <div id="root"></div>
-
-  <!-- Your code (converted to plain JS/JSX) -->
-  <script type="text/babel">
-    // Paste the React component code here (replace export default with just function App)
-
-import React, { useMemo, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Download, Info, Layers, Server, MemoryStick } from "lucide-react";
-
-/**
- * TC33x/TC32x Memory Map Visualizer
- *
- * This single-file React page lets you explore common memory variants shown in the
- * Infineon AURIX TC33x/TC32x "Memory maps" figures (PFlash, DFlash, DSPR, DLMU).
- *
- * Notes
- * - This is an illustrative tool; sizes, addresses, and sector counts are mapped from
- *   the figures and public summaries. Some details are simplified to keep the UI compact.
- * - PFlash is shown as one logical bank composed of 16‑KB sectors.
- * - DFlash sectors are shown as 4‑KB blocks.
- * - DSPR/DLMU are drawn as contiguous regions starting at the typical base addresses
- *   (0x7000_0000 for DSPR, 0x9000_0000 for DLMU) for visualization only.
- */
-
-// ---------- Data Model ----------
-
-type PFlashVariantKey = "2MB" | "1_5MB" | "1MB";
-
-const PFLASH_BASE = 0x8000_0000;
-const PFLASH_SECTOR_SIZE = 16 * 1024; // 16 KB
-const PFLASH_VARIANTS: Record<PFlashVariantKey, { title: string; total: number; sectors: number; reservedSectorsAtTop: number; note?: string }>
-  = {
-    "2MB": { title: "2 MB", total: 2 * 1024 * 1024, sectors: 128, reservedSectorsAtTop: 0 },
-    "1_5MB": { title: "1.5 MB", total: 1.5 * 1024 * 1024, sectors: 96, reservedSectorsAtTop: 32, note: "Top 0.5 MB reserved (not available)." },
-    "1MB": { title: "1 MB", total: 1 * 1024 * 1024, sectors: 64, reservedSectorsAtTop: 64, note: "Top 1 MB reserved (not available)." }
-  };
-
-// DFlash (EEPROM emulation) — 4 KB sectors
-const DFLASH_BASE = 0xAF00_0000;
-const DFLASH_SECTOR_SIZE = 4 * 1024;
-const DFLASH_VARIANTS = {
-  "128KB": { total: 128 * 1024, sectors: 32, reservedSectorsAtTop: 0, title: "128 KB" },
-  "96KB": { total: 96 * 1024, sectors: 24, reservedSectorsAtTop: 8, title: "96 KB (upper area reserved)" }
-};
-
-// CPU memories (CPU0 variants shown in the figure)
-const DSPR_BASE = 0x7000_0000;
-const DLMU_BASE = 0x9000_0000;
-const DSPR_VARIANTS = {
-  "192KB": { total: 192 * 1024, title: "192 KB" },
-  "144KB": { total: 144 * 1024, title: "144 KB (reduced)" },
-  "96KB": { total: 96 * 1024, title: "96 KB (reduced)" }
-};
-const DLMU_VARIANTS = {
-  "8KB": { total: 8 * 1024, title: "8 KB" },
-  "0KB": { total: 0, title: "0 KB (reduced)" }
-};
-
-// ---------- Helpers ----------
-
-function hex(n: number) {
-  return "0x" + n.toString(16).toUpperCase().padStart(8, "0");
-}
-
-function human(n: number) {
-  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-  if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${n} B`;
-}
-
-// Compute blocks for a memory region with optional reserved area at top
-function buildBlocks({ base, blockSize, blocks, reservedAtTop }: { base: number; blockSize: number; blocks: number; reservedAtTop?: number }) {
-  const arr: { index: number; start: number; end: number; reserved: boolean }[] = [];
-  for (let i = 0; i < blocks; i++) {
-    const start = base + i * blockSize;
-    const end = start + blockSize - 1;
-    const reserved = reservedAtTop ? i >= blocks - reservedAtTop : false;
-    arr.push({ index: i, start, end, reserved });
-  }
-  return arr;
-}
-
-// ---------- UI Primitives ----------
-
-function SectionHeader({ icon: Icon, title, subtitle }: { icon: any; title: string; subtitle?: string }) {
-  return (
-    <div className="flex items-center gap-3 mb-3">
-      <Icon className="w-5 h-5" />
-      <div>
-        <div className="text-lg font-semibold leading-tight">{title}</div>
-        {subtitle && <div className="text-xs opacity-70 -mt-0.5">{subtitle}</div>}
+  <div class="wrap">
+    <header>
+      <h1>PFlash Memory Map (Logical Sectors in 16KB steps)</h1>
+      <div class="controls">
+        <label class="note" for="variant">Bank size:</label>
+        <select id="variant" aria-label="Choose PFlash bank size">
+          <option value="2">2 MB (S0 – S127)</option>
+          <option value="1.5">1.5 MB (S0 – S95, S96–S127 Reserved)</option>
+          <option value="1">1 MB (S0 – S63, S64–S127 Reserved)</option>
+        </select>
+        <button id="btnTop">Scroll to S0</button>
+        <button id="btnBottom">Scroll to S127</button>
       </div>
-    </div>
-  );
-}
+    </header>
 
-function Legend() {
-  return (
-    <div className="flex flex-wrap gap-3 text-xs">
-      <div className="flex items-center gap-2"><div className="w-4 h-3 rounded bg-gray-200" /> Available</div>
-      <div className="flex items-center gap-2"><div className="w-4 h-3 rounded bg-gray-400" /> Reserved</div>
-      <div className="flex items-center gap-2"><div className="w-4 h-3 rounded border border-dashed" /> Sector/Block</div>
+    <div class="card legend">
+      <div class="chip"><span class="dot ok"></span>Available</div>
+      <div class="chip"><span class="dot res"></span>Reserved</div>
+      <div class="chip"><span class="dot ps0"></span>PS0 (first 1 MB)</div>
+      <div class="chip"><span class="dot ps1"></span>PS1 (second 1 MB)</div>
+      <div class="chip">Sector size: 16 KB · Address stride: 0x4000</div>
     </div>
-  );
-}
 
-function MemoryBar({ blocks, maxWidth = 720, labelEvery = 8 }: { blocks: { index: number; start: number; end: number; reserved: boolean }[]; maxWidth?: number; labelEvery?: number }) {
-  const widthPerBlock = Math.max(4, Math.floor(maxWidth / blocks.length));
-  return (
-    <div className="overflow-x-auto">
-      <div className="flex items-end h-16">
-        {blocks.map((b) => (
-          <div key={b.index}
-               title={`S${b.index}  ${hex(b.start)} - ${hex(b.end)} ${b.reserved ? "(reserved)" : ""}`}
-               className={`border border-dashed h-10 ${b.reserved ? "bg-gray-400" : "bg-gray-200"}`}
-               style={{ width: widthPerBlock }} />
-        ))}
+    <div class="grid" id="grid">
+      <div class="card map" id="map" aria-label="Visual sector map">
+        <div class="band ps0" aria-hidden="true"></div>
+        <div class="band ps1" aria-hidden="true"></div>
+        <!-- Sectors injected by JS -->
       </div>
-      <div className="flex text-[10px] text-center select-none">
-        {blocks.map((b) => (
-          <div key={"l" + b.index} style={{ width: widthPerBlock }}>
-            {b.index % labelEvery === 0 ? `S${b.index}` : "\u00A0"}
+
+      <aside class="sidebar">
+        <div class="card">
+          <div class="title">Sectors</div>
+          <div class="table">
+            <table id="table" aria-label="Sector details">
+              <thead>
+                <tr>
+                  <th>Logical</th>
+                  <th>PS</th>
+                  <th class="addr">Offset</th>
+                  <th>State</th>
+                </tr>
+              </thead>
+              <tbody><!-- rows injected --></tbody>
+            </table>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="text-xs">
-      <div className="opacity-60">{label}</div>
-      <div className="font-medium">{value}</div>
-    </div>
-  );
-}
-
-// ---------- Main Page ----------
-
-export default function App() {
-  const [pflashKey, setPflashKey] = useState<PFlashVariantKey>("2MB");
-  const [dflashKey, setDflashKey] = useState<keyof typeof DFLASH_VARIANTS>("128KB");
-  const [dsprKey, setDsprKey] = useState<keyof typeof DSPR_VARIANTS>("192KB");
-  const [dlmuKey, setDlmuKey] = useState<keyof typeof DLMU_VARIANTS>("8KB");
-
-  const pflash = PFLASH_VARIANTS[pflashKey];
-  const dflash = DFLASH_VARIANTS[dflashKey];
-  const dspr = DSPR_VARIANTS[dsprKey];
-  const dlmu = DLMU_VARIANTS[dlmuKey];
-
-  const pflashBlocks = useMemo(() => buildBlocks({ base: PFLASH_BASE, blockSize: PFLASH_SECTOR_SIZE, blocks: 128, reservedAtTop: pflash.reservedSectorsAtTop }), [pflashKey]);
-  const dflashBlocks = useMemo(() => buildBlocks({ base: DFLASH_BASE, blockSize: DFLASH_SECTOR_SIZE, blocks: 32, reservedAtTop: dflash.reservedSectorsAtTop }), [dflashKey]);
-
-  const exportJSON = () => {
-    const payload = {
-      pflash: { variant: pflash.title, base: hex(PFLASH_BASE), sectorBytes: PFLASH_SECTOR_SIZE, sectors: pflashBlocks.map(b => ({ index: b.index, start: hex(b.start), end: hex(b.end), reserved: b.reserved })) },
-      dflash: { variant: dflash.title, base: hex(DFLASH_BASE), sectorBytes: DFLASH_SECTOR_SIZE, sectors: dflashBlocks.map(b => ({ index: b.index, start: hex(b.start), end: hex(b.end), reserved: b.reserved })) },
-      dspr: { variant: dspr.title, base: hex(DSPR_BASE), sizeBytes: dspr.total },
-      dlmu: { variant: dlmu.title, base: hex(DLMU_BASE), sizeBytes: dlmu.total },
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "tc33x_tc32x_memory_map.json"; a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="min-h-screen w-full bg-white text-gray-900">
-      <div className="mx-auto max-w-6xl p-6">
-        <header className="flex items-start justify-between gap-4 pb-4 border-b">
-          <div>
-            <h1 className="text-2xl font-bold">TC33x / TC32x Memory Map Visualizer</h1>
-            <p className="text-sm opacity-70 mt-1">Interactive, simplified view of Program Flash (PFlash), Data Flash (DFlash), and CPU memories (DSPR & DLMU). Select the variants to match your MCU.</p>
-          </div>
-          <Button onClick={exportJSON} className="rounded-2xl shadow px-4"><Download className="w-4 h-4 mr-2"/>Export JSON</Button>
-        </header>
-
-        <div className="grid md:grid-cols-2 gap-6 mt-6">
-          {/* PFlash */}
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="p-5">
-              <SectionHeader icon={Server} title="Program Flash (PFlash)" subtitle="16‑KB logical sectors from 0x8000_0000" />
-              <div className="flex flex-wrap items-center gap-3 mb-3">
-                <select value={pflashKey} onChange={(e) => setPflashKey(e.target.value as PFlashVariantKey)} className="border rounded-xl px-3 py-1 text-sm">
-                  <option value="2MB">2 MB</option>
-                  <option value="1_5MB">1.5 MB</option>
-                  <option value="1MB">1 MB</option>
-                </select>
-                <Legend/>
-              </div>
-              <MemoryBar blocks={pflashBlocks} labelEvery={8} />
-              <div className="flex gap-6 mt-4">
-                <Stat label="Base" value={hex(PFLASH_BASE)} />
-                <Stat label="Sector" value={human(PFLASH_SECTOR_SIZE)} />
-                <Stat label="Available" value={human(pflash.total)} />
-                <Stat label="Sectors" value={`${pflash.sectors} available / 128 total`} />
-              </div>
-              {pflash.note && (
-                <div className="mt-2 text-xs flex items-center gap-2 opacity-80"><Info className="w-3.5 h-3.5"/> {pflash.note}</div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* DFlash */}
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="p-5">
-              <SectionHeader icon={Layers} title="Data Flash / EEPROM Emulation (DFlash)" subtitle="4‑KB logical sectors from 0xAF00_0000" />
-              <div className="flex flex-wrap items-center gap-3 mb-3">
-                <select value={dflashKey} onChange={(e) => setDflashKey(e.target.value as any)} className="border rounded-xl px-3 py-1 text-sm">
-                  <option value="128KB">128 KB</option>
-                  <option value="96KB">96 KB</option>
-                </select>
-                <Legend/>
-              </div>
-              <MemoryBar blocks={dflashBlocks} labelEvery={4} />
-              <div className="flex gap-6 mt-4">
-                <Stat label="Base" value={hex(DFLASH_BASE)} />
-                <Stat label="Sector" value={human(DFLASH_SECTOR_SIZE)} />
-                <Stat label="Available" value={human(dflash.total)} />
-                <Stat label="Sectors" value={`${dflash.sectors} available / 32 total`} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* DSPR */}
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="p-5">
-              <SectionHeader icon={MemoryStick} title="CPU0 DSPR (Data Scratch-Pad RAM)" subtitle="contiguous region from 0x7000_0000" />
-              <div className="flex items-center gap-3 mb-3">
-                <select value={dsprKey} onChange={(e) => setDsprKey(e.target.value as any)} className="border rounded-xl px-3 py-1 text-sm">
-                  <option value="192KB">192 KB</option>
-                  <option value="144KB">144 KB</option>
-                  <option value="96KB">96 KB</option>
-                </select>
-                <Legend/>
-              </div>
-              <div className="h-10 w-full bg-gray-200 rounded border relative overflow-hidden">
-                <div className="h-full bg-gray-400/50" style={{ width: "100%" }} />
-                <div className="absolute inset-0 flex items-center">
-                  <div className="text-[10px] px-2">{hex(DSPR_BASE)}</div>
-                  <div className="ml-auto text-[10px] px-2">{hex(DSPR_BASE + dspr.total)}</div>
-                </div>
-              </div>
-              <div className="flex gap-6 mt-4">
-                <Stat label="Base" value={hex(DSPR_BASE)} />
-                <Stat label="Size" value={human(dspr.total)} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* DLMU */}
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="p-5">
-              <SectionHeader icon={MemoryStick} title="CPU0 DLMU (Local Memory)" subtitle="from 0x9000_0000" />
-              <div className="flex items-center gap-3 mb-3">
-                <select value={dlmuKey} onChange={(e) => setDlmuKey(e.target.value as any)} className="border rounded-xl px-3 py-1 text-sm">
-                  <option value="8KB">8 KB</option>
-                  <option value="0KB">0 KB</option>
-                </select>
-                <Legend/>
-              </div>
-              <div className="h-10 w-full bg-gray-200 rounded border relative overflow-hidden">
-                <div className="h-full bg-gray-400/50" style={{ width: dlmu.total === 0 ? 0 : "100%" }} />
-                <div className="absolute inset-0 flex items-center">
-                  <div className="text-[10px] px-2">{hex(DLMU_BASE)}</div>
-                  <div className="ml-auto text-[10px] px-2">{hex(DLMU_BASE + dlmu.total)}</div>
-                </div>
-              </div>
-              <div className="flex gap-6 mt-4">
-                <Stat label="Base" value={hex(DLMU_BASE)} />
-                <Stat label="Size" value={human(dlmu.total)} />
-              </div>
-            </CardContent>
-          </Card>
+          <footer>
+            Offsets shown from PFlash bank base (e.g., 0xA000_0000). For PS0 (S0–S63) range is 0x000000–0x0FC000; for PS1 (S64–S127) 0x100000–0x1FC000.
+          </footer>
         </div>
-
-        <footer className="mt-8 text-xs opacity-70">
-          <p className="mb-1">Tip: Hover a sector to see its address range. Use the dropdowns to match your device variant (e.g., TC33x 1.5 MB PFlash / 96 KB DFlash / 144 KB DSPR / 0 KB DLMU).</p>
-          <p>Disclaimer: For engineering, always consult the Infineon User's Manual and specific datasheet for your exact device and stepping.</p>
-        </footer>
-      </div>
+      </aside>
     </div>
-  );
-}
 
+    <footer class="note">
+      Tip: Use the selector above to switch between 2MB, 1.5MB, and 1MB variants. Hover the map to see tooltips; reserved sectors are dimmed.
+    </footer>
+  </div>
 
-    
-    // Then render it:
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-  </script>
+<script>
+(function(){
+  const map = document.getElementById('map');
+  const tbody = document.querySelector('#table tbody');
+  const variantSel = document.getElementById('variant');
+  const btnTop = document.getElementById('btnTop');
+  const btnBottom = document.getElementById('btnBottom');
+
+  const SECTOR_SIZE = 16 * 1024; // 16 KB
+  const STRIDE_HEX = 0x4000;     // for display convenience
+
+  // Compute y-position for a sector (0..127) within the map.
+  function yOf(i){
+    // top padding and total height mapping
+    const pad = 8; // px
+    const usable = map.clientHeight - pad*2;
+    return pad + Math.round((i/128) * usable);
+  }
+
+  function fmtHex(n, width=6){
+    let s = n.toString(16).toUpperCase();
+    while(s.length < width) s = '0' + s;
+    // format like 0x00 0000h → 00 0000h for easy scan
+    return '0x' + s.replace(/([0-9A-F]{2})([0-9A-F]{4})/, '$1_$2');
+  }
+
+  function psOf(i){
+    return (i < 64) ? 'PS0' : 'PS1';
+  }
+
+  function build(variantMB){
+    // available sector count by variant
+    let availableCount = 128; // 2 MB default
+    if(variantMB === 1.5) availableCount = 96;
+    if(variantMB === 1)   availableCount = 64;
+
+    map.querySelectorAll('.sector').forEach(el => el.remove());
+    tbody.innerHTML = '';
+
+    for(let i=0;i<128;i++){
+      const off = i * STRIDE_HEX; // 0x000000, 0x004000, ...
+      const reserved = i >= availableCount;
+
+      // Visual lane
+      const sec = document.createElement('div');
+      sec.className = 'sector';
+      // block height segment between this and next line
+      const y = yOf(i);
+      const yNext = yOf(i+1);
+      sec.style.top = y + 'px';
+      sec.style.height = (yNext - y) + 'px';
+      sec.title = `S${i} • ${psOf(i)} • Offset ${fmtHex(off)} • ${reserved? 'Reserved' : 'Available'} (16 KB)`;
+
+      const row = document.createElement('div');
+      row.className = 'row';
+      const labels = document.createElement('div');
+      labels.className = 'labels';
+
+      const tSec = document.createElement('span');
+      tSec.className = 'tag';
+      tSec.textContent = 'S'+i;
+
+      const tPs = document.createElement('span');
+      tPs.className = 'tag';
+      tPs.style.borderColor = i<64 ? 'rgba(132,94,247,.6)' : 'rgba(34,184,207,.6)';
+      tPs.textContent = psOf(i);
+
+      const tOff = document.createElement('span');
+      tOff.className = 'tag';
+      tOff.textContent = fmtHex(off);
+
+      const pill = document.createElement('span');
+      pill.className = 'pill ' + (reserved ? 'res' : 'ok');
+      pill.textContent = reserved ? 'Reserved' : 'Available';
+
+      labels.append(tSec,tPs,tOff);
+      row.append(labels,pill);
+      sec.append(row);
+      if(reserved){ sec.style.opacity = .45; }
+      map.append(sec);
+
+      // Table row
+      const tr = document.createElement('tr');
+      if(reserved) tr.classList.add('res');
+      tr.innerHTML = `<td>S${i}</td><td>${psOf(i)}</td><td class="addr">${fmtHex(off)}</td><td>${reserved? 'Reserved' : 'Available'}</td>`;
+      tbody.append(tr);
+    }
+  }
+
+  // UI wiring
+  function readVariant(){
+    const v = variantSel.value;
+    return v === '2' ? 2 : (v === '1.5' ? 1.5 : 1);
+  }
+
+  variantSel.addEventListener('change', ()=> build(readVariant()));
+  btnTop.addEventListener('click', ()=> map.scrollTo({top:0,behavior:'smooth'}));
+  btnBottom.addEventListener('click', ()=> map.scrollTo({top:map.scrollHeight,behavior:'smooth'}));
+
+  // First paint
+  build(readVariant());
+})();
+</script>
 </body>
 </html>
