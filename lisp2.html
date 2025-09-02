@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LISP Interpreter with Syntax Highlighting</title>
+  <link href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism.css" rel="stylesheet" />
+  <style>
+    :root { --bg:#f8f8f8; --panel:#ffffff; --ink:#222; --muted:#666; --code-bg:#272822; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      max-width: 900px; margin: 0 auto; padding: 24px; background: var(--bg); color: var(--ink);
+    }
+    h1 { text-align:center; margin: 0 0 16px; font-size: 1.6rem; }
+    .toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:center; margin: 8px 0 16px; }
+    button {
+      padding: 10px 16px; font-size: 0.95rem; border: 1px solid #ccc; background: #f5f5f5; border-radius: 8px; cursor: pointer;
+    }
+    button:active { transform: translateY(1px); }
+    .panel { background: var(--panel); border: 1px solid #e4e4e4; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .editor-wrap { overflow: hidden; }
+    pre.editor { margin:0; background: var(--code-bg); border-radius: 12px 12px 0 0; }
+    pre.editor code { display:block; min-height: 220px; outline: none; white-space: pre; }
+    .hint { color: var(--muted); font-size: 0.9rem; text-align:center; margin: 8px 0 16px; }
+    .output { padding: 16px; border-top: 1px solid #eee; max-height: 320px; overflow:auto; border-radius: 0 0 12px 12px; background:#fafafa; }
+    .row { display:grid; gap:16px; grid-template-columns: 1fr; }
+    @media (min-width: 860px) { .row { grid-template-columns: 1fr; } }
+    .status { font-size: .9rem; color: var(--muted); text-align:center; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <h1>LISP Interpreter (with Highlighting)</h1>
+  <div class="hint">Type code below and press <strong>Run</strong> or <kbd>Ctrl/⌘ + Enter</kbd>.</div>
+
+  <div class="panel editor-wrap">
+    <pre class="editor"><code id="input" class="language-lisp" contenteditable="true">; Sample program
+(define square (lambda (x) (* x x)))
+(define fact
+  (lambda (n)
+    (if (&lt;= n 1)
+        1
+        (* n (fact (- n 1))))))
+
+(begin
+  (print (square 6))
+  (print (fact 6))
+  (print (let ((a 10) (b 20)) (+ a b)))
+  (print (/ 3))     ; => 1/3
+  (print (- 3))     ; => -3
+)
+</code></pre>
+    <div class="toolbar" role="group" aria-label="actions">
+      <button id="runBtn" onclick="runLisp()">Run</button>
+      <button onclick="formatAndHighlight()">Re-highlight</button>
+      <button onclick="resetProgram()">Reset</button>
+      <button onclick="copyOutput()">Copy Output</button>
+    </div>
+    <div class="output" id="output" aria-live="polite"></div>
+  </div>
+  <div class="status" id="status"></div>
+
+  <!-- Prism.js -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-clike.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-lisp.min.js"></script>
+
+  <script>
+    function setStatus(msg){ document.getElementById('status').textContent = msg || ''; }
+    function appendOut(s){
+      const el = document.getElementById('output');
+      el.textContent += (el.textContent ? "\n" : "") + s;
+    }
+
+    function tokenize(str) {
+      // strip ; comments to EOL, then space parens
+      str = str.replace(/;.*$/gm, '');
+      return str.replace(/\(/g, ' ( ').replace(/\)/g, ' ) ').trim().split(/\s+/).filter(Boolean);
+    }
+
+    function parse(tokens) {
+      if (tokens.length === 0) throw "Unexpected EOF";
+      const token = tokens.shift();
+      if (token === '(') {
+        const L = [];
+        while (tokens.length && tokens[0] !== ')') L.push(parse(tokens));
+        if (!tokens.length) throw "Missing ')'";
+        tokens.shift(); // remove ')'
+        return L;
+      } else if (token === ')') {
+        throw "Unexpected ')'";
+      } else if (!isNaN(token)) {
+        return Number(token);
+      } else {
+        return token; // symbol
+      }
+    }
+
+    function standardEnv() {
+      const env = Object.create(null);
+      // arithmetic & comparisons with proper unary handling
+      env['+'] = (...a) => a.reduce((x,y)=>x+y, 0);
+      env['-'] = (...a) => a.length===1 ? -a[0] : a.slice(1).reduce((x,y)=>x-y, a[0]);
+      env['*'] = (...a) => a.reduce((x,y)=>x*y, 1);
+      env['/'] = (...a) => a.length===1 ? 1/a[0] : a.slice(1).reduce((x,y)=>x/y, a[0]);
+      env['>'] = (a,b)=>a>b;   env['<']=(a,b)=>a<b;   env['>=']=(a,b)=>a>=b;   env['<=']=(a,b)=>a<=b;   env['=']=(a,b)=>a===b;
+      // list ops
+      env['list'] = (...xs)=> xs;
+      env['car']  = (xs)=> xs[0];
+      env['cdr']  = (xs)=> xs.slice(1);
+      env['cons'] = (x, xs)=> [x, ...xs];
+      env['length'] = (xs)=> xs.length;
+      env['map'] = (f, xs)=> xs.map(v=> f(v));
+      // misc
+      env['print'] = (x)=>{ appendOut(String(x)); return x; };
+      env['pi'] = Math.PI; env['abs'] = Math.abs;
+      return env;
+    }
+
+    function evalLisp(x, env) {
+      if (typeof x === 'string') {
+        if (x in env) return env[x];
+        throw `Undefined symbol: ${x}`;
+      }
+      if (typeof x === 'number') return x;
+
+      const [op, ...rest] = x;
+
+      if (op === 'define') {
+        const [name, exp] = rest;
+        env[name] = evalLisp(exp, env);
+        return `${name} defined`;
+      }
+      if (op === 'set!') {
+        const [name, exp] = rest;
+        if (!(name in env)) throw `Cannot set! undefined symbol: ${name}`;
+        env[name] = evalLisp(exp, env);
+        return env[name];
+      }
+      if (op === 'lambda') {
+        const [params, ...body] = rest;
+        return function(...args){
+          const local = Object.create(env);
+          params.forEach((p,i)=> local[p] = args[i]);
+          let val;
+          for (const form of body) val = evalLisp(form, local);
+          return val;
+        };
+      }
+      if (op === 'begin') {
+        let val;
+        for (const form of rest) val = evalLisp(form, env);
+        return val;
+      }
+      if (op === 'if') {
+        const [test, conseq, alt] = rest;
+        return evalLisp(evalLisp(test, env) ? conseq : alt, env);
+      }
+      if (op === 'let') {
+        const [bindings, ...body] = rest;
+        const local = Object.create(env);
+        bindings.forEach(([name, expr]) => { local[name] = evalLisp(expr, env); });
+        let val;
+        for (const form of body) val = evalLisp(form, local);
+        return val;
+      }
+
+      const proc = evalLisp(op, env);
+      const args = rest.map(a => evalLisp(a, env));
+      return proc(...args);
+    }
+
+    function runLisp() {
+      const raw = document.getElementById('input').innerText;
+      const tokens = tokenize(raw);
+      const env = standardEnv();
+      const out = [];
+      document.getElementById('output').textContent = '';
+      setStatus('Running…');
+      try {
+        while (tokens.length) {
+          const form = parse(tokens);
+          const val = evalLisp(form, env);
+          out.push(val);
+        }
+        if (out.length) appendOut(out.map(String).join('\n'));
+        setStatus('Done');
+      } catch (err) {
+        appendOut('❌ Error: ' + err);
+        setStatus('Error');
+      }
+    }
+
+    function formatAndHighlight(){ Prism.highlightElement(document.getElementById('input')); }
+    function resetProgram(){
+      document.getElementById('output').textContent='';
+      setStatus('');
+      formatAndHighlight();
+    }
+    function copyOutput(){
+      const out = document.getElementById('output').textContent;
+      navigator.clipboard.writeText(out).then(()=> setStatus('Output copied')).catch(()=> setStatus('Copy failed'));
+    }
+
+    // Keybinding: Ctrl/Cmd + Enter to Run
+    document.addEventListener('keydown', (e)=>{
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault(); runLisp();
+      }
+    });
+
+    // Initial syntax highlight
+    window.addEventListener('load', ()=>{
+      formatAndHighlight();
+    });
+  </script>
+</body>
+</html>
