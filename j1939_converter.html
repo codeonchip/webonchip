@@ -3,330 +3,139 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>J1939 PGN vs. 29‑Bit CAN ID — Online Converter</title>
+<title>J1939 CAN ID → PGN Converter</title>
 <style>
-  :root { --bg:#0f172a; --card:#111827; --muted:#9CA3AF; --fg:#E5E7EB; --accent:#60A5FA; --ok:#34D399; --warn:#FBBF24; }
+  :root { --bg:#0f172a; --card:#111827; --muted:#9CA3AF; --fg:#E5E7EB; --accent:#60A5FA; --ok:#34D399; }
   * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background: var(--bg); color: var(--fg); }
-  header { padding:24px 18px; text-align:center; border-bottom: 1px solid #1f2937; background:#0b1224; position:sticky; top:0; z-index:2; }
-  h1 { margin:0; font-weight:800; letter-spacing:.2px; }
+  html, body { margin:0; height:100%; font-family: ui-sans-serif, system-ui; background: var(--bg); color: var(--fg); }
+  header { padding:24px 18px; text-align:center; border-bottom: 1px solid #1f2937; background:#0b1224; }
+  h1 { margin:0; font-weight:800; }
   h1 small { display:block; font-weight:500; color:var(--muted); margin-top:6px; }
-  main { padding:24px; max-width:1100px; margin:0 auto; }
-  .row { display:flex; gap:16px; flex-wrap:wrap; }
-  .card { background: var(--card); border:1px solid #1f2937; border-radius:14px; padding:16px; flex:1 1 320px; }
-  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  label { font-size:12px; color:var(--muted); display:block; margin-bottom:6px; }
-  input, select, button, textarea { background:#0b1224; color:var(--fg); border:1px solid #243042; border-radius:10px; padding:10px 12px; }
+  main { padding:24px; max-width:800px; margin:0 auto; }
+  .card { background: var(--card); border:1px solid #1f2937; border-radius:14px; padding:16px; margin-bottom:16px; }
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  label { font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+  input, select, button { background:#0b1224; color:var(--fg); border:1px solid #243042; border-radius:10px; padding:10px 12px; }
   input::placeholder { color:#64748b; }
-  button { cursor:pointer; transition:.15s ease; }
-  button:hover { border-color:#334155; transform: translateY(-1px); }
-  .btn { padding:10px 14px; border-radius:10px; border:1px solid #334155; }
-  .btn.primary { background:linear-gradient(180deg,#2563EB,#1D4ED8); border:none; }
-  .btn.ghost { background:transparent; }
-  .btn.warn { background:#1f2937; border-color:#F59E0B; color:#F59E0B; }
-  .grid { display:grid; gap:8px; grid-template-columns: repeat(6, minmax(0,1fr)); }
+  button { cursor:pointer; }
+  .btn.primary { background:linear-gradient(180deg,#2563EB,#1D4ED8); border:none; padding:10px 14px; border-radius:10px; }
+  .btn.danger { background:#7f1d1d; border:none; padding:10px 14px; border-radius:10px; }
+  .grid { display:grid; gap:8px; grid-template-columns: repeat(7, 1fr); margin-top:12px; }
   .grid .cell { padding:8px 10px; background:#0b1224; border:1px solid #1f2937; border-radius:10px; text-align:center; }
-  .muted { color:var(--muted); font-size:12px; }
-  table { width:100%; border-collapse:collapse; border:1px solid #1f2937; border-radius:12px; overflow:hidden; }
-  th, td { border-bottom:1px solid #1f2937; padding:10px 12px; text-align:left; font-variant-numeric: tabular-nums; }
-  th { background:#0b1224; color:#cbd5e1; position:sticky; top:65px; z-index:1; }
-  tbody tr:hover { background:#0b1224; }
   code.k { background:#0b1224; padding:2px 6px; border-radius:6px; border:1px solid #1f2937; }
-  .right { text-align:right; }
-  footer { color:#94a3b8; text-align:center; padding:24px; }
+  table { width:100%; border-collapse:collapse; margin-top:16px; }
+  th, td { border-bottom:1px solid #1f2937; padding:8px; font-variant-numeric: tabular-nums; text-align:left; }
+  th { background:#0b1224; color:#cbd5e1; }
 </style>
 </head>
 <body>
 <header>
-  <h1>J1939 PGN vs. 29‑Bit CAN ID — Online Converter
-    <small>Convert between Extended CAN ID and J1939 fields (Prio, R, DP, PF, PS, SA) with live decoding.</small>
+  <h1>J1939 CAN ID → PGN Converter
+    <small>Decode 29-bit CAN IDs into J1939 fields</small>
   </h1>
 </header>
 
 <main>
-  <div class="row">
-    <section class="card" style="max-width:520px">
-      <h3 style="margin:0 0 10px 0">CAN ID → PGN</h3>
-      <div class="controls">
-        <select id="base">
-          <option value="hex" selected>HEX</option>
-          <option value="dec">DEC</option>
-        </select>
-        <input id="canid" placeholder="e.g. 0CF004FE or 219002879" style="flex:1" />
-        <button class="btn primary" id="decode">Decode</button>
-        <button class="btn ghost" id="clear1">Clear</button>
-        <button class="btn ghost" id="copy1">Copy row</button>
-      </div>
-      <p class="muted">29‑bit format: <code class="k">prio(3) | R(1) | DP(1) | PF(8) | PS(8) | SA(8)</code></p>
-      <div class="grid" style="grid-template-columns: repeat(7, minmax(0,1fr));">
-        <div class="cell"><label>P<br>(Prio.)</label><div id="outP">—</div></div>
-        <div class="cell"><label>R<br>(Res.)</label><div id="outR">—</div></div>
-        <div class="cell"><label>DP<br>(Data Page)</label><div id="outDP">—</div></div>
-        <div class="cell"><label>PF<br>(PDU Format)</label><div id="outPF">—</div></div>
-        <div class="cell"><label>PS<br>(PDU Specific)</label><div id="outPS">—</div></div>
-        <div class="cell"><label>SA<br>(Source Addr.)</label><div id="outSA">—</div></div>
-        <div class="cell"><label>PGN</label><div id="outPGN">—</div></div>
-      </div>
-    </section>
-
-    <section class="card" style="max-width:520px">
-      <h3 style="margin:0 0 10px 0">PGN → CAN ID</h3>
-      <div class="controls">
-        <input id="pgn" placeholder="PGN (hex like F004 or decimal 61444)" style="flex:1" />
-        <input id="sa" placeholder="SA (hex or dec, e.g. FE = 254)" style="width:190px" />
-      </div>
-      <div class="controls">
-        <label style="margin-right:6px">Priority</label>
-        <select id="prio">
-          <option value="3" selected>3 (Default)</option>
-          <option value="6">6</option>
-          <option value="2">2</option>
-          <option value="0">0</option>
-        </select>
-        <button class="btn primary" id="encode">Build CAN ID</button>
-        <button class="btn ghost" id="clear2">Clear</button>
-      </div>
-      <div class="grid" style="grid-template-columns: repeat(4, minmax(0,1fr));">
-        <div class="cell"><label>DP</label><div id="inDP">—</div></div>
-        <div class="cell"><label>PF</label><div id="inPF">—</div></div>
-        <div class="cell"><label>PS</label><div id="inPS">—</div></div>
-        <div class="cell"><label>CAN ID</label><div id="builtID">—</div></div>
-      </div>
-      <p class="muted">For PDU2 (PF ≥ 240), PS = Group Extension (GE=0 unless used). For PDU1 (PF &lt; 240), PS is the Destination Address and PGN’s low byte is 0.</p>
-    </section>
-  </div>
-
-  <section class="card" style="margin-top:16px">
-    <div class="controls" style="justify-content:space-between">
-      <div>
-        <strong>PGN list</strong>
-        <span class="muted">• A tiny built‑in catalog to label common PGNs. (You can add rows below.)</span>
-      </div>
-      <div class="controls">
-        <button class="btn ghost" id="addSample">Add decoded row</button>
-        <button class="btn ghost" id="copyTable">Copy table</button>
-      </div>
+  <section class="card">
+    <h3>Decode CAN ID</h3>
+    <div class="controls">
+      <select id="base">
+        <option value="hex" selected>HEX</option>
+        <option value="dec">DEC</option>
+      </select>
+      <input id="canid" placeholder="e.g. 0CF004FE or 219002879" style="flex:1" />
+      <button class="btn primary" id="decode">Decode</button>
     </div>
-    <div style="overflow:auto; margin-top:8px">
-      <table id="tbl">
-        <thead>
-          <tr>
-            <th style="width:120px">CAN ID</th>
-            <th class="right">P</th>
-            <th class="right">R</th>
-            <th class="right">DP</th>
-            <th class="right">PF</th>
-            <th class="right">PS</th>
-            <th class="right">SA</th>
-            <th>PGN</th>
-            <th>PGN label</th>
-            <th>In DBC?</th>
-          </tr>
-        </thead>
-        <tbody id="body">
-        </tbody>
-      </table>
+    <div class="grid">
+      <div class="cell"><label>P</label><div id="outP">—</div></div>
+      <div class="cell"><label>R</label><div id="outR">—</div></div>
+      <div class="cell"><label>DP</label><div id="outDP">—</div></div>
+      <div class="cell"><label>PF</label><div id="outPF">—</div></div>
+      <div class="cell"><label>PS</label><div id="outPS">—</div></div>
+      <div class="cell"><label>SA</label><div id="outSA">—</div></div>
+      <div class="cell"><label>PGN</label><div id="outPGN">—</div></div>
     </div>
   </section>
 
-  <footer>
-    Built as a single static HTML file — just open <code class="k">index.html</code> locally or host on GitHub Pages.
-  </footer>
+  <section class="card">
+    <div class="controls" style="justify-content:space-between">
+      <h3 style="margin:0">Decoded Rows</h3>
+      <button class="btn danger" id="clearTable">Clear Table</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>CAN ID</th><th>P</th><th>R</th><th>DP</th><th>PF</th><th>PS</th><th>SA</th><th>PGN</th><th>Label</th>
+        </tr>
+      </thead>
+      <tbody id="body"></tbody>
+    </table>
+  </section>
 </main>
 
 <script>
-// --- Helpers
 const toInt = (v) => {
-  if (v === null || v === undefined || v === '') return NaN;
+  if (!v) return NaN;
   v = String(v).trim();
-  if (/^0x/i.test(v)) return parseInt(v, 16);
-  if (/^[0-9a-f]+$/i.test(v) && v.length <= 8 && v.toUpperCase() === v && v.match(/[A-F]/)) {
-    // likely hex like F004 or FE
-    return parseInt(v, 16);
-  }
-  if (/^[0-9]+$/.test(v)) return parseInt(v, 10);
-  if (/^[0-9a-f]+$/i.test(v)) return parseInt(v, 16);
-  return NaN;
+  if (/^0x/i.test(v)) return parseInt(v,16);
+  if (/^[0-9]+$/.test(v)) return parseInt(v,10);
+  return parseInt(v,16);
 };
-const hex2 = (n) => (n >>> 0).toString(16).toUpperCase().padStart(2,'0');
-const hex8 = (n) => (n >>> 0).toString(16).toUpperCase().padStart(8,'0');
-const dec = (n) => (n >>> 0).toString(10);
-
-// --- Built-in PGN labels (tiny set for demo)
+const hex2 = (n) => (n>>>0).toString(16).toUpperCase().padStart(2,'0');
+const hex8 = (n) => (n>>>0).toString(16).toUpperCase().padStart(8,'0');
 const PGN_LABELS = {
-  0xF004: "Electronic Engine Controller 1 (EEC1)",
-  0xFDA1: "Aftertreatment 1 Fuel Control 1",
-  0xF111: "Gaseous Fuel Pressure 3",
-  0xFE6C: "Tachograph",
-  0xFFA2: "Proprietary B",
-  0xEB00: "ISO Transport Protocol, Data Transfer",
-  0xF003: "Electronic Engine Controller 2 (EEC2)",
-  0xFEEE: "Diagnostic Message 1 (DM1)",
-  0xFECA: "Vehicle Speed (CCVS)",
-  0xFEF1: "Electronic Transmission Controller 1 (ETC1)",
-  0xFEF2: "Electronic Transmission Controller 2 (ETC2)",
+  0xF004:"Electronic Engine Controller 1",
+  0xFDA1:"Aftertreatment 1 Fuel Control 1",
+  0xF111:"Gaseous Fuel Pressure 3",
+  0xFE6C:"Tachograph",
+  0xFFA2:"Proprietary B",
+  0xEB00:"ISO Transport Protocol, Data Transfer"
 };
 
-function decode29(canId) {
-  const id = canId >>> 0;
-  const prio = (id >>> 26) & 0x7;
-  const R    = (id >>> 25) & 0x1;
-  const DP   = (id >>> 24) & 0x1;
-  const PF   = (id >>> 16) & 0xFF;
-  const PS   = (id >>> 8)  & 0xFF;
-  const SA   = (id >>> 0)  & 0xFF;
+function decode29(canId){
+  const id=canId>>>0;
+  const prio=(id>>>26)&0x7;
+  const R=(id>>>25)&1;
+  const DP=(id>>>24)&1;
+  const PF=(id>>>16)&0xFF;
+  const PS=(id>>>8)&0xFF;
+  const SA=id&0xFF;
   let PGN;
-  if (PF < 240) {
-    PGN = (DP << 16) | (PF << 8) | 0x00; // PDU1: PS is DA
-  } else {
-    PGN = (DP << 16) | (PF << 8) | PS;   // PDU2: PS is GE
-  }
-  return { prio, R, DP, PF, PS, SA, PGN };
+  if(PF<240) PGN=(DP<<16)|(PF<<8);
+  else PGN=(DP<<16)|(PF<<8)|PS;
+  return{prio,R,DP,PF,PS,SA,PGN};
 }
 
-function encode29({prio=3, PGN=0, SA=0}) {
-  prio = (prio|0) & 0x7;
-  PGN  = PGN >>> 0;
-  SA   = SA >>> 0;
-  const DP = (PGN >>> 16) & 0x1;
-  const PF = (PGN >>> 8) & 0xFF;
-  let PS;
-  if (PF < 240) {
-    // PDU1 — PS is Destination Address; PGN’s LSByte must be 0
-    if ((PGN & 0xFF) !== 0) {
-      throw new Error("For PDU1 (PF < 240), PGN low byte must be 0.");
-    }
-    PS = 0xFF; // default DA = global (can be changed in table if needed)
-  } else {
-    // PDU2 — PS is Group Extension
-    PS = PGN & 0xFF;
-  }
-  const id = (prio << 26) | (0 << 25) | (DP << 24) | (PF << 16) | (PS << 8) | (SA & 0xFF);
-  return { id, DP, PF, PS };
+function toHex(val,pad=2){return (val>>>0).toString(16).toUpperCase().padStart(pad,'0');}
+
+function addRow(o){
+  const tbody=document.querySelector("#body");
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><code class=k>${hex8(o.canid)}</code></td><td>${o.prio}</td><td>${o.R}</td><td>${toHex(o.DP)}</td><td>${toHex(o.PF)}</td><td>${toHex(o.PS)}</td><td>${toHex(o.SA)}</td><td>${toHex(o.PGN,4)}</td><td>${PGN_LABELS[o.PGN]||''}</td>`;
+  tbody.prepend(tr);
 }
 
-// --- UI wiring
-const $ = (s) => document.querySelector(s);
-const body = $("#body");
-
-function fillDecoded(d, raw) {
-  $("#outP").textContent = d.prio;
-  $("#outR").textContent = d.R;
-  $("#outDP").textContent = toHexOrDec(d.DP,2);
-  $("#outPF").textContent = toHexOrDec(d.PF,2);
-  $("#outPS").textContent = toHexOrDec(d.PS,2);
-  $("#outSA").textContent = toHexOrDec(d.SA,2);
-  $("#outPGN").textContent = toHexOrDec(d.PGN,4);
-  // add a preview row
-  addRow({
-    canid: raw,
-    prio: d.prio, R: d.R, DP: d.DP, PF: d.PF, PS: d.PS, SA: d.SA, PGN: d.PGN
-  });
-}
-
-function toHexOrDec(val, pad=0) {
-  const b = $("#base").value;
-  if (b === "hex") {
-    const w = Math.max(2, pad);
-    return ("0".repeat(w) + val.toString(16).toUpperCase()).slice(-w);
-  }
-  return String(val >>> 0);
-}
-
-function addRow(o) {
-  const tr = document.createElement("tr");
-  const pgnLabel = PGN_LABELS[o.PGN >>> 0] || "";
-  tr.innerHTML = `
-    <td><code class="k">${hex8(toInt(o.canid) ?? 0)}</code></td>
-    <td class="right">${o.prio}</td>
-    <td class="right">${o.R}</td>
-    <td class="right">${toHexOrDec(o.DP,2)}</td>
-    <td class="right">${toHexOrDec(o.PF,2)}</td>
-    <td class="right">${toHexOrDec(o.PS,2)}</td>
-    <td class="right">${toHexOrDec(o.SA,2)}</td>
-    <td><code class="k">${toHexOrDec(o.PGN,4)}</code></td>
-    <td>${pgnLabel}</td>
-    <td>${pgnLabel ? '<a href="#" style="color:var(--ok);text-decoration:none">J1939 DBC</a>' : '—'}</td>
-  `;
-  body.prepend(tr);
-}
-
-// Buttons
-$("#decode").addEventListener("click", () => {
-  const raw = $("#canid").value.trim();
-  const id = toInt(raw);
-  if (Number.isNaN(id)) {
-    alert("Enter a valid CAN ID (hex like 0CF004FE or decimal).");
-    return;
-  }
-  try {
-    const d = decode29(id);
-    fillDecoded(d, id);
-  } catch (e) {
-    alert(e.message);
-  }
+document.querySelector("#decode").addEventListener("click",()=>{
+  const raw=document.querySelector("#canid").value.trim();
+  const id=toInt(raw);
+  if(Number.isNaN(id)){alert("Invalid CAN ID");return;}
+  const d=decode29(id);
+  document.querySelector("#outP").textContent=d.prio;
+  document.querySelector("#outR").textContent=d.R;
+  document.querySelector("#outDP").textContent=toHex(d.DP);
+  document.querySelector("#outPF").textContent=toHex(d.PF);
+  document.querySelector("#outPS").textContent=toHex(d.PS);
+  document.querySelector("#outSA").textContent=toHex(d.SA);
+  document.querySelector("#outPGN").textContent=toHex(d.PGN,4);
+  addRow({canid:id,...d});
 });
 
-$("#clear1").addEventListener("click", () => {
-  $("#canid").value = "";
-  ["outP","outR","outDP","outPF","outPS","outSA","outPGN"].forEach(id => $("#"+id).textContent = "—");
-});
+// Clear table button
+const tbody=document.querySelector("#body");
+document.querySelector("#clearTable").addEventListener("click",()=>{tbody.innerHTML="";});
 
-$("#copy1").addEventListener("click", async () => {
-  const first = document.querySelector("#body tr:first-child");
-  if (!first) { alert("No rows yet."); return; }
-  const s = [...first.querySelectorAll("td")].map(td => td.textContent.trim()).join("	");
-  try { await navigator.clipboard.writeText(s); alert("Copied latest decoded row to clipboard."); } catch {}
-});
-
-$("#encode").addEventListener("click", () => {
-  const pgnVal = toInt($("#pgn").value);
-  const saVal  = toInt($("#sa").value);
-  const prio   = parseInt($("#prio").value, 10) || 3;
-  if (Number.isNaN(pgnVal)) { alert("Enter a valid PGN (hex or decimal)."); return; }
-  if (Number.isNaN(saVal))  { alert("Enter a valid Source Address (hex or decimal)."); return; }
-  try {
-    const r = encode29({prio, PGN:pgnVal, SA:saVal});
-    $("#inDP").textContent = toHexOrDec(r.DP,2);
-    $("#inPF").textContent = toHexOrDec(r.PF,2);
-    $("#inPS").textContent = toHexOrDec(r.PS,2);
-    $("#builtID").textContent = hex8(r.id);
-    addRow({
-      canid: r.id, prio, R:0, DP:r.DP, PF:r.PF, PS:r.PS, SA:saVal, PGN:pgnVal
-    });
-  } catch (e) {
-    alert(e.message);
-  }
-});
-
-$("#clear2").addEventListener("click", () => {
-  $("#pgn").value = ""; $("#sa").value = "";
-  ["inDP","inPF","inPS","builtID"].forEach(id => $("#"+id).textContent = "—");
-});
-
-$("#addSample").addEventListener("click", () => {
-  const raw = $("#canid").value.trim();
-  const id = toInt(raw);
-  if (Number.isNaN(id)) { alert("Decode a CAN ID first."); return; }
-  const d = decode29(id);
-  addRow({canid:id, prio:d.prio, R:d.R, DP:d.DP, PF:d.PF, PS:d.PS, SA:d.SA, PGN:d.PGN});
-});
-
-$("#copyTable").addEventListener("click", async () => {
-  const rows = [["CAN ID","P","R","DP","PF","PS","SA","PGN","Label","In DBC?"]];
-  document.querySelectorAll("#body tr").forEach(tr => {
-    rows.push([...tr.children].map(td => td.textContent.trim()));
-  });
-  const text = rows.map(r => r.join("	")).join("
-");
-  try { await navigator.clipboard.writeText(text); alert("Copied table to clipboard."); } catch {}
-});
-
-// Seed a few example rows
-[0x0CF004FE, 0x18FDA101, 0x18F111FE, 0x0FE6CEEE, 0x18FFA227, 0x18EBF900].forEach(id => {
-  const d = decode29(id);
-  addRow({canid:id, prio:d.prio, R:d.R, DP:d.DP, PF:d.PF, PS:d.PS, SA:d.SA, PGN:d.PGN});
-});
+// preload sample
+[0x0CF004FE,0x18FDA101,0x18F111FE].forEach(id=>{const d=decode29(id);addRow({canid:id,...d});});
 </script>
 </body>
 </html>
