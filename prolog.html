@@ -5,23 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Prolog Interpreter (Offline, No Dependencies)</title>
   <style>
-    :root {
-      --bg:#f8f8f8; --panel:#ffffff; --ink:#222; --muted:#666; --border:#e4e4e4; --btn-bg:#f5f5f5; --code-bg:#0b2a4a0f; --code-ink:#0b3a7a;
-    }
-    * { box-sizing: border-box; }
-    body { font-family: "Fira Code", "Source Code Pro", Consolas, monospace; background:var(--bg); color:var(--ink); margin:0; }
-    main { max-width: 1000px; margin: 0 auto; padding: 24px; }
-    h1 { margin: 0 0 12px; text-align:center; font-family: Inter, Arial, sans-serif; }
-    .grid { display:grid; grid-template-columns: 1fr; gap:16px; }
-    @media (min-width: 980px){ .grid { grid-template-columns: 1fr 1fr; } }
-    .card { background: var(--panel); border:1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.05); overflow:hidden; }
-    .card h2 { margin:0; padding: 10px 14px; border-bottom:1px solid var(--border); font-family: Inter, Arial, sans-serif; font-size:1rem; background:#fafafa; }
-    .editor { padding: 0; }
-    textarea { width:100%; min-height: 260px; border:0; outline: none; resize: vertical; padding: 12px 14px; background: var(--code-bg); color: var(--code-ink); font-family: "Fira Code", "Source Code Pro", Consolas, monospace; }
-    .controls { display:flex; gap:8px; flex-wrap:wrap; padding: 12px; border-top:1px solid var(--border); background:#fafafa; }
-    button { padding: 10px 14px; font-size:.95rem; border:1px solid var(--border); border-radius:8px; background: var(--btn-bg); cursor: pointer; }
-    .output { padding: 12px; min-height: 180px; white-space: pre-wrap; font-family: "Fira Code", "Source Code Pro", Consolas, monospace; }
-    .muted { color: var(--muted); font-size:.9rem; text-align:center; margin-top:4px; }
+    :root { --bg:#f8f8f8; --panel:#fff; --ink:#222; --muted:#666; --border:#e4e4e4; --btn-bg:#f5f5f5; --code-bg:#0b2a4a0f; --code-ink:#0b3a7a; }
+    *{box-sizing:border-box}
+    body{font-family:"Fira Code","Source Code Pro",Consolas,monospace;background:var(--bg);color:var(--ink);margin:0}
+    main{max-width:1000px;margin:0 auto;padding:24px}
+    h1{margin:0 0 12px;text-align:center;font-family:Inter,Arial,sans-serif}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media(min-width:980px){.grid{grid-template-columns:1fr 1fr}}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.05);overflow:hidden}
+    .card h2{margin:0;padding:10px 14px;border-bottom:1px solid var(--border);font-family:Inter,Arial,sans-serif;font-size:1rem;background:#fafafa}
+    .editor{padding:0}
+    textarea{width:100%;min-height:260px;border:0;outline:none;resize:vertical;padding:12px 14px;background:var(--code-bg);color:var(--code-ink);font-family:"Fira Code","Source Code Pro",Consolas,monospace}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;padding:12px;border-top:1px solid var(--border);background:#fafafa}
+    button{padding:10px 14px;font-size:.95rem;border:1px solid var(--border);border-radius:8px;background:var(--btn-bg);cursor:pointer}
+    .output{padding:12px;min-height:180px;white-space:pre-wrap;font-family:"Fira Code","Source Code Pro",Consolas,monospace}
+    .muted{color:var(--muted);font-size:.9rem;text-align:center;margin-top:4px}
   </style>
 </head>
 <body>
@@ -50,7 +48,7 @@ likes(alice, [apples, bananas]).
 
       <section class="card editor">
         <h2>Query</h2>
-        <textarea id="query">% Example queries (one at a time)
+        <textarea id="query">% Example queries (run one at a time)
 ?- ancestor(john, Who).
 ?- member(X, [a,b,c]).
         </textarea>
@@ -62,7 +60,7 @@ likes(alice, [apples, bananas]).
         </div>
       </section>
 
-      <section class="card" style="grid-column: 1 / -1;">
+      <section class="card" style="grid-column:1 / -1;">
         <h2>Output</h2>
         <div id="output" class="output"></div>
         <div class="muted" id="status"></div>
@@ -83,23 +81,15 @@ likes(alice, [apples, bananas]).
     function tokenize(src){
       // Remove % line comments
       src = src.replace(/%.*$/gm,'');
-      // Normalize ?- queries by removing prefix if present (we keep query separate anyway)
-      // Split into tokens
       const tokens=[]; let i=0;
       while(i < src.length){
         const c = src[i];
         if (/\s/.test(c)) { i++; continue; }
-        if (c===':' && src[i+1]==='-'){ tokens.push(":-"); i+=2; continue; }
-        if (c==='?' && src[i+1]==='-'){ tokens.push('?-'); i+=2; continue; }
-        if (",.()[]|".includes(c)) { tokens.push(c); i++; continue; }
-        if (c==='\' && src[i+1]==='+'){ tokens.push('not_op'); i+=2; continue; }
-        if (c==='\' && src[i+1]==='\' && src[i+2]==='+'){ tokens.push('not_op'); i+=3; continue; }
-        if (c==='\' && src[i+1]===''''){ // ignore, not_op variant won't appear normally
-          i++; continue;
-        }
-        if (c==='\''){
-          // quoted atom 'like this'
-          i++; let s=''; while(i<src.length && src[i]!=="'"){ s += src[i++]; }
+        if (c === ':' && src[i+1] === '-') { tokens.push(":-"); i += 2; continue; }
+        if (c === '?' && src[i+1] === '-') { tokens.push('?-'); i += 2; continue; }
+        if (c === ',' || c === '.' || c === '(' || c === ')' || c === '[' || c === ']' || c === '|') { tokens.push(c); i++; continue; }
+        if (c === "'") { // quoted atom
+          i++; let s = ""; while(i < src.length && src[i] !== "'") { s += src[i++]; }
           i++; tokens.push({type:'atom', value:s}); continue;
         }
         if (/[0-9]/.test(c)){
@@ -114,7 +104,7 @@ likes(alice, [apples, bananas]).
           let s=''; while(i<src.length && /[A-Za-z0-9_]/.test(src[i])) s+=src[i++];
           tokens.push({type:'atom', value:s}); continue;
         }
-        // fallback single char token
+        // otherwise single-char token (fallback)
         tokens.push(c); i++;
       }
       return tokens;
@@ -214,10 +204,11 @@ likes(alice, [apples, bananas]).
       // accept optional ?- prefix; only parse first query in the box
       const m = text.match(/\?-[\s\S]*?\./);
       const qtext = m ? m[0].replace(/^\?-\s*/, '') : text;
-      const clauses = parseProgram(qtext); // reuse parser for a body ending with '.'
+      const clauses = parseProgram(qtext);
       if (!clauses.length) throw 'Empty query';
       if (clauses.length>1) setStatus('Parsed first query only.');
-      const goals = clauses[0].head && clauses[0].body.length===0 ? [clauses[0].head] : clauses[0].body.length? clauses[0].body : [clauses[0].head];
+      const cl0 = clauses[0];
+      const goals = cl0.body.length ? cl0.body : [cl0.head];
       // collect variables used in goals
       const vset = new Map();
       function collect(t){
@@ -286,7 +277,6 @@ likes(alice, [apples, bananas]).
       if (goal.type==='atom'){
         if (goal.name==='true'){ branches.push({goals: restGoals, subst}); }
         else if (goal.name==='fail'){ /* no branches */ }
-        else { /* not a builtin atom */ }
         return branches;
       }
       if (goal.functor==='='){
@@ -320,8 +310,10 @@ likes(alice, [apples, bananas]).
           return;
         }
         // user-defined clauses
-        const name = (g0.type==='comp')? g0.functor : g0.name;
-        const arity = (g0.type==='comp')? g0.args.length : 0;
+        if (g0.type==='atom'){ // treat atom/0 as comp with 0 args
+          g0 = Comp(g0.name, []);
+        }
+        const name = g0.functor; const arity = g0.args.length;
         for (const cl of DB){
           const h = cl.head;
           if (h.type==='comp' && h.functor===name && h.args.length===arity){
