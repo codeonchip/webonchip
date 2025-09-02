@@ -21,6 +21,292 @@
   <!-- Your code (converted to plain JS/JSX) -->
   <script type="text/babel">
     // Paste the React component code here (replace export default with just function App)
+
+import React, { useMemo, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Download, Info, Layers, Server, MemoryStick } from "lucide-react";
+
+/**
+ * TC33x/TC32x Memory Map Visualizer
+ *
+ * This single-file React page lets you explore common memory variants shown in the
+ * Infineon AURIX TC33x/TC32x "Memory maps" figures (PFlash, DFlash, DSPR, DLMU).
+ *
+ * Notes
+ * - This is an illustrative tool; sizes, addresses, and sector counts are mapped from
+ *   the figures and public summaries. Some details are simplified to keep the UI compact.
+ * - PFlash is shown as one logical bank composed of 16‑KB sectors.
+ * - DFlash sectors are shown as 4‑KB blocks.
+ * - DSPR/DLMU are drawn as contiguous regions starting at the typical base addresses
+ *   (0x7000_0000 for DSPR, 0x9000_0000 for DLMU) for visualization only.
+ */
+
+// ---------- Data Model ----------
+
+type PFlashVariantKey = "2MB" | "1_5MB" | "1MB";
+
+const PFLASH_BASE = 0x8000_0000;
+const PFLASH_SECTOR_SIZE = 16 * 1024; // 16 KB
+const PFLASH_VARIANTS: Record<PFlashVariantKey, { title: string; total: number; sectors: number; reservedSectorsAtTop: number; note?: string }>
+  = {
+    "2MB": { title: "2 MB", total: 2 * 1024 * 1024, sectors: 128, reservedSectorsAtTop: 0 },
+    "1_5MB": { title: "1.5 MB", total: 1.5 * 1024 * 1024, sectors: 96, reservedSectorsAtTop: 32, note: "Top 0.5 MB reserved (not available)." },
+    "1MB": { title: "1 MB", total: 1 * 1024 * 1024, sectors: 64, reservedSectorsAtTop: 64, note: "Top 1 MB reserved (not available)." }
+  };
+
+// DFlash (EEPROM emulation) — 4 KB sectors
+const DFLASH_BASE = 0xAF00_0000;
+const DFLASH_SECTOR_SIZE = 4 * 1024;
+const DFLASH_VARIANTS = {
+  "128KB": { total: 128 * 1024, sectors: 32, reservedSectorsAtTop: 0, title: "128 KB" },
+  "96KB": { total: 96 * 1024, sectors: 24, reservedSectorsAtTop: 8, title: "96 KB (upper area reserved)" }
+};
+
+// CPU memories (CPU0 variants shown in the figure)
+const DSPR_BASE = 0x7000_0000;
+const DLMU_BASE = 0x9000_0000;
+const DSPR_VARIANTS = {
+  "192KB": { total: 192 * 1024, title: "192 KB" },
+  "144KB": { total: 144 * 1024, title: "144 KB (reduced)" },
+  "96KB": { total: 96 * 1024, title: "96 KB (reduced)" }
+};
+const DLMU_VARIANTS = {
+  "8KB": { total: 8 * 1024, title: "8 KB" },
+  "0KB": { total: 0, title: "0 KB (reduced)" }
+};
+
+// ---------- Helpers ----------
+
+function hex(n: number) {
+  return "0x" + n.toString(16).toUpperCase().padStart(8, "0");
+}
+
+function human(n: number) {
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${n} B`;
+}
+
+// Compute blocks for a memory region with optional reserved area at top
+function buildBlocks({ base, blockSize, blocks, reservedAtTop }: { base: number; blockSize: number; blocks: number; reservedAtTop?: number }) {
+  const arr: { index: number; start: number; end: number; reserved: boolean }[] = [];
+  for (let i = 0; i < blocks; i++) {
+    const start = base + i * blockSize;
+    const end = start + blockSize - 1;
+    const reserved = reservedAtTop ? i >= blocks - reservedAtTop : false;
+    arr.push({ index: i, start, end, reserved });
+  }
+  return arr;
+}
+
+// ---------- UI Primitives ----------
+
+function SectionHeader({ icon: Icon, title, subtitle }: { icon: any; title: string; subtitle?: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <Icon className="w-5 h-5" />
+      <div>
+        <div className="text-lg font-semibold leading-tight">{title}</div>
+        {subtitle && <div className="text-xs opacity-70 -mt-0.5">{subtitle}</div>}
+      </div>
+    </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="flex flex-wrap gap-3 text-xs">
+      <div className="flex items-center gap-2"><div className="w-4 h-3 rounded bg-gray-200" /> Available</div>
+      <div className="flex items-center gap-2"><div className="w-4 h-3 rounded bg-gray-400" /> Reserved</div>
+      <div className="flex items-center gap-2"><div className="w-4 h-3 rounded border border-dashed" /> Sector/Block</div>
+    </div>
+  );
+}
+
+function MemoryBar({ blocks, maxWidth = 720, labelEvery = 8 }: { blocks: { index: number; start: number; end: number; reserved: boolean }[]; maxWidth?: number; labelEvery?: number }) {
+  const widthPerBlock = Math.max(4, Math.floor(maxWidth / blocks.length));
+  return (
+    <div className="overflow-x-auto">
+      <div className="flex items-end h-16">
+        {blocks.map((b) => (
+          <div key={b.index}
+               title={`S${b.index}  ${hex(b.start)} - ${hex(b.end)} ${b.reserved ? "(reserved)" : ""}`}
+               className={`border border-dashed h-10 ${b.reserved ? "bg-gray-400" : "bg-gray-200"}`}
+               style={{ width: widthPerBlock }} />
+        ))}
+      </div>
+      <div className="flex text-[10px] text-center select-none">
+        {blocks.map((b) => (
+          <div key={"l" + b.index} style={{ width: widthPerBlock }}>
+            {b.index % labelEvery === 0 ? `S${b.index}` : "\u00A0"}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-xs">
+      <div className="opacity-60">{label}</div>
+      <div className="font-medium">{value}</div>
+    </div>
+  );
+}
+
+// ---------- Main Page ----------
+
+export default function App() {
+  const [pflashKey, setPflashKey] = useState<PFlashVariantKey>("2MB");
+  const [dflashKey, setDflashKey] = useState<keyof typeof DFLASH_VARIANTS>("128KB");
+  const [dsprKey, setDsprKey] = useState<keyof typeof DSPR_VARIANTS>("192KB");
+  const [dlmuKey, setDlmuKey] = useState<keyof typeof DLMU_VARIANTS>("8KB");
+
+  const pflash = PFLASH_VARIANTS[pflashKey];
+  const dflash = DFLASH_VARIANTS[dflashKey];
+  const dspr = DSPR_VARIANTS[dsprKey];
+  const dlmu = DLMU_VARIANTS[dlmuKey];
+
+  const pflashBlocks = useMemo(() => buildBlocks({ base: PFLASH_BASE, blockSize: PFLASH_SECTOR_SIZE, blocks: 128, reservedAtTop: pflash.reservedSectorsAtTop }), [pflashKey]);
+  const dflashBlocks = useMemo(() => buildBlocks({ base: DFLASH_BASE, blockSize: DFLASH_SECTOR_SIZE, blocks: 32, reservedAtTop: dflash.reservedSectorsAtTop }), [dflashKey]);
+
+  const exportJSON = () => {
+    const payload = {
+      pflash: { variant: pflash.title, base: hex(PFLASH_BASE), sectorBytes: PFLASH_SECTOR_SIZE, sectors: pflashBlocks.map(b => ({ index: b.index, start: hex(b.start), end: hex(b.end), reserved: b.reserved })) },
+      dflash: { variant: dflash.title, base: hex(DFLASH_BASE), sectorBytes: DFLASH_SECTOR_SIZE, sectors: dflashBlocks.map(b => ({ index: b.index, start: hex(b.start), end: hex(b.end), reserved: b.reserved })) },
+      dspr: { variant: dspr.title, base: hex(DSPR_BASE), sizeBytes: dspr.total },
+      dlmu: { variant: dlmu.title, base: hex(DLMU_BASE), sizeBytes: dlmu.total },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "tc33x_tc32x_memory_map.json"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-white text-gray-900">
+      <div className="mx-auto max-w-6xl p-6">
+        <header className="flex items-start justify-between gap-4 pb-4 border-b">
+          <div>
+            <h1 className="text-2xl font-bold">TC33x / TC32x Memory Map Visualizer</h1>
+            <p className="text-sm opacity-70 mt-1">Interactive, simplified view of Program Flash (PFlash), Data Flash (DFlash), and CPU memories (DSPR & DLMU). Select the variants to match your MCU.</p>
+          </div>
+          <Button onClick={exportJSON} className="rounded-2xl shadow px-4"><Download className="w-4 h-4 mr-2"/>Export JSON</Button>
+        </header>
+
+        <div className="grid md:grid-cols-2 gap-6 mt-6">
+          {/* PFlash */}
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="p-5">
+              <SectionHeader icon={Server} title="Program Flash (PFlash)" subtitle="16‑KB logical sectors from 0x8000_0000" />
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <select value={pflashKey} onChange={(e) => setPflashKey(e.target.value as PFlashVariantKey)} className="border rounded-xl px-3 py-1 text-sm">
+                  <option value="2MB">2 MB</option>
+                  <option value="1_5MB">1.5 MB</option>
+                  <option value="1MB">1 MB</option>
+                </select>
+                <Legend/>
+              </div>
+              <MemoryBar blocks={pflashBlocks} labelEvery={8} />
+              <div className="flex gap-6 mt-4">
+                <Stat label="Base" value={hex(PFLASH_BASE)} />
+                <Stat label="Sector" value={human(PFLASH_SECTOR_SIZE)} />
+                <Stat label="Available" value={human(pflash.total)} />
+                <Stat label="Sectors" value={`${pflash.sectors} available / 128 total`} />
+              </div>
+              {pflash.note && (
+                <div className="mt-2 text-xs flex items-center gap-2 opacity-80"><Info className="w-3.5 h-3.5"/> {pflash.note}</div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* DFlash */}
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="p-5">
+              <SectionHeader icon={Layers} title="Data Flash / EEPROM Emulation (DFlash)" subtitle="4‑KB logical sectors from 0xAF00_0000" />
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <select value={dflashKey} onChange={(e) => setDflashKey(e.target.value as any)} className="border rounded-xl px-3 py-1 text-sm">
+                  <option value="128KB">128 KB</option>
+                  <option value="96KB">96 KB</option>
+                </select>
+                <Legend/>
+              </div>
+              <MemoryBar blocks={dflashBlocks} labelEvery={4} />
+              <div className="flex gap-6 mt-4">
+                <Stat label="Base" value={hex(DFLASH_BASE)} />
+                <Stat label="Sector" value={human(DFLASH_SECTOR_SIZE)} />
+                <Stat label="Available" value={human(dflash.total)} />
+                <Stat label="Sectors" value={`${dflash.sectors} available / 32 total`} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* DSPR */}
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="p-5">
+              <SectionHeader icon={MemoryStick} title="CPU0 DSPR (Data Scratch-Pad RAM)" subtitle="contiguous region from 0x7000_0000" />
+              <div className="flex items-center gap-3 mb-3">
+                <select value={dsprKey} onChange={(e) => setDsprKey(e.target.value as any)} className="border rounded-xl px-3 py-1 text-sm">
+                  <option value="192KB">192 KB</option>
+                  <option value="144KB">144 KB</option>
+                  <option value="96KB">96 KB</option>
+                </select>
+                <Legend/>
+              </div>
+              <div className="h-10 w-full bg-gray-200 rounded border relative overflow-hidden">
+                <div className="h-full bg-gray-400/50" style={{ width: "100%" }} />
+                <div className="absolute inset-0 flex items-center">
+                  <div className="text-[10px] px-2">{hex(DSPR_BASE)}</div>
+                  <div className="ml-auto text-[10px] px-2">{hex(DSPR_BASE + dspr.total)}</div>
+                </div>
+              </div>
+              <div className="flex gap-6 mt-4">
+                <Stat label="Base" value={hex(DSPR_BASE)} />
+                <Stat label="Size" value={human(dspr.total)} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* DLMU */}
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="p-5">
+              <SectionHeader icon={MemoryStick} title="CPU0 DLMU (Local Memory)" subtitle="from 0x9000_0000" />
+              <div className="flex items-center gap-3 mb-3">
+                <select value={dlmuKey} onChange={(e) => setDlmuKey(e.target.value as any)} className="border rounded-xl px-3 py-1 text-sm">
+                  <option value="8KB">8 KB</option>
+                  <option value="0KB">0 KB</option>
+                </select>
+                <Legend/>
+              </div>
+              <div className="h-10 w-full bg-gray-200 rounded border relative overflow-hidden">
+                <div className="h-full bg-gray-400/50" style={{ width: dlmu.total === 0 ? 0 : "100%" }} />
+                <div className="absolute inset-0 flex items-center">
+                  <div className="text-[10px] px-2">{hex(DLMU_BASE)}</div>
+                  <div className="ml-auto text-[10px] px-2">{hex(DLMU_BASE + dlmu.total)}</div>
+                </div>
+              </div>
+              <div className="flex gap-6 mt-4">
+                <Stat label="Base" value={hex(DLMU_BASE)} />
+                <Stat label="Size" value={human(dlmu.total)} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <footer className="mt-8 text-xs opacity-70">
+          <p className="mb-1">Tip: Hover a sector to see its address range. Use the dropdowns to match your device variant (e.g., TC33x 1.5 MB PFlash / 96 KB DFlash / 144 KB DSPR / 0 KB DLMU).</p>
+          <p>Disclaimer: For engineering, always consult the Infineon User's Manual and specific datasheet for your exact device and stepping.</p>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+
+    
     // Then render it:
     ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   </script>
