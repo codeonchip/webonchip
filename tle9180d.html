@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>TLE9180D BLDC Gate Driver Simulator (Educational)</title>
+  <style>
+    :root{
+      --bg:#0d111a;--panel:#141a26;--ink:#e8ecf8;--muted:#9fb0d1;--line:#2a3450;--accent:#7dd3fc;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--chip:#1b2233
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    h1{font-size:20px;margin:0 0 8px}
+    h2{font-size:16px;margin:14px 0 8px}
+    .app{display:grid;grid-template-columns:340px 1fr;gap:14px;padding:16px;min-height:100%}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+    .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+    .row>label{min-width:130px;color:var(--muted)}
+    input[type=range]{width:100%}
+    input[type=number]{width:100px;background:#0c1220;color:var(--ink);border:1px solid #334066;border-radius:8px;padding:6px}
+    textarea, input[type=text]{width:100%;background:#0c1220;color:var(--ink);border:1px solid #334066;border-radius:8px;padding:8px}
+    textarea{min-height:120px;resize:vertical}
+    button{background:#18223a;color:var(--ink);border:1px solid #3a4a76;border-radius:10px;padding:8px 10px;cursor:pointer}
+    button:hover{filter:brightness(1.08)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .kv{display:flex;justify-content:space-between;gap:8px}
+    .kv .k{color:var(--muted)}
+    .meter{height:14px;background:#0a1020;border:1px solid #2a3554;border-radius:999px;overflow:hidden}
+    .meter>i{display:block;height:100%;background:linear-gradient(90deg,#60a5fa,#22d3ee);width:0%}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .log{height:180px;overflow:auto;background:#0c1220;border:1px solid #334066;border-radius:8px;padding:8px}
+    .spark{height:40px;width:100%;display:block;border:1px solid #2a3554;border-radius:8px;background:#0a1020}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid #2b375c;font-weight:600}
+    .pill.ok{background:#0d2a1a;color:#b9f7cc;border-color:#1e8242}
+    .pill.warn{background:#2d250f;color:#ffe0a3;border-color:#8a6808}
+    .pill.err{background:#321216;color:#ffbac1;border-color:#a11a26}
+    .pin{min-width:80px;border:1px solid #334066;border-radius:10px;padding:6px 8px}
+    .pin .name{color:var(--muted);font-size:12px}
+    .badge{font-size:12px;padding:3px 7px;border-radius:999px;border:1px solid #3a4a76;background:#121833}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
+    th{color:#cfe2ff}
+    .small{font-size:12px}
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- LEFT: Controls -->
+  <aside class="panel" id="controls">
+    <h1>TLE9180D BLDC Gate Driver Simulator</h1>
+    <div class="row"><span class="badge">Educational • High-level model (not analog-accurate)</span></div>
+
+    <h2>Supply</h2>
+    <div class="row"><label>VBAT (V)</label><input id="vbat" type="range" min="6" max="60" step="0.1" value="12"><span id="vbatVal" class="mono">12.0 V</span></div>
+    <div class="grid3">
+      <button id="preset12">Preset 12 V</button>
+      <button id="preset48">Preset 48 V</button>
+      <button id="toggleRipple">Toggle Ripple</button>
+    </div>
+
+    <h2>Driver Control</h2>
+    <div class="grid3">
+      <label class="row"><input type="checkbox" id="drvEnable"> Driver Enable</label>
+      <label class="row"><input type="checkbox" id="coast"> Coast (all OFF)</label>
+      <label class="row"><input type="checkbox" id="brake"> Brake (all LS)</label>
+    </div>
+    <div class="row"><label>Deadtime (ns)</label><input id="deadtime" type="number" value="400"></div>
+    <div class="row"><label>Gate Strength</label><input id="gateStr" type="range" min="1" max="4" step="1" value="2"><span id="gateStrVal" class="mono">2</span></div>
+
+    <h2>Mode</h2>
+    <div class="grid3">
+      <label class="row"><input type="radio" name="mode" value="manual" checked> Manual PWM</label>
+      <label class="row"><input type="radio" name="mode" value="sixstep"> Six‑Step</label>
+      <label class="row"><input type="checkbox" id="reverse"> Reverse</label>
+    </div>
+
+    <div id="manualBox">
+      <div class="row"><label>PWM Freq (Hz)</label><input id="pwmHz" type="number" value="10000"></div>
+      <div class="row"><label>Duty A</label><input id="dA" type="range" min="0" max="1" step="0.01" value="0.5"><span id="dAVal" class="mono">0.50</span></div>
+      <div class="row"><label>Duty B</label><input id="dB" type="range" min="0" max="1" step="0.01" value="0.2"><span id="dBVal" class="mono">0.20</span></div>
+      <div class="row"><label>Duty C</label><input id="dC" type="range" min="0" max="1" step="0.01" value="0.8"><span id="dCVal" class="mono">0.80</span></div>
+    </div>
+
+    <div id="sixstepBox" style="display:none">
+      <div class="row"><label>Elec Speed (Hz)</label><input id="eHz" type="range" min="0" max="400" step="1" value="80"><span id="eHzVal" class="mono">80</span></div>
+      <div class="row"><label>Modulation</label><input id="mod" type="range" min="0" max="1" step="0.01" value="0.7"><span id="modVal" class="mono">0.70</span></div>
+      <div class="row small"><em>Six‑step commutation pattern drives two phases, floats one; PWM scales phase high/low levels.</em></div>
+    </div>
+
+    <h2>Current Sense</h2>
+    <div class="grid3">
+      <label class="row"><input type="radio" name="shunt" value="low" checked> Single low‑side</label>
+      <label class="row"><input type="radio" name="shunt" value="triple"> Triple‑shunt</label>
+      <label class="row"><input type="checkbox" id="ocLatch" checked> OC latches</label>
+    </div>
+    <div class="row"><label>Rshunt (mΩ)</label><input id="rshunt" type="number" value="2"></div>
+    <div class="row"><label>OC Threshold (A)</label><input id="ocThr" type="number" value="120"></div>
+
+    <h2>Protection / Fault Injection</h2>
+    <div class="grid3">
+      <label class="row"><input type="checkbox" id="injOC"> Force Over‑Current</label>
+      <label class="row"><input type="checkbox" id="injOT"> Over‑Temp</label>
+      <label class="row"><input type="checkbox" id="injUVCP"> UV on VCP</label>
+    </div>
+    <div class="row"><label>UV VS (V)</label><input id="uvVs" type="range" min="6" max="12" step="0.1" value="7.0"><span id="uvVsVal" class="mono">7.0 V</span></div>
+    <div class="grid3">
+      <button id="btnClearFaults">Clear Faults</button>
+      <button id="btnReset">Soft Reset</button>
+      <button id="btnDefaults">Factory Defaults</button>
+    </div>
+
+    <h2>SPI (toy)</h2>
+    <div class="small">Examples: <span class="mono">wr 0x01 0x0009</span>, <span class="mono">wr 0x02 0x0190</span> (deadtime=400ns), <span class="mono">rd 0x10</span></div>
+    <textarea id="spiCmd" placeholder="wr 0x01 0x0009\nrd 0x10"></textarea>
+    <div class="grid3">
+      <button id="btnSpi">Send</button>
+      <button id="btnDemo">Demo: enable + six‑step</button>
+      <button id="btnExport">Export JSON</button>
+    </div>
+    <input id="fileImport" type="file" accept="application/json" style="display:none"/>
+    <div class="grid3" style="margin-top:8px">
+      <button id="btnImport">Import JSON</button>
+      <button id="btnSave">Save to Local</button>
+      <button id="btnLoad">Load from Local</button>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Visuals -->
+  <main class="panel">
+    <div class="grid2">
+      <section>
+        <h2>Driver / Power</h2>
+        <div class="row kv"><span class="k">Mode</span><span id="modePill" class="pill warn">DISABLED</span></div>
+        <div class="row kv"><span class="k">VBAT</span><span id="vbRead" class="mono">12.0 V</span></div>
+        <div class="row kv"><span class="k">VCP (charge pump)</span><span id="vcpRead" class="mono">22.0 V</span></div>
+        <div class="meter"><i id="mVBat"></i></div>
+        
+        <h2>Half‑Bridge States</h2>
+        <div class="grid3 small">
+          <div class="pin"><div class="name">Phase A HS</div><div id="hsA">OFF</div></div>
+          <div class="pin"><div class="name">Phase A LS</div><div id="lsA">OFF</div></div>
+          <div class="pin"><div class="name">Va</div><div id="vA" class="mono">0.00 V</div></div>
+          <div class="pin"><div class="name">Phase B HS</div><div id="hsB">OFF</div></div>
+          <div class="pin"><div class="name">Phase B LS</div><div id="lsB">OFF</div></div>
+          <div class="pin"><div class="name">Vb</div><div id="vB" class="mono">0.00 V</div></div>
+          <div class="pin"><div class="name">Phase C HS</div><div id="hsC">OFF</div></div>
+          <div class="pin"><div class="name">Phase C LS</div><div id="lsC">OFF</div></div>
+          <div class="pin"><div class="name">Vc</div><div id="vC" class="mono">0.00 V</div></div>
+        </div>
+
+        <h2>Sparklines</h2>
+        <div class="row"><canvas id="spVa" class="spark"></canvas></div>
+        <div class="row"><canvas id="spVb" class="spark"></canvas></div>
+        <div class="row"><canvas id="spVc" class="spark"></canvas></div>
+        <div class="row"><canvas id="spI" class="spark"></canvas></div>
+      </section>
+
+      <section>
+        <h2>Status</h2>
+        <div class="grid4 small">
+          <div>PG_VS: <b id="pgVS">0</b></div>
+          <div>PG_VCP: <b id="pgVCP">0</b></div>
+          <div>PG_DRV: <b id="pgDRV">0</b></div>
+          <div>DT(ns): <b id="dtLbl">400</b></div>
+          <div>UV: <b id="stUV">0</b></div>
+          <div>OV: <b id="stOV">0</b></div>
+          <div>OT: <b id="stOT">0</b></div>
+          <div>OC: <b id="stOC">0</b></div>
+          <div>SC: <b id="stSC">0</b></div>
+          <div>UVCP: <b id="stUVCP">0</b></div>
+          <div>Mode: <b id="stMode">MANUAL</b></div>
+          <div>I_shunt(A): <b id="ishunt">0.0</b></div>
+        </div>
+
+        <h2>Registers (toy map)</h2>
+        <table class="mono" id="regTable"><thead><tr><th>Addr</th><th>Name</th><th>Value</th><th>Fields</th></tr></thead><tbody></tbody></table>
+
+        <h2>Event Log</h2>
+        <div id="log" class="log mono"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+// =============================
+// TLE9180D Gate Driver (Educational Model)
+// =============================
+// Not analog-accurate; focuses on control flow, gating, simple current model, and fault/status.
+
+const ui = {
+  vbat: q('#vbat'), vbatVal: q('#vbatVal'), vbRead:q('#vbRead'), mVBat:q('#mVBat'),
+  preset12:q('#preset12'), preset48:q('#preset48'), toggleRipple:q('#toggleRipple'),
+  drvEnable:q('#drvEnable'), coast:q('#coast'), brake:q('#brake'),
+  deadtime:q('#deadtime'), gateStr:q('#gateStr'), gateStrVal:q('#gateStrVal'), dtLbl:q('#dtLbl'),
+  modeRadios:[...document.querySelectorAll('input[name="mode"]')], reverse:q('#reverse'),
+  manualBox:q('#manualBox'), sixstepBox:q('#sixstepBox'),
+  pwmHz:q('#pwmHz'), dA:q('#dA'), dB:q('#dB'), dC:q('#dC'), dAVal:q('#dAVal'), dBVal:q('#dBVal'), dCVal:q('#dCVal'),
+  eHz:q('#eHz'), eHzVal:q('#eHzVal'), mod:q('#mod'), modVal:q('#modVal'),
+  rshunt:q('#rshunt'), ocThr:q('#ocThr'), shuntRadios:[...document.querySelectorAll('input[name="shunt"]')], ocLatch:q('#ocLatch'),
+  injOC:q('#injOC'), injOT:q('#injOT'), injUVCP:q('#injUVCP'), uvVs:q('#uvVs'), uvVsVal:q('#uvVsVal'),
+  btnClearFaults:q('#btnClearFaults'), btnReset:q('#btnReset'), btnDefaults:q('#btnDefaults'),
+  spiCmd:q('#spiCmd'), btnSpi:q('#btnSpi'), btnDemo:q('#btnDemo'), btnExport:q('#btnExport'), btnImport:q('#btnImport'), btnSave:q('#btnSave'), btnLoad:q('#btnLoad'), fileImport:q('#fileImport'),
+  hsA:q('#hsA'), lsA:q('#lsA'), hsB:q('#hsB'), lsB:q('#lsB'), hsC:q('#hsC'), lsC:q('#lsC'),
+  vA:q('#vA'), vB:q('#vB'), vC:q('#vC'), spVa:q('#spVa'), spVb:q('#spVb'), spVc:q('#spVc'), spI:q('#spI'),
+  pgVS:q('#pgVS'), pgVCP:q('#pgVCP'), pgDRV:q('#pgDRV'),
+  stUV:q('#stUV'), stOV:q('#stOV'), stOT:q('#stOT'), stOC:q('#stOC'), stSC:q('#stSC'), stUVCP:q('#stUVCP'),
+  ishunt:q('#ishunt'), stMode:q('#stMode'), modePill:q('#modePill'),
+  regTable:q('#regTable tbody'), log:q('#log'), vcpRead:q('#vcpRead')
+};
+
+const S = {
+  dt: 20, // ms tick
+  tick: 0,
+  ripple:false,
+  VS:12.0,
+  VCP:22.0,
+  uvVS:7.0,
+  driverEn:false,
+  coast:false,
+  brake:false,
+  deadtime_ns:400,
+  gate_str:2,
+  mode:'manual', // manual|sixstep
+  reverse:false,
+  pwmHz:10000,
+  duty:{A:.5,B:.2,C:.8},
+  eHz:80,
+  mod:0.7,
+  shunt:'low',
+  Rshunt_milliohm:2,
+  OC_A:120,
+  latches:{UV:0,OV:0,OT:0,OC:0,SC:0,UVCP:0},
+  PG:{VS:0,VCP:0,DRV:0},
+  pins:{hsA:0,lsA:0,hsB:0,lsB:0,hsC:0,lsC:0},
+  Va:0,Vb:0,Vc:0, Ibus:0,
+  theta:0,
+  spark:{Va:[],Vb:[],Vc:[],I:[]}
+};
+
+// --- Registers (toy) ---
+const REG = new Map();
+const DEF = {
+  0x00:{name:'DEV_ID', ro:true, val:0x9180},
+  0x01:{name:'DRV_CTRL', ro:false, val:0x0000}, // b0 EN, b1 COAST, b2 BRAKE, b5..b4 GATE_STR(1..4), b8 OC_LATCH
+  0x02:{name:'DEADTIME', ro:false, val:0x0190}, // ns
+  0x03:{name:'MODE', ro:false, val:0x0000}, // 0 manual, 1 sixstep, b8 REV
+  0x04:{name:'PWMFREQ', ro:false, val:10000},
+  0x05:{name:'DUTY_A', ro:false, val:500}, // 0..1000
+  0x06:{name:'DUTY_B', ro:false, val:200},
+  0x07:{name:'DUTY_C', ro:false, val:800},
+  0x08:{name:'E_HZ', ro:false, val:80},
+  0x09:{name:'MOD_0_1000', ro:false, val:700},
+  0x0A:{name:'UV_VS_X10', ro:false, val:70},
+  0x10:{name:'STAT', ro:true, val:0}, // bits: UV,OV,OT,OC,SC,UVCP
+  0x11:{name:'CLR_LATCH', ro:false, val:0} // write 1s to clear
+};
+
+function resetRegs(){ REG.clear(); for(const [a,d] of Object.entries(DEF)) REG.set(+a,{...d}); }
+
+// --- Helpers ---
+function q(s){return document.querySelector(s)}
+function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
+function hex(v,w=4){return '0x'+(v>>>0).toString(16).toUpperCase().padStart(w,'0')}
+function log(msg,level='info'){
+  const t=(S.tick/1000).toFixed(3);
+  const el=document.createElement('div'); el.textContent=`[${t}s] ${msg}`;
+  if(level==='warn') el.style.color='#ffd599';
+  if(level==='err') el.style.color='#ffb1b6';
+  ui.log.prepend(el);
+}
+
+// --- SPI ---
+function wr(addr,val){ const r=REG.get(addr); if(!r){log(`WR ${hex(addr)} invalid`,'err'); return;} if(r.ro){log(`WR ${hex(addr)} RO`,'warn'); return;} r.val = val & 0xFFFF; sideEffects(addr); renderRegs(); }
+function rd(addr){ const r=REG.get(addr); if(!r){log(`RD ${hex(addr)} invalid`,'err'); return 0;} if(addr===0x10){ // STAT
+    let v=0; if(S.latches.UV) v|=1; if(S.latches.OV) v|=2; if(S.latches.OT) v|=4; if(S.latches.OC) v|=8; if(S.latches.SC) v|=16; if(S.latches.UVCP) v|=32; r.val=v; }
+  return r.val & 0xFFFF; }
+function sideEffects(addr){
+  if(addr===0x01){ const v=REG.get(0x01).val; S.driverEn=!!(v&1); ui.drvEnable.checked=S.driverEn; S.coast=!!(v&2); ui.coast.checked=S.coast; S.brake=!!(v&4); ui.brake.checked=S.brake; S.gate_str=((v>>4)&3)+1; ui.gateStr.value=S.gate_str; ui.gateStrVal.textContent=S.gate_str; }
+  if(addr===0x02){ S.deadtime_ns = REG.get(0x02).val; ui.deadtime.value=S.deadtime_ns; ui.dtLbl.textContent=S.deadtime_ns; }
+  if(addr===0x03){ const v=REG.get(0x03).val; S.mode = (v&1)?'sixstep':'manual'; ui.stMode.textContent=S.mode.toUpperCase(); ui.manualBox.style.display=S.mode==='manual'?'block':'none'; ui.sixstepBox.style.display=S.mode==='sixstep'?'block':'none'; S.reverse=!!(v&0x100); ui.reverse.checked=S.reverse; }
+  if(addr===0x04){ S.pwmHz = REG.get(0x04).val; ui.pwmHz.value=S.pwmHz; }
+  if(addr===0x05){ S.duty.A = REG.get(0x05).val/1000; ui.dA.value=S.duty.A; ui.dAVal.textContent=S.duty.A.toFixed(2); }
+  if(addr===0x06){ S.duty.B = REG.get(0x06).val/1000; ui.dB.value=S.duty.B; ui.dBVal.textContent=S.duty.B.toFixed(2); }
+  if(addr===0x07){ S.duty.C = REG.get(0x07).val/1000; ui.dC.value=S.duty.C; ui.dCVal.textContent=S.duty.C.toFixed(2); }
+  if(addr===0x08){ S.eHz = REG.get(0x08).val; ui.eHz.value=S.eHz; ui.eHzVal.textContent=S.eHz; }
+  if(addr===0x09){ S.mod = REG.get(0x09).val/1000; ui.mod.value=S.mod; ui.modVal.textContent=S.mod.toFixed(2); }
+  if(addr===0x0A){ S.uvVS = REG.get(0x0A).val/10; ui.uvVs.value=S.uvVS; ui.uvVsVal.textContent=S.uvVS.toFixed(1)+" V"; }
+  if(addr===0x11){ // clear bits
+    const v=REG.get(0x11).val; if(v&1)S.latches.UV=0; if(v&2)S.latches.OV=0; if(v&4)S.latches.OT=0; if(v&8)S.latches.OC=0; if(v&16)S.latches.SC=0; if(v&32)S.latches.UVCP=0; REG.get(0x11).val=0; log('Latched faults cleared'); }
+}
+function renderRegs(){ const tb=ui.regTable; tb.innerHTML=''; for(const [a,r] of REG.entries()){ const tr=document.createElement('tr'); tr.innerHTML=`<td>${hex(a,2)}</td><td>${r.name}${r.ro?'<span class=small style="opacity:.7"> (RO)</span>':''}</td><td>${hex(r.val,4)}</td><td class=small>${fields(a,r.val)}</td>`; tb.appendChild(tr);} }
+function fields(a,v){
+  if(a===0x01){return `EN=${v&1} COAST=${(v>>1)&1} BRAKE=${(v>>2)&1} GATE_STR=${((v>>4)&3)+1}`}
+  if(a===0x02){return `DT=${v}ns`}
+  if(a===0x03){return `MODE=${(v&1)?'SIXSTEP':'MANUAL'} REV=${(v>>8)&1}`}
+  if(a===0x04){return `PWM=${v}Hz`}
+  if(a===0x05||a===0x06||a===0x07){return `duty=${(v/10).toFixed(1)}%`}
+  if(a===0x08){return `eHz=${v}`}
+  if(a===0x09){return `mod=${(v/10).toFixed(1)}%`}
+  if(a===0x0A){return `UV_VS=${(v/10).toFixed(1)}V`}
+  if(a===0x10){return `UV=${(v>>0)&1} OV=${(v>>1)&1} OT=${(v>>2)&1} OC=${(v>>3)&1} SC=${(v>>4)&1} UVCP=${(v>>5)&1}`}
+  if(a===0x11){return `Write 1s to clear latched faults`}
+  return ''
+}
+
+// --- Persistence ---
+const SAVE='tle9180d_sim_v1';
+function save(){ localStorage.setItem(SAVE, JSON.stringify({S, regs:[...REG.entries()]})); }
+function load(){ try{ const o=JSON.parse(localStorage.getItem(SAVE)||''); if(!o) return; Object.assign(S,o.S); REG.clear(); for(const [k,v] of o.regs) REG.set(+k,v);}catch(e){} }
+
+// --- UI Bindings ---
+function bind(){
+  ui.vbat.addEventListener('input',()=>{ S.VS=+ui.vbat.value; ui.vbatVal.textContent=S.VS.toFixed(1)+' V'; });
+  ui.preset12.onclick=()=>{S.VS=12; ui.vbat.value=12; ui.vbatVal.textContent='12.0 V'};
+  ui.preset48.onclick=()=>{S.VS=48; ui.vbat.value=48; ui.vbatVal.textContent='48.0 V'};
+  ui.toggleRipple.onclick=()=>{ S.ripple=!S.ripple; log(`Input ripple ${S.ripple?'EN':'DIS'}abled`) };
+
+  ui.drvEnable.onchange=()=>{ S.driverEn=ui.drvEnable.checked; REG.get(0x01).val = (REG.get(0x01).val & ~1) | (S.driverEn?1:0); renderRegs(); };
+  ui.coast.onchange=()=>{ S.coast=ui.coast.checked; REG.get(0x01).val = (REG.get(0x01).val & ~2) | (S.coast?2:0); renderRegs(); };
+  ui.brake.onchange=()=>{ S.brake=ui.brake.checked; REG.get(0x01).val = (REG.get(0x01).val & ~4) | (S.brake?4:0); renderRegs(); };
+  ui.deadtime.onchange=()=>{ S.deadtime_ns=+ui.deadtime.value; ui.dtLbl.textContent=S.deadtime_ns; REG.get(0x02).val=S.deadtime_ns; renderRegs(); };
+  ui.gateStr.oninput=()=>{ S.gate_str=+ui.gateStr.value; ui.gateStrVal.textContent=S.gate_str; let v=REG.get(0x01).val; v=(v&~(3<<4)) | ((S.gate_str-1)<<4); REG.get(0x01).val=v; renderRegs(); };
+
+  ui.modeRadios.forEach(r=> r.onchange=()=>{ if(!r.checked) return; S.mode=r.value; ui.manualBox.style.display=S.mode==='manual'?'block':'none'; ui.sixstepBox.style.display=S.mode==='sixstep'?'block':'none'; ui.stMode.textContent=S.mode.toUpperCase(); REG.get(0x03).val = (S.mode==='sixstep'?1:0) | (S.reverse?0x100:0); renderRegs(); });
+  ui.reverse.onchange=()=>{ S.reverse=ui.reverse.checked; let v=REG.get(0x03).val; v = (v&~0x100) | (S.reverse?0x100:0); REG.get(0x03).val=v; renderRegs(); };
+
+  ui.pwmHz.onchange=()=>{ S.pwmHz=+ui.pwmHz.value; REG.get(0x04).val=S.pwmHz; renderRegs(); };
+  ui.dA.oninput=()=>{ S.duty.A=+ui.dA.value; ui.dAVal.textContent=S.duty.A.toFixed(2); REG.get(0x05).val=(S.duty.A*1000)|0; renderRegs(); };
+  ui.dB.oninput=()=>{ S.duty.B=+ui.dB.value; ui.dBVal.textContent=S.duty.B.toFixed(2); REG.get(0x06).val=(S.duty.B*1000)|0; renderRegs(); };
+  ui.dC.oninput=()=>{ S.duty.C=+ui.dC.value; ui.dCVal.textContent=S.duty.C.toFixed(2); REG.get(0x07).val=(S.duty.C*1000)|0; renderRegs(); };
+
+  ui.eHz.oninput=()=>{ S.eHz=+ui.eHz.value; ui.eHzVal.textContent=S.eHz; REG.get(0x08).val=S.eHz; renderRegs(); };
+  ui.mod.oninput=()=>{ S.mod=+ui.mod.value; ui.modVal.textContent=S.mod.toFixed(2); REG.get(0x09).val=(S.mod*1000)|0; renderRegs(); };
+
+  ui.rshunt.onchange=()=>{ S.Rshunt_milliohm=+ui.rshunt.value; };
+  ui.ocThr.onchange=()=>{ S.OC_A=+ui.ocThr.value; };
+  ui.shuntRadios.forEach(r=> r.onchange=()=>{ if(!r.checked) return; S.shunt=r.value; log(`Shunt mode: ${S.shunt}`)});
+  ui.ocLatch.onchange=()=>{ let v=REG.get(0x01).val; v = (v&~(1<<8)) | (ui.ocLatch.checked? (1<<8) : 0); REG.get(0x01).val=v; };
+
+  ui.injOC.onchange=()=>{}; ui.injOT.onchange=()=>{}; ui.injUVCP.onchange=()=>{};
+  ui.uvVs.oninput=()=>{ S.uvVS=+ui.uvVs.value; ui.uvVsVal.textContent=S.uvVS.toFixed(1)+' V'; REG.get(0x0A).val=(S.uvVS*10)|0; renderRegs(); };
+
+  ui.btnClearFaults.onclick=()=>{ wr(0x11, 0x3F); };
+  ui.btnReset.onclick=softReset; ui.btnDefaults.onclick=factoryDefaults;
+
+  ui.btnSpi.onclick=sendSpi; ui.btnDemo.onclick=()=>{ ui.spiCmd.value='wr 0x01 0x0011\nwr 0x03 0x0001\nwr 0x09 0x0320\nrd 0x10'; sendSpi(); };
+  ui.btnExport.onclick=exportJSON; ui.btnImport.onclick=()=>ui.fileImport.click(); ui.fileImport.onchange=importJSON; ui.btnSave.onclick=save; ui.btnLoad.onclick=()=>{ load(); renderAll(); };
+}
+
+function sendSpi(){ const lines=ui.spiCmd.value.split(/\n+/).map(s=>s.trim()).filter(Boolean); for(const ln of lines){ const [op,aStr,vStr] = ln.split(/\s+/); if(!op) continue; const a = parseInt(aStr); if(op.toLowerCase()==='wr'){ wr(a, parseInt(vStr)); log(`SPI WR ${hex(a,2)} <= ${hex(parseInt(vStr)||0,4)}`)} else if(op.toLowerCase()==='rd'){ const v=rd(a); log(`SPI RD ${hex(a,2)} -> ${hex(v,4)}`)} else { log(`SPI ? '${ln}'`,'warn'); } } save(); }
+
+// --- Physics-ish model ---
+function physics(){
+  // VS with ripple
+  let vs = S.VS; if(S.ripple){ vs += Math.sin(S.tick/18)* (S.VS*0.01); }
+  // Simple VCP model (bootstrapped/charge pump): aim ~ VS+10V
+  S.VCP = clamp(vs + 10, 0, vs + 12);
+
+  // Power-good
+  S.PG.VS = vs >= S.uvVS ? 1:0;
+  S.PG.VCP = (S.VCP >= vs+7) ? 1:0;
+  S.PG.DRV = (S.driverEn && !isAnyFault()) ? 1:0;
+
+  // Faults
+  S.latches.UV = S.PG.VS? S.latches.UV : 1;
+  if(vs>58) S.latches.OV=1; // arbitrary OV threshold for demo
+  if(ui.injOT.checked) S.latches.OT=1;
+  if(ui.injUVCP.checked) S.latches.UVCP=1;
+
+  // Gating logic (average-level model)
+  let gates = {hsA:0,lsA:0,hsB:0,lsB:0,hsC:0,lsC:0};
+  if(S.driverEn && !isAnyFault()){
+    if(S.coast){ /* all off */ }
+    else if(S.brake){ gates.lsA=1; gates.lsB=1; gates.lsC=1; }
+    else if(S.mode==='manual'){
+      // Complementary PWM w/ deadtime (average): HS duty = d, LS duty = 1-d
+      gates.hsA = S.duty.A>0.01?1:0; gates.lsA = S.duty.A<0.99?1:0;
+      gates.hsB = S.duty.B>0.01?1:0; gates.lsB = S.duty.B<0.99?1:0;
+      gates.hsC = S.duty.C>0.01?1:0; gates.lsC = S.duty.C<0.99?1:0;
+    } else { // six-step
+      const dir = S.reverse?-1:1; const w = 2*Math.PI*S.eHz/1000 * (S.dt); S.theta += dir*w; if(S.theta>2*Math.PI)S.theta-=2*Math.PI; if(S.theta<0)S.theta+=2*Math.PI;
+      const sec = (S.theta/(Math.PI/3))|0; // 0..5
+      // Pattern: two phases driven, one float (HS/LS depend on sector)
+      // Table (sec -> HS,LS pairs ON), float phase F
+      const table=[
+        {H:'A', L:'B', F:'C'},
+        {H:'A', L:'C', F:'B'},
+        {H:'B', L:'C', F:'A'},
+        {H:'B', L:'A', F:'C'},
+        {H:'C', L:'A', F:'B'},
+        {H:'C', L:'B', F:'A'}
+      ];
+      const cell=table[(sec%6+6)%6];
+      const d=S.mod; // modulation scales average level
+      setPhase(gates, cell.H, 'HS', 1); setPhase(gates, cell.L, 'LS', 1); // driven
+      // floating phase remains off (both trans off)
+      // crude PWM averaging: later used in voltage calculation
+    }
+  }
+  S.pins = gates;
+
+  // Phase node voltages (average model):
+  // If HS on => ~VS*duty (manual) or VS*mod (six-step); if LS on => 0V; floating => ~VS/2 + bemf
+  let Va=0,Vb=0,Vc=0; const bemfAmp = vs*0.25; const wt = S.theta; // pseudo bemf
+  const bemfA = bemfAmp*Math.sin(wt);
+  const bemfB = bemfAmp*Math.sin(wt - 2*Math.PI/3);
+  const bemfC = bemfAmp*Math.sin(wt - 4*Math.PI/3);
+
+  if(S.mode==='manual'){
+    Va = gates.hsA? vs*S.duty.A : gates.lsA? 0 : vs/2 + bemfA*0.2;
+    Vb = gates.hsB? vs*S.duty.B : gates.lsB? 0 : vs/2 + bemfB*0.2;
+    Vc = gates.hsC? vs*S.duty.C : gates.lsC? 0 : vs/2 + bemfC*0.2;
+  } else {
+    const d=S.mod; const H=val=>vs*d; const L=0; const F=(bemf)=>vs/2 + bemf*0.4;
+    const pat = S.pins; // use which phases driven
+    Va = pat.hsA?H(): pat.lsA?L : F(bemfA);
+    Vb = pat.hsB?H(): pat.lsB?L : F(bemfB);
+    Vc = pat.hsC?H(): pat.lsC?L : F(bemfC);
+  }
+  S.Va=Va; S.Vb=Vb; S.Vc=Vc;
+
+  // Neutral & currents (very rough):
+  const Vn = (Va+Vb+Vc)/3; const Van=Va-Vn, Vbn=Vb-Vn, Vcn=Vc-Vn;
+  // Approximate bus current from modulation, limited by OC
+  const torqueFactor = S.mode==='manual' ? (S.duty.A+S.duty.B+S.duty.C)/3 : S.mod;
+  let I = (vs/ (S.Rshunt_milliohm/1000 + 0.1)) * torqueFactor * 0.02; // ~proportional, arbitrary scale
+  // ripple
+  I += Math.sin(S.tick/30)* I*0.1;
+  if(S.brake) I = Math.abs(I)*1.2; if(S.coast||!S.driverEn) I*=0.1;
+  S.Ibus = Math.max(0, I);
+
+  // Over‑current detection
+  if(ui.injOC.checked || S.Ibus > S.OC_A){ S.latches.OC=1; if(REG.get(0x01).val & (1<<8)){ // latch enable
+      // disable driver on OC
+      S.driverEn=false; let v=REG.get(0x01).val; v&=~1; REG.get(0x01).val=v; log('OC detected → driver disabled','err');
+    } else { log('OC detected','err'); }
+  }
+
+  // If any latched fault, put mode to FAIL (coast)
+  const anyF=isAnyFault();
+  if(anyF){ S.coast=true; }
+
+  // Samples for sparklines
+  pushS('Va', S.Va, 0, vs);
+  pushS('Vb', S.Vb, 0, vs);
+  pushS('Vc', S.Vc, 0, vs);
+  pushS('I', S.Ibus, 0, Math.max(1,S.OC_A));
+
+  // Expose for UI
+  ui.vbRead.textContent = vs.toFixed(1)+' V'; ui.vcpRead.textContent = S.VCP.toFixed(1)+' V';
+  ui.pgVS.textContent=S.PG.VS; ui.pgVCP.textContent=S.PG.VCP; ui.pgDRV.textContent=S.PG.DRV;
+  ui.stUV.textContent=S.latches.UV; ui.stOV.textContent=S.latches.OV; ui.stOT.textContent=S.latches.OT; ui.stOC.textContent=S.latches.OC; ui.stSC.textContent=S.latches.SC; ui.stUVCP.textContent=S.latches.UVCP;
+  ui.ishunt.textContent=S.Ibus.toFixed(1);
+
+  // Update pin labels
+  ui.hsA.textContent=S.pins.hsA?'ON':'OFF'; ui.lsA.textContent=S.pins.lsA?'ON':'OFF';
+  ui.hsB.textContent=S.pins.hsB?'ON':'OFF'; ui.lsB.textContent=S.pins.lsB?'ON':'OFF';
+  ui.hsC.textContent=S.pins.hsC?'ON':'OFF'; ui.lsC.textContent=S.pins.lsC?'ON':'OFF';
+}
+function setPhase(gates, ph, which, on){ if(ph==='A'){ if(which==='HS')gates.hsA=on; else gates.lsA=on; } if(ph==='B'){ if(which==='HS')gates.hsB=on; else gates.lsB=on; } if(ph==='C'){ if(which==='HS')gates.hsC=on; else gates.lsC=on; } }
+
+function isAnyFault(){ return !!(S.latches.UV||S.latches.OV||S.latches.OT||S.latches.OC||S.latches.SC||S.latches.UVCP); }
+
+function pushS(key,val,min,max){ const arr=S.spark[key]; arr.push(val); if(arr.length>140) arr.shift(); const c = key==='Va'?ui.spVa:key==='Vb'?ui.spVb:key==='Vc'?ui.spVc:ui.spI; drawSpark(c,arr,min,max); }
+function drawSpark(canvas, data, min, max){ const w=canvas.width=canvas.clientWidth, h=canvas.height=canvas.clientHeight; const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,w,h); ctx.strokeStyle='#7dd3fc'; ctx.lineWidth=1.4; ctx.beginPath(); for(let i=0;i<data.length;i++){ const x=(i/(data.length-1))*(w-4)+2; const y = h-2 - ((data[i]-min)/(max-min||1))*(h-4); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.stroke(); }
+
+// --- Render ---
+function renderAll(){
+  ui.vbat.value=S.VS; ui.vbatVal.textContent=S.VS.toFixed(1)+' V';
+  ui.drvEnable.checked=S.driverEn; ui.coast.checked=S.coast; ui.brake.checked=S.brake;
+  ui.deadtime.value=S.deadtime_ns; ui.dtLbl.textContent=S.deadtime_ns; ui.gateStr.value=S.gate_str; ui.gateStrVal.textContent=S.gate_str;
+  const modeRadio = ui.modeRadios.find(r=>r.value===S.mode); if(modeRadio){ modeRadio.checked=true; }
+  ui.manualBox.style.display=S.mode==='manual'?'block':'none'; ui.sixstepBox.style.display=S.mode==='sixstep'?'block':'none'; ui.stMode.textContent=S.mode.toUpperCase();
+  ui.pwmHz.value=S.pwmHz; ui.dA.value=S.duty.A; ui.dB.value=S.duty.B; ui.dC.value=S.duty.C; ui.dAVal.textContent=S.duty.A.toFixed(2); ui.dBVal.textContent=S.duty.B.toFixed(2); ui.dCVal.textContent=S.duty.C.toFixed(2);
+  ui.eHz.value=S.eHz; ui.eHzVal.textContent=S.eHz; ui.mod.value=S.mod; ui.modVal.textContent=S.mod.toFixed(2);
+  ui.rshunt.value=S.Rshunt_milliohm; ui.ocThr.value=S.OC_A; ui.uvVs.value=S.uvVS; ui.uvVsVal.textContent=S.uvVS.toFixed(1)+' V'; ui.reverse.checked=S.reverse;
+  renderRegs();
+}
+
+// --- Housekeeping ---
+function softReset(){ log('Soft reset'); S.latches.OC=0; S.coast=false; S.brake=false; }
+function factoryDefaults(){ log('Factory defaults'); resetRegs(); Object.assign(S, { ...S, VS:12.0, ripple:false, VCP:22.0, uvVS:7.0, driverEn:false, coast:false, brake:false, deadtime_ns:400, gate_str:2, mode:'manual', reverse:false, pwmHz:10000, duty:{A:.5,B:.2,C:.8}, eHz:80, mod:0.7, shunt:'low', Rshunt_milliohm:2, OC_A:120, latches:{UV:0,OV:0,OT:0,OC:0,SC:0,UVCP:0}, PG:{VS:0,VCP:0,DRV:0}, pins:{hsA:0,lsA:0,hsB:0,lsB:0,hsC:0,lsC:0}, Va:0,Vb:0,Vc:0,Ibus:0, theta:0, spark:{Va:[],Vb:[],Vc:[],I:[]} }); renderAll(); save(); }
+function exportJSON(){ const blob=new Blob([JSON.stringify({S, regs:[...REG.entries()]},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tle9180d_sim.json'; a.click(); URL.revokeObjectURL(a.href);} 
+function importJSON(e){ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const o=JSON.parse(r.result); Object.assign(S,o.S); REG.clear(); for(const [k,v] of o.regs) REG.set(+k,v); renderAll(); log('Imported config'); save(); }catch(err){ log('Import failed','err'); } }; r.readAsText(f);} 
+
+function tick(){ S.tick+=S.dt; physics(); // Mode pill
+  const mp=ui.modePill; mp.textContent = (!S.driverEn? 'DISABLED' : isAnyFault()? 'FAULT' : (S.mode==='manual'?'MANUAL':'SIX‑STEP'));
+  mp.classList.remove('ok','warn','err'); if(!S.driverEn) mp.classList.add('warn'); else if(isAnyFault()) mp.classList.add('err'); else mp.classList.add('ok'); save(); }
+
+function init(){ load(); if(REG.size===0) resetRegs(); bind(); renderAll(); log('TLE9180D simulator ready'); setInterval(tick, S.dt); }
+
+init();
+</script>
+</body>
+</html>
