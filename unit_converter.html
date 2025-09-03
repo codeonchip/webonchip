@@ -103,7 +103,10 @@
         <div>
           <div class="kicker">Result</div>
           <div id="result" class="result">—</div>
-          <div id="detail" class="muted" style="margin-top:10px"></div>
+          $1
+          <div class="kicker" style="margin-top:12px">Hex (integer)</div>
+          <div id="hexResult" class="result" style="font-feature-settings:'tnum' 1; font-variant-numeric: tabular-nums;">—</div>
+          <small class="note">Shows <span class="mono">int(value)</span> in hexadecimal for both input and result.</small>
           <div class="footer">
             <span class="pill"><span class="ok">●</span> Works offline • Extensible JSON map</span>
             <span class="kicker">Made for engineers, students, and the simply curious.</span>
@@ -319,6 +322,7 @@
   const fromSearch = byId('fromSearch');
   const resultBox = byId('result');
   const detailBox = byId('detail');
+  const hexBox = byId('hexResult');
 
   function populateCategories(){
     categorySel.innerHTML = '';
@@ -357,6 +361,11 @@
   }
 
   // ====== Conversion Engine ======
+  function toHex(n){
+    if(!isFinite(n)) return '—';
+    const neg = n < 0; const t = Math.trunc(Math.abs(n));
+    return (neg ? '-0x' : '0x') + t.toString(16).toUpperCase();
+  }
   function toBase(catKey, unitKey, val){
     const cat = categories[catKey]; const u = cat.units[unitKey];
     if('to_base' in u) return u.to_base(val);
@@ -393,6 +402,7 @@
     const val = parseFloat(fromValueInput.value || '0'); const decimals = Math.max(0, Math.min(12, parseInt(decimalsInput.value||'6')));
     const out = convert(catKey, fromKey, toKey, val);
     resultBox.textContent = `${fmt(out, decimals)}  ${toKey}`;
+    if(hexBox) hexBox.textContent = `${toHex(val)} → ${toHex(out)}`;
 
     // Details
     const cat = categories[catKey];
