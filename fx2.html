@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Multi-Function Grapher</title>
+<style>
+  :root { --bg:#0f172a; --fg:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --grid:#0f2138; --axis:#3b5168; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding: 14px 16px; border-bottom: 1px solid #0b1220; background:#0b1020; position: sticky; top: 0; z-index: 1; }
+  h1 { margin:0 0 6px; font-size: 18px; font-weight: 600; color:#e5f3ff; }
+  .row { display:flex; flex-wrap: wrap; gap:10px; align-items:center; }
+  input, select, button, textarea {
+    background:#0b1220; color:var(--fg); border:1px solid #1e293b; border-radius:8px; padding:8px 10px; font-size:14px;
+  }
+  textarea { width:100%; min-height:120px; resize:vertical; line-height:1.4; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #124d74; border-color:#0ea5e9; }
+  button { cursor: pointer; background:#0ea5e9; border-color:#0ea5e9; color:#0b1220; font-weight:600; }
+  button.secondary { background: transparent; border-color:#334155; color:#cbd5e1; }
+  main { display:grid; grid-template-columns: 360px 1fr; min-height: calc(100dvh - 72px); }
+  aside { border-right:1px solid #0b1220; padding:14px; }
+  .group { margin-bottom:12px; }
+  .hint { font-size:12px; color:#9fb3c8; line-height:1.35; }
+  .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  canvas { width:100%; height:100%; display:block; background:#0a0f1a; }
+  #errors { color:#fca5a5; white-space: pre-wrap; font-size:12px; min-height:1.2em; }
+  footer { padding:10px 14px; border-top:1px solid #0b1220; color:#8daac1; font-size:12px; }
+  #legend { display:flex; flex-wrap:wrap; gap:8px; padding:8px 12px; border-top:1px solid #0b1220; background:#0a0f1a; }
+  .legend-item { display:flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid #1f2a3b; border-radius:10px; cursor:pointer; user-select:none; }
+  .swatch { width:14px; height:14px; border-radius:3px; border:1px solid #0b1220; }
+  .legend-off { opacity:0.45; filter:saturate(60%); }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } aside { border-right:none; border-bottom:1px solid #0b1220; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Multi-Function Grapher</h1>
+  <div class="row">
+    <select id="preset">
+      <option value="">Presets…</option>
+      <option>f: sin(x)\ng: cos(x)\nh: tan(x)</option>
+      <option>f: sin(x)\ng: sin(2x)\nh: sin(3x)</option>
+      <option>f: x^2\ng: x^3 - 6x\nh: exp(x)</option>
+      <option>f: exp(-x^2)\ng: exp(-(x-2)^2)\nh: exp(-(x+2)^2)</option>
+      <option>f: 1/(x-1)\ng: 1/(x+1)</option>
+    </select>
+    <button id="plot">Plot</button>
+    <button id="reset" class="secondary">Reset View</button>
+    <span id="errors"></span>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="group">
+      <label for="exprs">Functions (one per line, optional <code>label: expression</code>)</label>
+      <textarea id="exprs" placeholder="Examples:
+f: sin(x)
+g: cos(2*x)
+exp(-x^2)"></textarea>
+    </div>
+
+    <div class="group grid-2">
+      <label>x-min <input id="xmin" type="number" step="any" value="-10"></label>
+      <label>x-max <input id="xmax" type="number" step="any" value="10"></label>
+    </div>
+    <div class="group grid-2">
+      <label>y-min <input id="ymin" type="number" step="any" value="-5"></label>
+      <label>y-max <input id="ymax" type="number" step="any" value="5"></label>
+    </div>
+    <div class="group">
+      <label>Samples per curve <input id="samples" type="number" min="100" max="8000" value="1400"></label>
+    </div>
+    <div class="group">
+      <button id="apply">Apply Range</button>
+    </div>
+
+    <div class="group">
+      <div class="hint">
+        <strong>Syntax</strong><br/>
+        • Operators: <code>+ - * / % ^</code> (use <code>^</code> for power)<br/>
+        • Functions: sin, cos, tan, asin, acos, atan, ln(=log), log10, exp, sqrt, abs, floor, ceil, round, min, max, pow, sign<br/>
+        • Constants: <code>pi</code>, <code>e</code><br/>
+        • Examples: <code>sin(x)</code>, <code>x^2 - 4</code>, <code>exp(-x^2)</code>, <code>sin(x)/x</code>
+      </div>
+    </div>
+    <div class="group">
+      <div class="hint">
+        <strong>Mouse</strong><br/>
+        • Zoom: wheel • Pan: drag • Reset: double-click or “Reset View”
+      </div>
+    </div>
+  </aside>
+
+  <section id="panel" style="display:grid; grid-template-rows: 1fr auto auto;">
+    <canvas id="canvas"></canvas>
+    <div id="legend"></div>
+    <footer>
+      Tip: Toggle a series by clicking its legend entry. Increase “Samples” if curves look jagged; zoom in for discontinuities.
+    </footer>
+  </section>
+</main>
+
+<script>
+(function(){
+  // ——— Elements
+  const exprsTA     = document.getElementById('exprs');
+  const presetSel   = document.getElementById('preset');
+  const plotBtn     = document.getElementById('plot');
+  const resetBtn    = document.getElementById('reset');
+  const applyBtn    = document.getElementById('apply');
+  const errSpan     = document.getElementById('errors');
+  const xminInput   = document.getElementById('xmin');
+  const xmaxInput   = document.getElementById('xmax');
+  const yminInput   = document.getElementById('ymin');
+  const ymaxInput   = document.getElementById('ymax');
+  const samplesInput= document.getElementById('samples');
+  const canvas      = document.getElementById('canvas');
+  const legendDiv   = document.getElementById('legend');
+  const ctx         = canvas.getContext('2d');
+
+  // ——— View, series, colors
+  let view = { xmin:-10, xmax:10, ymin:-5, ymax:5 };
+  let series = []; // {label,color,exprText,fn,visible:true}
+  const palette = [
+    "#38bdf8", "#f472b6", "#a3e635", "#f59e0b", "#c084fc",
+    "#34d399", "#fb7185", "#60a5fa", "#fcd34d", "#22d3ee"
+  ];
+
+  // ——— Canvas sizing
+  function fitCanvas(){
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const bounds = canvas.getBoundingClientRect();
+    canvas.width  = Math.floor(bounds.width * dpr);
+    const h = Math.max(240, (window.innerHeight - document.querySelector('header').offsetHeight - 120));
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.height = Math.floor(canvas.height / dpr) + "px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', ()=>{ fitCanvas(); draw(); });
+
+  // ——— Safe-ish compiler
+  const allowedNames = new Set([
+    "sin","cos","tan","asin","acos","atan","log","log10","exp","sqrt","abs","floor","ceil","round","min","max","pow","sign",
+    "ln","pi","e","x","Math" // tolerate Math but not required
+  ]);
+  const forbiddenSnippets = ["constructor","__proto__","prototype","window","document","self","globalThis","Function","eval","import","new ","class ","=>","XML","fetch"];
+
+  function sanitize(expr){
+    const raw = expr.trim();
+    if (!raw) throw new Error("Empty expression.");
+    if (forbiddenSnippets.some(s => raw.toLowerCase().includes(s))) {
+      throw new Error("Expression contains forbidden keyword.");
+    }
+    let s = raw.replace(/\^/g, "**");
+    s = s.replace(/\bln\s*\(/gi, "log(");
+    if (/[`"';]/.test(s)) throw new Error("Please avoid quotes or semicolons.");
+    const idents = s.match(/[A-Za-z_]\w*/g) || [];
+    for (const id of idents) {
+      if (!allowedNames.has(id)) {
+        if (id === "E") continue;         // scientific notation
+        if (id === "PI") continue;        // tolerate Math alias
+        if (id === "NaN" || id === "Infinity") throw new Error("Not allowed: " + id);
+        if (id !== "x") throw new Error(`Unknown identifier: ${id}`);
+      }
+    }
+    return s;
+  }
+
+  function compileOne(exprText){
+    const s = sanitize(exprText);
+    const src = `with (Math) { const pi=PI, e=E; return (${s}); }`;
+    // eslint-disable-next-line no-new-func
+    const fn = new Function("x", src);
+    fn(0); // quick test
+    return fn;
+  }
+
+  // ——— Parsing multiple lines
+  function parseAll(text){
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) throw new Error("Please enter at least one function.");
+    const out = [];
+    let autoIndex = 1;
+    for (const line of lines) {
+      let label, expr;
+      const m = line.match(/^\s*([^:]+)\s*:\s*(.+)$/); // "label: expr"
+      if (m) { label = m[1].trim(); expr = m[2].trim(); }
+      else { label = `f${autoIndex++}`; expr = line; }
+      out.push({ label, exprText: expr });
+    }
+    return out;
+  }
+
+  // ——— Build/compile series and legend
+  function rebuildSeries(){
+    const defs = parseAll(exprsTA.value);
+    series = defs.map((d, i) => ({
+      label: d.label,
+      exprText: d.exprText,
+      fn: compileOne(d.exprText),
+      color: palette[i % palette.length],
+      visible: true
+    }));
+    buildLegend();
+  }
+
+  function buildLegend(){
+    legendDiv.innerHTML = "";
+    series.forEach((s, idx) => {
+      const item = document.createElement('div');
+      item.className = 'legend-item' + (s.visible ? '' : ' legend-off');
+      item.title = "Click to toggle";
+      const sw = document.createElement('span');
+      sw.className = 'swatch';
+      sw.style.background = s.color;
+      const txt = document.createElement('span');
+      txt.textContent = s.label + ": " + s.exprText;
+      item.appendChild(sw);
+      item.appendChild(txt);
+      item.addEventListener('click', ()=>{
+        s.visible = !s.visible;
+        item.className = 'legend-item' + (s.visible ? '' : ' legend-off');
+        draw();
+      });
+      legendDiv.appendChild(item);
+    });
+  }
+
+  // ——— Coord transforms
+  function xToPx(x){ return (x - view.xmin) * canvas.width  / (view.xmax - view.xmin); }
+  function yToPy(y){ return canvas.height - (y - view.ymin) * canvas.height / (view.ymax - view.ymin); }
+  function pxToX(px){ return view.xmin + px * (view.xmax - view.xmin) / canvas.width; }
+  function pyToY(py){ return view.ymin + (canvas.height - py) * (view.ymax - view.ymin) / canvas.height; }
+
+  // ——— Grid and axes
+  function niceStep(span){
+    const rough = span / 10;
+    const pow10 = Math.pow(10, Math.floor(Math.log10(rough)));
+    const candidates = [1,2,5,10];
+    return candidates.reduce((best,c)=>{
+      const st = c * pow10;
+      return (Math.abs(rough - st) < Math.abs(rough - best)) ? st : best;
+    }, pow10);
+  }
+
+  function drawGrid(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "#071224";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    const xStep = niceStep(view.xmax - view.xmin);
+    const yStep = niceStep(view.ymax - view.ymin);
+
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#0f2138";
+    ctx.fillStyle = "#6b93b3";
+    ctx.font = "12px system-ui, sans-serif";
+
+    for (let x = Math.ceil(view.xmin / xStep) * xStep; x <= view.xmax; x += xStep) {
+      const px = xToPx(x) + 0.5;
+      ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,canvas.height); ctx.stroke();
+      if (px >= 24 && px <= canvas.width - 24) ctx.fillText(Number(x.toFixed(6)).toString(), px + 4, canvas.height - 6);
+    }
+    for (let y = Math.ceil(view.ymin / yStep) * yStep; y <= view.ymax; y += yStep) {
+      const py = yToPy(y) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(canvas.width,py); ctx.stroke();
+      if (py >= 14 && py <= canvas.height - 8) ctx.fillText(Number(y.toFixed(6)).toString(), 6, py - 4);
+    }
+
+    // axes
+    ctx.strokeStyle = "#3b5168";
+    ctx.lineWidth = 1.5;
+    if (view.xmin < 0 && view.xmax > 0) {
+      const px = xToPx(0) + 0.5;
+      ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,canvas.height); ctx.stroke();
+    }
+    if (view.ymin < 0 && view.ymax > 0) {
+      const py = yToPy(0) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(canvas.width,py); ctx.stroke();
+    }
+  }
+
+  // ——— Draw curves
+  function drawCurves(){
+    const n = Math.max(100, Math.min(8000, Number(samplesInput.value) || 1400));
+    const dx = (view.xmax - view.xmin) / (n - 1);
+
+    for (const s of series) {
+      if (!s.visible) continue;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = s.color;
+      ctx.beginPath();
+      let move = true;
+      for (let i = 0; i < n; i++) {
+        const x = view.xmin + i * dx;
+        let y;
+        try { y = s.fn(x); }
+        catch { move = true; continue; }
+        if (!isFinite(y) || Math.abs(y) > 1e12) { move = true; continue; }
+        const px = xToPx(x), py = yToPy(y);
+        if (move) { ctx.moveTo(px, py); move = false; }
+        else { ctx.lineTo(px, py); }
+      }
+      ctx.stroke();
+    }
+  }
+
+  function draw(){
+    try {
+      drawGrid();
+      drawCurves();
+      errSpan.textContent = "";
+    } catch (e) {
+      errSpan.textContent = e.message || String(e);
+    }
+  }
+
+  // ——— View helpers
+  function applyInputsToView(){
+    const xmin = Number(xminInput.value), xmax = Number(xmaxInput.value);
+    const ymin = Number(yminInput.value), ymax = Number(ymaxInput.value);
+    if (!(isFinite(xmin) && isFinite(xmax) && xmax > xmin)) throw new Error("Invalid x-range.");
+    if (!(isFinite(ymin) && isFinite(ymax) && ymax > ymin)) throw new Error("Invalid y-range.");
+    view = { xmin, xmax, ymin, ymax };
+  }
+  function updateInputsFromView(){
+    xminInput.value = view.xmin; xmaxInput.value = view.xmax;
+    yminInput.value = view.ymin; ymaxInput.value = view.ymax;
+  }
+
+  // ——— Mouse interactions
+  let isDragging = false, dragStart = {x:0,y:0}, viewStart = null;
+
+  canvas.addEventListener('mousedown', (e)=>{
+    isDragging = true; dragStart = { x: e.offsetX, y: e.offsetY }; viewStart = { ...view };
+  });
+  window.addEventListener('mouseup', ()=>{ isDragging = false; });
+  window.addEventListener('mousemove', (e)=>{
+    if (!isDragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const dxPx = e.offsetX - dragStart.x;
+    const dyPx = e.offsetY - dragStart.y;
+    const dx = dxPx * (viewStart.xmax - viewStart.xmin) / rect.width;
+    const dy = dyPx * (viewStart.ymax - viewStart.ymin) / rect.height;
+    view.xmin = viewStart.xmin - dx; view.xmax = viewStart.xmax - dx;
+    view.ymin = viewStart.ymin + dy; view.ymax = viewStart.ymax + dy;
+    updateInputsFromView(); draw();
+  });
+
+  canvas.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const px = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const py = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    const zx = pxToX(px), zy = pyToY(py);
+    const scale = (e.deltaY < 0) ? 0.9 : 1.1;
+    view = {
+      xmin: zx + (view.xmin - zx) * scale,
+      xmax: zx + (view.xmax - zx) * scale,
+      ymin: zy + (view.ymin - zy) * scale,
+      ymax: zy + (view.ymax - zy) * scale
+    };
+    updateInputsFromView(); draw();
+  }, { passive:false });
+
+  canvas.addEventListener('dblclick', ()=>{
+    view = { xmin:-10, xmax:10, ymin:-5, ymax:5 };
+    updateInputsFromView(); draw();
+  });
+
+  // ——— Controls
+  plotBtn.addEventListener('click', ()=>{
+    try { rebuildSeries(); draw(); }
+    catch (e) { errSpan.textContent = e.message || String(e); }
+  });
+
+  presetSel.addEventListener('change', ()=>{
+    if (!presetSel.value) return;
+    exprsTA.value = presetSel.value;
+    plotBtn.click();
+  });
+
+  applyBtn.addEventListener('click', ()=>{
+    try { applyInputsToView(); draw(); }
+    catch (e) { errSpan.textContent = e.message || String(e); }
+  });
+
+  // ——— Init
+  exprsTA.value = "f: sin(x)\ng: cos(2*x)\nh: exp(-x^2)";
+  try { rebuildSeries(); } catch(e) { errSpan.textContent = e.message; }
+  fitCanvas();
+  updateInputsFromView();
+  draw();
+})();
+</script>
+</body>
+</html>
