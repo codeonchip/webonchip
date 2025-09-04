@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MPC8347 + DDR (Beginner Guide)</title>
+  <style>
+    :root{
+      --bg: #0b1020;
+      --panel: #121933;
+      --ink: #e7ecff;
+      --muted: #aab3d1;
+      --accent: #88b0ff;
+      --accent-2:#7ef7d7;
+      --warn:#ffd166;
+      --ok:#90ee90;
+      --danger:#ff7a7a;
+      --code:#0d1228;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:linear-gradient(180deg, #0b1020, #0a1430 45%, #0a0f26);
+      color:var(--ink); font-family:var(--sans); line-height:1.45;
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:28px 18px 120px}
+    header{display:flex; gap:14px; align-items:center; justify-content:space-between; margin-bottom:20px}
+    h1{font-size: clamp(22px, 3.4vw, 36px); margin:0; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:14px}
+    .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px}
+    .card{background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius); padding:16px 16px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25)}
+    .card h2{margin:0 0 8px; font-size:18px}
+    .card p{margin:6px 0}
+    .muted{color:var(--muted)}
+    code, pre{font-family:var(--mono)}
+    pre{background:var(--code); border-radius:14px; padding:14px; overflow:auto; border:1px solid rgba(255,255,255,0.06)}
+    .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px}
+    label{display:block; font-size:13px; color:var(--muted); margin-bottom:4px}
+    input[type="number"], select, input[type="text"]{
+      width:100%; padding:10px 12px; border-radius:12px; background:#0b1430; color:var(--ink); border:1px solid rgba(255,255,255,0.12);
+      outline:none; transition:border .15s ease
+    }
+    input:focus, select:focus{border-color:var(--accent)}
+    .row{display:flex; gap:10px; align-items:center}
+    .btn{
+      appearance:none; border:1px solid rgba(255,255,255,0.14); padding:10px 14px; border-radius:12px; background:#0a1535; color:var(--ink);
+      cursor:pointer; font-weight:600; transition: transform .06s ease, background .2s ease, border .2s ease;
+    }
+    .btn:hover{background:#0c1a44; border-color:rgba(255,255,255,0.22)}
+    .btn:active{transform:translateY(1px)}
+    .tag{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; background:#0c1a44; border:1px solid rgba(255,255,255,0.12); border-radius:999px; font-size:12px; color:var(--muted)}
+    .pill{display:inline-block; background:#0a193e; border:1px solid rgba(255,255,255,0.1); border-radius:999px; padding:2px 8px; font-size:12px; color:var(--accent-2)}
+    .tbl{width:100%; border-collapse:collapse; font-size:14px}
+    .tbl th,.tbl td{border-bottom:1px dashed rgba(255,255,255,0.1); padding:8px 6px; text-align:left}
+    .tbl th{color:var(--muted); font-weight:600}
+    .hl{color:var(--accent)}
+    .ok{color:var(--ok)}
+    .warn{color:var(--warn)}
+    details{background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:10px 12px}
+    details summary{cursor:pointer; font-weight:600}
+    .flow{background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px;}
+    .kbd{font-family:var(--mono); font-size:12px; background:#0b1430; padding:2px 6px; border-radius:6px; border:1px solid rgba(255,255,255,0.12)}
+    footer{margin-top:24px; color:var(--muted); font-size:12px}
+    .note{font-size:13px; color:var(--muted)}
+    .split{display:grid; grid-template-columns:1.2fr .8fr; gap:16px}
+    @media (max-width: 880px){.split{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>MPC8347 + DDR — A Friendly Beginner’s Guide</h1>
+        <div class="sub">Understand what the controller does, the terms you’ll see, and generate starter code for boot-time init.</div>
+      </div>
+      <div class="tag">No libraries • Single HTML file</div>
+    </header>
+
+    <section class="cards">
+      <div class="card">
+        <h2>What you’ll learn</h2>
+        <p>• What DDR/SDRAM timing names mean (CL, tRCD, tRP, …)</p>
+        <p>• Which <b>key registers</b> matter on MPC8347</p>
+        <p>• The <b>boot-time sequence</b> in plain English</p>
+        <p>• Convert datasheet <b>nanoseconds → cycles</b></p>
+        <p>• Generate a <b>starter C snippet</b> with your numbers</p>
+      </div>
+      <div class="card">
+        <h2>Quick terms</h2>
+        <p><b>CAS (CL):</b> Read command → data output delay (in cycles).</p>
+        <p><b>tRCD:</b> Row activate → column access (RAS→CAS) delay.</p>
+        <p><b>tRP:</b> Time to precharge (close a row).</p>
+        <p><b>tRAS:</b> Minimum time a row stays active.</p>
+        <p><b>tRFC:</b> Recovery time after a refresh.</p>
+        <p class="muted">We’ll convert these to controller cycles below.</p>
+      </div>
+      <div class="card">
+        <h2>MPC8347 registers (friendly map)</h2>
+        <table class="tbl">
+          <tr><th>Register</th><th>What it controls</th></tr>
+          <tr><td><code>CSn_BNDS / CSn_CONFIG</code></td><td>Chip-select address range, row/col size, banks</td></tr>
+          <tr><td><code>TIMING_CFG_1 / _2</code></td><td>tRCD, tRP, tRAS, tRC, tRFC, tWR, tWTR, CASLAT</td></tr>
+          <tr><td><code>DDR_SDRAM_CFG</code></td><td>Enable (MEM_EN), type (DDR), ECC, low-power</td></tr>
+          <tr><td><code>DDR_SDRAM_MODE(_2)</code></td><td>SDRAM mode values (CAS, burst length, etc.)</td></tr>
+          <tr><td><code>DDR_SDRAM_INTERVAL</code></td><td>Refresh interval (e.g., ~7.8µs)</td></tr>
+          <tr><td><code>DDR_SDRAM_CLK_CNTRL</code></td><td>Source-synchronous & MCK phase (¼-cycle steps)</td></tr>
+        </table>
+        <p class="note">Exact bitfields depend on the MPC8347 reference manual. This page helps you reason and calculate values.</p>
+      </div>
+    </section>
+
+    <br/>
+
+    <section class="card split">
+      <div>
+        <h2>1) Pick your clock & timings</h2>
+        <p class="muted">Enter your DDR clock and datasheet values (ns). We’ll compute controller cycles with <span class="kbd">ceil(ns / tCK)</span>.</p>
+        <div class="grid">
+          <div>
+            <label>DDR clock (MHz)</label>
+            <input id="mhz" type="number" value="133" min="50" max="400" step="1" />
+          </div>
+          <div>
+            <label>CAS Latency (CL)</label>
+            <select id="cl">
+              <option value="2">2</option>
+              <option value="2.5">2.5</option>
+              <option value="3" selected>3</option>
+            </select>
+          </div>
+          <div>
+            <label>tRCD (ns)</label>
+            <input id="trcd" type="number" value="15" step="0.5" />
+          </div>
+          <div>
+            <label>tRP (ns)</label>
+            <input id="trp" type="number" value="15" step="0.5" />
+          </div>
+          <div>
+            <label>tRAS (ns)</label>
+            <input id="tras" type="number" value="42" step="0.5" />
+          </div>
+          <div>
+            <label>tRC (ns)</label>
+            <input id="trc" type="number" value="60" step="0.5" />
+          </div>
+          <div>
+            <label>tRFC (ns)</label>
+            <input id="trfc" type="number" value="66" step="0.5" />
+          </div>
+          <div>
+            <label>tWR (ns)</label>
+            <input id="twr" type="number" value="15" step="0.5" />
+          </div>
+          <div>
+            <label>tWTR (ns)</label>
+            <input id="twtr" type="number" value="10" step="0.5" />
+          </div>
+          <div>
+            <label>Refresh interval (µs) per refresh</label>
+            <input id="trefus" type="number" value="7.8" step="0.1" />
+          </div>
+        </div>
+        <div style="margin-top:12px" class="row">
+          <button class="btn" onclick="compute()">Compute cycles</button>
+          <span id="tck" class="pill">tCK: — ns</span>
+        </div>
+        <div id="calcOut" style="margin-top:12px"></div>
+      </div>
+      <div>
+        <h2>2) Boot sequence (plain English)</h2>
+        <div class="flow">
+          <ol>
+            <li>Keep controller disabled (<code>DDR_SDRAM_CFG.MEM_EN = 0</code>).</li>
+            <li>Program <b>CSn, TIMING_CFG_1/_2, INTERVAL, MODE</b>.</li>
+            <li>(If needed) Set <b>CLK_CNTRL</b> (source-synchronous, MCK phase).</li>
+            <li>Wait for power/clock to stabilize (e.g., ≥ 200 µs).</li>
+            <li>Set <code>MEM_EN = 1</code>. Controller issues <b>Precharge-All → (E)MRS → Auto-Refresh×2 → MRS</b>.</li>
+            <li>Do a tiny delay; memory is now usable by later boot stages.</li>
+          </ol>
+        </div>
+        <details style="margin-top:10px">
+          <summary>Why convert ns → cycles?</summary>
+          <div style="margin-top:8px" class="muted">The DDR controller understands whole clock cycles. Datasheets usually give timing in nanoseconds. We compute <code>ceil(ns / tCK)</code> so we never violate minimum timing.</div>
+        </details>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3) Starter C snippet (auto‑filled from your numbers)</h2>
+      <p class="muted">This is <b>example-style</b> code to help you picture what goes where. Replace register names/fields with the exact ones from the MPC8347 reference manual.</p>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn" onclick="copyCode()">Copy code</button>
+        <button class="btn" onclick="downloadHeader()">Download <span class="kbd">ddr_init.h</span></button>
+      </div>
+      <pre id="code">Run the calculator above to generate code…</pre>
+    </section>
+
+    <section class="card">
+      <h2>4) Visual: Initialization flow</h2>
+      <svg viewBox="0 0 920 210" width="100%" height="210" aria-label="Boot flow diagram">
+        <defs>
+          <linearGradient id="g1" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stop-color="#7ef7d7"/><stop offset="100%" stop-color="#88b0ff"/>
+          </linearGradient>
+        </defs>
+        <style>
+          .bx{fill:#0d1533; stroke:#3a4a7a; stroke-width:1.2}
+          .txt{fill:#dfe6ff; font: 13px var(--sans)}
+          .arrow{stroke:url(#g1); stroke-width:2.5; fill:none; marker-end:url(#arrowHead)}
+        </style>
+        <defs>
+          <marker id="arrowHead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0,0 8,3 0,6" fill="url(#g1)"/>
+          </marker>
+        </defs>
+        <rect class="bx" x="10" y="40" width="170" height="80" rx="12"/>
+        <text class="txt" x="25" y="70">MEM_EN = 0</text>
+        <text class="txt" x="25" y="92">Program CSn, TIMING,</text>
+        <text class="txt" x="25" y="112">INTERVAL, MODE</text>
+
+        <rect class="bx" x="210" y="40" width="190" height="80" rx="12"/>
+        <text class="txt" x="223" y="70">CLK_CNTRL (optional)</text>
+        <text class="txt" x="223" y="92">source‑sync / MCK phase</text>
+
+        <rect class="bx" x="420" y="40" width="150" height="80" rx="12"/>
+        <text class="txt" x="435" y="70">Delay ≥ 200 µs</text>
+        <text class="txt" x="435" y="92">power/clock stable</text>
+
+        <rect class="bx" x="600" y="40" width="300" height="80" rx="12"/>
+        <text class="txt" x="615" y="64">MEM_EN = 1 → Controller auto‑sequence:</text>
+        <text class="txt" x="615" y="86">Precharge‑All → (E)MRS → Auto‑Refresh×2 → MRS</text>
+
+        <path class="arrow" d="M180,80 L210,80"/>
+        <path class="arrow" d="M400,80 L420,80"/>
+        <path class="arrow" d="M570,80 L600,80"/>
+      </svg>
+    </section>
+
+    <section class="card">
+      <h2>FAQ (super short)</h2>
+      <details open>
+        <summary>Is CL=3 “slower” than CL=2?</summary>
+        <p class="muted">CL is in <b>cycles</b>. A higher clock can make a higher CL still be a smaller <b>time</b> in ns. Always check both.</p>
+      </details>
+      <details>
+        <summary>What refresh value do I use?</summary>
+        <p class="muted">Typical spec: 8192 refreshes per 64 ms → ~7.8 µs between refreshes. Convert that to cycles at your DDR clock and program <code>DDR_SDRAM_INTERVAL</code>.</p>
+      </details>
+      <details>
+        <summary>Will these fields match my exact silicon?</summary>
+        <p class="muted">Names here are friendly labels. Always map to the exact bitfields in your MPC8347 reference manual & your DDR chip datasheet.</p>
+      </details>
+    </section>
+
+    <footer>
+      Built for beginners. No external libraries. Tweak, save, and share with your team.
+    </footer>
+  </div>
+
+  <script>
+    function ceilCycles(ns, mhz){
+      if(!isFinite(ns) || !isFinite(mhz) || mhz <= 0){return NaN}
+      const cycles = Math.ceil((ns * mhz) / 1000.0); // ceil(ns / tCK), tCK = 1000/mhz
+      return Math.max(1, cycles);
+    }
+
+    function fmtHex(n){
+      if (!isFinite(n)) return "0x0";
+      const v = (n>>>0).toString(16).toUpperCase();
+      return "0x" + v;
+    }
+
+    function compute(){
+      const mhz = parseFloat(document.getElementById('mhz').value);
+      const cl  = parseFloat(document.getElementById('cl').value);
+      const trcd= parseFloat(document.getElementById('trcd').value);
+      const trp = parseFloat(document.getElementById('trp').value);
+      const tras= parseFloat(document.getElementById('tras').value);
+      const trc = parseFloat(document.getElementById('trc').value);
+      const trfc= parseFloat(document.getElementById('trfc').value);
+      const twr = parseFloat(document.getElementById('twr').value);
+      const twtr= parseFloat(document.getElementById('twtr').value);
+      const trefus = parseFloat(document.getElementById('trefus').value);
+
+      const tck = 1000.0 / mhz; // ns
+      document.getElementById('tck').textContent = `tCK: ${tck.toFixed(3)} ns`;
+
+      const c_trcd = ceilCycles(trcd, mhz);
+      const c_trp  = ceilCycles(trp,  mhz);
+      const c_tras = ceilCycles(tras, mhz);
+      const c_trc  = ceilCycles(trc,  mhz);
+      const c_trfc = ceilCycles(trfc, mhz);
+      const c_twr  = ceilCycles(twr,  mhz);
+      const c_twtr = ceilCycles(twtr, mhz);
+      const c_ref  = ceilCycles(trefus * 1000.0, mhz); // µs → ns
+
+      // Simple presentation table
+      const tbl = `
+        <table class="tbl">
+          <tr><th>Parameter</th><th>Datasheet (ns)</th><th>Controller (cycles)</th></tr>
+          <tr><td>CAS (CL)</td><td class="muted">—</td><td><b>${cl}</b></td></tr>
+          <tr><td>tRCD</td><td>${trcd}</td><td>${c_trcd}</td></tr>
+          <tr><td>tRP</td><td>${trp}</td><td>${c_trp}</td></tr>
+          <tr><td>tRAS</td><td>${tras}</td><td>${c_tras}</td></tr>
+          <tr><td>tRC</td><td>${trc}</td><td>${c_trc}</td></tr>
+          <tr><td>tRFC</td><td>${trfc}</td><td>${c_trfc}</td></tr>
+          <tr><td>tWR</td><td>${twr}</td><td>${c_twr}</td></tr>
+          <tr><td>tWTR</td><td>${twtr}</td><td>${c_twtr}</td></tr>
+          <tr><td>Refresh interval</td><td>${trefus} µs</td><td>${c_ref}</td></tr>
+        </table>`;
+      document.getElementById('calcOut').innerHTML = tbl;
+
+      // Generate illustrative C snippet (pseudocode-style fields)
+      const code = `/* Auto-generated starter (illustrative) \n   Replace names/fields with exact MPC8347 refs */\n\n// Convert datasheet ns → cycles with ceil(ns / tCK) @ ${mhz} MHz\n#define DDR_MHZ        ${mhz}\n#define DDR_CL         ${cl}\n#define DDR_tRCD_cyc   ${c_trcd}\n#define DDR_tRP_cyc    ${c_trp}\n#define DDR_tRAS_cyc   ${c_tras}\n#define DDR_tRC_cyc    ${c_trc}\n#define DDR_tRFC_cyc   ${c_trfc}\n#define DDR_tWR_cyc    ${c_twr}\n#define DDR_tWTR_cyc   ${c_twtr}\n#define DDR_REF_cyc    ${c_ref}   // ~7.8µs default\n\nstatic void ddr_init(void){\n    // 1) Disable controller (MEM_EN = 0)\n    DDR_SDRAM_CFG &= ~MEM_EN;\n\n    // 2) Program timing registers\n    TIMING_CFG_1 = (CASLAT(${cl}) | tRCD(${c_trcd}) | tRP(${c_trp}) | tRAS(${c_tras}));\n    TIMING_CFG_2 = (tRC(${c_trc}) | tRFC(${c_trfc}) | tWR(${c_twr}) | tWTR(${c_twtr}));\n\n    // 3) Refresh interval (convert µs to cycles)\n    DDR_SDRAM_INTERVAL = REFINT(${c_ref});\n\n    // 4) Mode register(s) — CAS & burst length (example values)\n    DDR_SDRAM_MODE  = MODE_BL(8) | MODE_CL(${cl});\n    // DDR_SDRAM_MODE_2 = ... (if your part uses it)\n\n    // 5) Optional clock control (source-synchronous, MCK phase)\n    // DDR_SDRAM_CLK_CNTRL = SS_EN | MCK_PHASE(1);\n\n    // 6) Delay ≥ 200µs for power/clock settle (platform-specific)\n    delay_us(200);\n\n    // 7) Enable controller — auto-sequence kicks in\n    DDR_SDRAM_CFG |= MEM_EN;\n\n    // 8) Small guard delay before first access\n    delay_us(10);\n}\n`;
+      document.getElementById('code').textContent = code;
+      window.__genCode = code;
+    }
+
+    function copyCode(){
+      if(!window.__genCode){compute()}
+      navigator.clipboard.writeText(window.__genCode||'').then(()=>{
+        toast('Copied!');
+      });
+    }
+
+    function downloadHeader(){
+      if(!window.__genCode){compute()}
+      const blob = new Blob([window.__genCode||''], {type:'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'ddr_init.h'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    }
+
+    function toast(msg){
+      const t = document.createElement('div');
+      t.textContent = msg;
+      Object.assign(t.style,{
+        position:'fixed', bottom:'18px', right:'18px', background:'#0c1a44', color:'#e7ecff',
+        border:'1px solid rgba(255,255,255,0.14)', padding:'10px 14px', borderRadius:'12px', zIndex:9999,
+        boxShadow:'0 10px 24px rgba(0,0,0,.25)'
+      });
+      document.body.appendChild(t);
+      setTimeout(()=>t.remove(), 1400);
+    }
+  </script>
+</body>
+</html>
