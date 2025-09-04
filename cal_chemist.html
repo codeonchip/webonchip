@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chemist's Calculator – Molar Mass, Molarity, Dilution, pH, Gas Law</title>
+  <style>
+    :root{
+      --bg:#0b1022;--panel:#0f172a;--panel2:#111827;--ink:#e5e7eb;--muted:#94a3b8;--accent:#22d3ee;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(160deg,#0b1024,#0c122b 35%,#0b0f22);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial;display:grid;place-items:center}
+    .app{width:min(1100px,96vw);background:var(--panel);border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.05) inset;overflow:hidden;display:grid;grid-template-columns: 240px 1px 1fr;min-height: 78vh}
+    .divider{background:linear-gradient(180deg,transparent,rgba(255,255,255,.08),transparent)}
+    .sidebar{background:linear-gradient(180deg,#0e142b,#111827);padding:14px;display:flex;flex-direction:column;gap:10px}
+    .brand{font-weight:800;letter-spacing:.06em;color:var(--accent);text-transform:uppercase;font-size:13px}
+    .nav button{width:100%;text-align:left;padding:10px 12px;border-radius:10px;background:var(--panel2);color:var(--ink);border:0;cursor:pointer;font-weight:700}
+    .nav button[aria-current="page"]{outline:2px solid rgba(34,211,238,.4);background:#0b2d36}
+    .nav small{color:var(--muted);display:block;margin-top:2px}
+    .content{padding:16px 18px 24px 18px;max-height:78vh;overflow:auto}
+    h1{margin:.2em 0 .6em 0;font-size:20px}
+    h2{margin:1.2em 0 .4em 0;font-size:16px;color:var(--accent)}
+    fieldset{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;margin:10px 0;background:rgba(255,255,255,.02)}
+    legend{padding:0 6px;color:var(--muted)}
+    label{display:flex;gap:8px;align-items:center;margin:6px 0}
+    input,select{flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--ink);font-weight:600}
+    .row{display:grid;grid-template-columns: repeat(2, minmax(0,1fr));gap:10px}
+    .row3{display:grid;grid-template-columns: repeat(3, minmax(0,1fr));gap:10px}
+    .row4{display:grid;grid-template-columns: repeat(4, minmax(0,1fr));gap:10px}
+    button.action{background:#0b3d4a;color:var(--ink);border:0;border-radius:10px;padding:10px 12px;font-weight:800;cursor:pointer}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px dashed rgba(255,255,255,.12);padding:6px 8px;text-align:right}
+    th:first-child,td:first-child{text-align:left}
+    .chip{display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-weight:800}
+    .note{font-size:12px;color:var(--muted)}
+    .ok{color:var(--ok)}.bad{color:var(--bad)}
+    .kbd{padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.1);font-family:ui-monospace,Menlo,Consolas,monospace}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Chemist's calculator">
+    <aside class="sidebar">
+      <div class="brand">Chemist's Calculator</div>
+      <div class="nav">
+        <button data-view="molar" aria-current="page">Molar mass<br><small>Parse formula (CuSO4·5H2O)</small></button>
+        <button data-view="molarity">Solution molarity<br><small>g, MW, volume → M</small></button>
+        <button data-view="dilution">Dilution (C₁V₁=C₂V₂)<br><small>Compute one unknown</small></button>
+        <button data-view="gas">Ideal Gas Law (PV=nRT)<br><small>Solve for one</small></button>
+        <button data-view="ph">pH / pOH<br><small>Strong acid/base</small></button>
+        <button data-view="hhb">Henderson–Hasselbalch<br><small>Buffer pH</small></button>
+        <button data-view="convert">Unit converters<br><small>T, P, amount</small></button>
+      </div>
+      <div class="note" style="margin-top:auto">Tip: press <span class="kbd">/</span> to jump to the main input.</div>
+    </aside>
+    <div class="divider"></div>
+
+    <main class="content" id="content" tabindex="-1"></main>
+  </div>
+
+<script>
+// ------- Atomic weights (IUPAC-ish, rounded) -------
+const AW = {
+  H:1.008, He:4.0026, Li:6.94, Be:9.0122, B:10.81, C:12.011, N:14.007, O:15.999, F:18.998, Ne:20.180,
+  Na:22.990, Mg:24.305, Al:26.982, Si:28.085, P:30.974, S:32.06, Cl:35.45, Ar:39.948, K:39.098, Ca:40.078,
+  Sc:44.956, Ti:47.867, V:50.942, Cr:51.996, Mn:54.938, Fe:55.845, Co:58.933, Ni:58.693, Cu:63.546, Zn:65.38,
+  Ga:69.723, Ge:72.630, As:74.922, Se:78.971, Br:79.904, Kr:83.798, Rb:85.468, Sr:87.62, Y:88.906, Zr:91.224,
+  Nb:92.906, Mo:95.95, Tc:98, Ru:101.07, Rh:102.905, Pd:106.42, Ag:107.868, Cd:112.414, In:114.818, Sn:118.710,
+  Sb:121.760, Te:127.60, I:126.904, Xe:131.293, Cs:132.905, Ba:137.327, La:138.905, Ce:140.116, Pr:140.908, Nd:144.242,
+  Pm:145, Sm:150.36, Eu:151.964, Gd:157.25, Tb:158.925, Dy:162.500, Ho:164.930, Er:167.259, Tm:168.934, Yb:173.045,
+  Lu:174.967, Hf:178.49, Ta:180.948, W:183.84, Re:186.207, Os:190.23, Ir:192.217, Pt:195.084, Au:196.967, Hg:200.592,
+  Tl:204.38, Pb:207.2, Bi:208.980, Po:209, At:210, Rn:222, Fr:223, Ra:226, Ac:227, Th:232.038, Pa:231.036, U:238.029,
+  Np:237, Pu:244, Am:243, Cm:247, Bk:247, Cf:251, Es:252, Fm:257, Md:258, No:259, Lr:266, Rf:267, Db:268, Sg:269,
+  Bh:270, Hs:277, Mt:278, Ds:281, Rg:282, Cn:285, Nh:286, Fl:289, Mc:290, Lv:293, Ts:294, Og:294
+};
+
+// ------- Formula parser (supports parentheses (), brackets [], and hydrates · or .) -------
+function parseFormula(formula){
+  if(!formula || typeof formula !== 'string') return {};
+  // Split hydrates and merge parts
+  const parts = formula.replace(/\s+/g,'').split(/[·\.]/g).filter(Boolean);
+  const total = {};
+  for(const part of parts){
+    const comp = parsePart(part);
+    for(const k in comp){ total[k]=(total[k]||0)+comp[k]; }
+  }
+  return total;
+}
+
+function parsePart(s){
+  let i=0; const n=s.length; const stack=[{}]; let pendingMult=1;
+  const merge=(dst,src,m=1)=>{ for(const k in src){ dst[k]=(dst[k]||0)+src[k]*m; } };
+  const readNum=()=>{ let j=i; while(i<n && /[0-9]/.test(s[i])) i++; return j===i?1:parseInt(s.slice(j,i),10); };
+  const readElem=()=>{ if(i>=n || !/[A-Z]/.test(s[i])) return null; let sym=s[i++]; if(i<n && /[a-z]/.test(s[i])) sym+=s[i++]; return sym; };
+
+  while(i<n){
+    const ch=s[i];
+    if(/[0-9]/.test(ch)){
+      pendingMult = readNum();
+      continue;
+    }
+    if(ch==='(' || ch==='['){
+      i++; stack.push({});
+      continue;
+    }
+    if(ch===')' || ch===']'){
+      i++; const mult = readNum(); const group = stack.pop();
+      merge(stack[stack.length-1], group, mult * (pendingMult||1));
+      pendingMult=1; continue;
+    }
+    const el = readElem();
+    if(el){
+      const count = readNum();
+      const add = (count * (pendingMult||1));
+      stack[stack.length-1][el]=(stack[stack.length-1][el]||0)+add;
+      pendingMult=1; continue;
+    }
+    // Unknown char -> skip to avoid infinite loop
+    i++;
+  }
+  // collapse stack
+  while(stack.length>1){ const top=stack.pop(); merge(stack[0],top,1); }
+  return stack[0];
+}
+
+function molarMass(comp){
+  let mw=0, missing=[]; const breakdown=[];
+  for(const el in comp){
+    const w = AW[el];
+    if(!w){ missing.push(el); continue; }
+    const c = comp[el];
+    const contrib = w*c; mw+=contrib;
+    breakdown.push({el,c,w,contrib});
+  }
+  return {mw, breakdown:breakdown.sort((a,b)=>a.el.localeCompare(b.el)), missing};
+}
+
+// ---------- Views ----------
+const content = document.getElementById('content');
+const views = {
+  molar(){
+    content.innerHTML = `
+      <h1>Molar Mass</h1>
+      <fieldset>
+        <legend>Formula</legend>
+        <label>Enter chemical formula
+          <input id="fml" placeholder="e.g., C6H12O6 or CuSO4·5H2O" autofocus />
+        </label>
+        <div class="note">Supports (), [], and hydrates with · or dot. Leading multipliers like 5H2O are OK.</div>
+      </fieldset>
+      <div class="row">
+        <button class="action" id="calcMw">Calculate</button>
+        <div><span class="chip">MW</span> <span id="mw">—</span> g/mol</div>
+      </div>
+      <h2>Breakdown</h2>
+      <table id="tbl"><thead><tr><th>Element</th><th>Count</th><th>Atomic wt</th><th>Contribution</th></tr></thead><tbody></tbody></table>
+      <div id="miss" class="note"></div>
+    `;
+    const inp = document.getElementById('fml');
+    const run = ()=>{
+      const comp = parseFormula(inp.value);
+      const {mw, breakdown, missing} = molarMass(comp);
+      document.getElementById('mw').textContent = mw? mw.toFixed(4): '—';
+      const tb = content.querySelector('#tbl tbody'); tb.innerHTML='';
+      breakdown.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.el}</td><td>${r.c}</td><td>${r.w.toFixed(4)}</td><td>${r.contrib.toFixed(4)}</td>`;
+        tb.appendChild(tr);
+      });
+      document.getElementById('miss').textContent = missing.length? `Unknown elements: ${missing.join(', ')}`: '';
+    };
+    document.getElementById('calcMw').onclick = run;
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
+  },
+
+  molarity(){
+    content.innerHTML = `
+      <h1>Solution Molarity</h1>
+      <fieldset>
+        <legend>Inputs</legend>
+        <div class="row3">
+          <label>Formula (optional)
+            <input id="mol_formula" placeholder="e.g., NaCl" />
+          </label>
+          <label>Grams solute (g)
+            <input id="mol_g" type="number" step="any" />
+          </label>
+          <label>Volume (L)
+            <input id="mol_vol" type="number" step="any" />
+          </label>
+        </div>
+        <div class="row3">
+          <label>Molar mass (g/mol)
+            <input id="mol_mw" type="number" step="any" placeholder="auto if formula given" />
+          </label>
+          <label>Moles (mol)
+            <input id="mol_n" type="number" step="any" placeholder="auto" />
+          </label>
+          <div style="display:flex;align-items:center;gap:8px"><button class="action" id="mol_calc">Calculate</button><span class="chip">M</span><span id="mol_M">—</span></div>
+        </div>
+        <div class="note">If formula is provided, molar mass auto-fills. Provide grams & volume to get M; or provide moles & volume.</div>
+      </fieldset>
+    `;
+    const $=id=>content.querySelector('#'+id);
+    const autoMw=()=>{
+      const f=$('mol_formula').value.trim(); if(!f) return;
+      const {mw}=molarMass(parseFormula(f)); if(mw) $('mol_mw').value = mw.toFixed(5);
+    };
+    $('mol_formula').addEventListener('change', autoMw);
+    $('mol_calc').onclick = ()=>{
+      autoMw();
+      const g=parseFloat($('mol_g').value); const V=parseFloat($('mol_vol').value);
+      let mw=parseFloat($('mol_mw').value); let n=parseFloat($('mol_n').value);
+      if(!isFinite(n)){
+        if(isFinite(g) && isFinite(mw)) n = g/mw;
+      }
+      const M = (isFinite(n) && isFinite(V) && V>0) ? n/V : NaN;
+      $('mol_M').textContent = isFinite(M)? M.toFixed(6)+' mol/L' : '—';
+    };
+  },
+
+  dilution(){
+    content.innerHTML = `
+      <h1>Dilution: C₁V₁=C₂V₂</h1>
+      <fieldset>
+        <legend>Enter any three</legend>
+        <div class="row4">
+          <label>C₁ (M)
+            <input id="d_c1" type="number" step="any" />
+          </label>
+          <label>V₁ (L)
+            <input id="d_v1" type="number" step="any" />
+          </label>
+          <label>C₂ (M)
+            <input id="d_c2" type="number" step="any" />
+          </label>
+          <label>V₂ (L)
+            <input id="d_v2" type="number" step="any" />
+          </label>
+        </div>
+        <button class="action" id="d_calc">Solve</button>
+        <div class="note">Leave exactly one field blank to compute it.</div>
+      </fieldset>
+      <div id="d_out"></div>
+    `;
+    const $=id=>content.querySelector('#'+id);
+    $('d_calc').onclick=()=>{
+      const vals=['d_c1','d_v1','d_c2','d_v2'].map(id=>{ const v=parseFloat($(id).value); return isFinite(v)? v: null; });
+      const [c1,v1,c2,v2]=vals; const missing = vals.filter(v=>v===null).length;
+      const out=$('d_out');
+      if(missing!==1){ out.innerHTML='<span class="bad">Error:</span> leave exactly one blank.'; return; }
+      let res={c1,v1,c2,v2};
+      if(c1===null) res.c1=(c2*v2)/v1; else
+      if(v1===null) res.v1=(c2*v2)/c1; else
+      if(c2===null) res.c2=(c1*v1)/v2; else
+      if(v2===null) res.v2=(c1*v1)/c2;
+      out.innerHTML=`<h2>Result</h2>
+        <div class="row4">
+          <div><span class="chip">C₁</span> ${res.c1??c1 ?? '—'}</div>
+          <div><span class="chip">V₁
