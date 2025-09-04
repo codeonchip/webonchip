@@ -6,15 +6,15 @@
   <title>Printing Calculator (Paper Tape)</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --panel: #111827;
-      --panel-2: #1f2937;
-      --ink: #e5e7eb;
-      --muted: #94a3b8;
-      --accent: #22d3ee;
-      --warn: #f59e0b;
-      --danger: #ef4444;
-      --success: #10b981;
+      --bg: #0f172a;          /* slate-900 */
+      --panel: #111827;       /* gray-900 */
+      --panel-2: #1f2937;     /* gray-800 */
+      --ink: #e5e7eb;         /* gray-200 */
+      --muted: #94a3b8;       /* slate-400 */
+      --accent: #22d3ee;      /* cyan-400 */
+      --warn: #f59e0b;        /* amber-500 */
+      --danger: #ef4444;      /* red-500 */
+      --success: #10b981;     /* emerald-500 */
     }
 
     * { box-sizing: border-box; }
@@ -26,45 +26,122 @@
       font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial;
       display: grid;
       place-items: center;
+      min-height: 100vh;
     }
 
     .app {
       width: min(1100px, 96vw);
       display: grid;
-      grid-template-columns: 1fr 1px 1.1fr;
+      grid-template-columns: 1fr 1px 1.1fr; /* keypad | divider | tape */
       gap: 0;
       border-radius: 18px;
       overflow: hidden;
       box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05) inset;
       background: var(--panel);
+      max-height: 92vh;              /* ensure the right panel can scroll */
     }
 
     .divider { background: linear-gradient(180deg, transparent, rgba(255,255,255,.08), transparent); }
 
-    .calc { display: grid; grid-template-rows: auto auto 1fr; padding: 18px; gap: 12px; }
+    /* Left: calculator */
+    .calc {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      padding: 18px;
+      gap: 12px;
+    }
 
-    .branding { display: flex; align-items: baseline; gap: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+    .branding {
+      display: flex; align-items: baseline; gap: 10px;
+      color: var(--muted);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
     .branding .model { color: var(--accent); }
 
-    .display { background: radial-gradient(120% 140% at 10% -10%, rgba(34,211,238,.18), rgba(255,255,255,.03)); border: 1px solid rgba(255,255,255,.07); border-radius: 14px; padding: 16px 18px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+    .display {
+      background: radial-gradient(120% 140% at 10% -10%, rgba(34,211,238,.18), rgba(255,255,255,.03));
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+    }
     .display small { color: var(--muted); }
-    .screen { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-weight: 700; font-size: clamp(28px, 4.5vw, 40px); text-align: right; letter-spacing: .03em; }
+    .screen {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-weight: 700;
+      font-size: clamp(28px, 4.5vw, 40px);
+      text-align: right;
+      letter-spacing: .03em;
+    }
 
-    .grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
-    button { appearance: none; border: 0; cursor: pointer; padding: 14px 12px; border-radius: 12px; font-weight: 700; color: var(--ink); background: var(--panel-2); box-shadow: 0 2px 0 rgba(0,0,0,.45); transition: transform .04s ease, box-shadow .2s ease, background .2s ease, color .2s ease; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 10px;
+      align-content: start;
+    }
+    button {
+      appearance: none; border: 0; cursor: pointer;
+      padding: 14px 12px; border-radius: 12px; font-weight: 700;
+      color: var(--ink); background: var(--panel-2);
+      box-shadow: 0 2px 0 rgba(0,0,0,.45);
+      transition: transform .04s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
+    }
     button:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,.45); }
     .op { background: #0b3d4a; }
     .equals { background: #0a3a2b; }
     .danger { background: #3d0b12; }
     .wide { grid-column: span 2; }
 
-    .tape-panel { background: linear-gradient(180deg, #0e142b, #111827); padding: 0; display: grid; grid-template-rows: auto 1fr auto; }
-    .tape-toolbar { display: flex; gap: 8px; padding: 12px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid rgba(255,255,255,.08); background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)); }
-    .tape-toolbar input[type="number"] { width: 80px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: var(--ink); font-weight: 600; }
+    /* Right: paper tape */
+    .tape-panel {
+      background: linear-gradient(180deg, #0e142b, #111827);
+      padding: 0;
+      display: flex;               /* switched to flex so the middle can grow */
+      flex-direction: column;      /* header | scrollable body | footer */
+      min-height: 0;               /* allow child flex to shrink in grid container */
+    }
+    .tape-toolbar {
+      display: flex; gap: 8px; padding: 12px; align-items: center; flex-wrap: wrap;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+      flex: 0 0 auto;
+    }
+    .tape-toolbar input[type="number"] {
+      width: 80px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.06); color: var(--ink);
+      font-weight: 600;
+    }
 
-    .tape-wrap { padding: 18px; overflow-y: auto; overflow-x: hidden; position: relative; max-height: 500px; background: radial-gradient(120% 50% at 50% -20%, rgba(255,255,255,.08), transparent 45%), repeating-linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.045) 1px, transparent 1px, transparent 28px); }
+    .tape-wrap {
+      padding: 18px;
+      overflow-y: auto;             /* ✅ vertical scroll always available when needed */
+      overflow-x: hidden;
+      position: relative;
+      flex: 1 1 auto;               /* take remaining height between toolbar and footer */
+      min-height: 0;                /* allow it to actually shrink */
+      background:
+        radial-gradient(120% 50% at 50% -20%, rgba(255,255,255,.08), transparent 45%),
+        repeating-linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.045) 1px, transparent 1px, transparent 28px);
+    }
 
-    .tape { width: 100%; min-height: 480px; margin: 0 auto; max-width: 520px; background: linear-gradient(180deg, #f5f5f0, #f7f7f2); color: #202020; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.15); padding: 18px 16px 28px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .tape {
+      width: 100%;
+      min-height: 480px;
+      margin: 0 auto;
+      max-width: 520px;
+      background: linear-gradient(180deg, #f5f5f0, #f7f7f2);
+      color: #202020;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.15);
+      padding: 18px 16px 28px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
 
     .tape h3 { margin: 2px 0 10px 0; font-size: 13px; color: #444; letter-spacing: .08em; text-transform: uppercase; }
     .tape .head { display: flex; justify-content: space-between; align-items: baseline; color: #4a4a4a; }
@@ -81,17 +158,351 @@
 
     .muted { color: #6b7280; }
 
-    .tape-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-top: 1px solid rgba(255,255,255,.08); color: var(--muted); }
+    .tape-footer {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 12px; border-top: 1px solid rgba(255,255,255,.08);
+      color: var(--muted);
+      flex: 0 0 auto;
+    }
     .tape-footer .hint { font-size: 12px; }
 
     .tag { padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
 
-    @media print { body { background: #fff; } .app { display: none; } .printable { display: block; } }
+    /* Print styles: hide UI, print only the tape */
+    @media print {
+      body { background: #fff; }
+      .app { display: none; }
+      .printable { display: block; }
+    }
 
+    /* Utility */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
 </head>
 <body>
-  <!-- (The rest of the HTML and JavaScript stays the same as before) -->
+  <div class="app" role="application" aria-label="Printing calculator with virtual paper tape">
+    <section class="calc" aria-labelledby="calc-title">
+      <div class="branding">
+        <div class="model">PX‑1200</div>
+        <div>Printing Calculator</div>
+      </div>
+
+      <div class="display" aria-live="polite">
+        <small id="status">Ready</small>
+        <div class="screen" id="screen" aria-label="display">0.00</div>
+      </div>
+
+      <div class="grid" id="keys" aria-label="calculator keys">
+        <button class="danger" data-act="ac" title="All Clear (Esc)">AC</button>
+        <button data-act="ce" title="Clear Entry (Del)">CE</button>
+        <button data-act="back" title="Backspace (⌫)">⌫</button>
+        <button class="op" data-op="/" title="Divide (/)">÷</button>
+
+        <button data-num="7">7</button>
+        <button data-num="8">8</button>
+        <button data-num="9">9</button>
+        <button class="op" data-op="*" title="Multiply (*)">×</button>
+
+        <button data-num="4">4</button>
+        <button data-num="5">5</button>
+        <button data-num="6">6</button>
+        <button class="op" data-op="-" title="Subtract (-)">−</button>
+
+        <button data-num="1">1</button>
+        <button data-num="2">2</button>
+        <button data-num="3">3</button>
+        <button class="op" data-op="+" title="Add (+)">+</button>
+
+        <button data-act="sign" title="Change Sign (±)">±</button>
+        <button data-num="0">0</button>
+        <button data-act="dot" title="Decimal (.)">.</button>
+        <button class="equals" data-act="equals" title="Equals (= or Enter)">=</button>
+
+        <button class="wide" data-act="subtotal" title="Subtotal (S)">SUBTOTAL</button>
+        <button class="wide" data-act="total" title="Total (T)">TOTAL</button>
+
+        <button class="wide" data-act="gt" title="Grand Total (G)">GT</button>
+        <button class="wide" data-act="gtc" title="Clear Grand Total">GT Clear</button>
+      </div>
+    </section>
+
+    <div class="divider" aria-hidden="true"></div>
+
+    <section class="tape-panel" aria-labelledby="tape-title">
+      <div class="tape-toolbar">
+        <span class="tag">Tape</span>
+        <button data-act="feed" title="Feed blank line">Feed</button>
+        <button data-act="stamp" title="Print date/time">Date/Time</button>
+        <button data-act="print" title="Print the tape">Print</button>
+        <button data-act="download" title="Download tape as .txt">Download</button>
+        <span style="margin-left:auto"></span>
+        <label>Tax %
+          <input id="taxRate" type="number" value="8.25" step="0.01" min="0" aria-label="Tax rate percent" />
+        </label>
+        <button data-act="tax+" title="Apply tax and add (Shift+=)">TAX+</button>
+        <button data-act="tax-" title="Apply tax and subtract (Shift+-)">TAX−</button>
+      </div>
+
+      <div class="tape-wrap">
+        <div class="tape" id="tape" aria-live="polite" aria-atomic="false">
+          <div class="head">
+            <div class="brand">PX‑1200</div>
+            <div class="date" id="tapeDate"></div>
+          </div>
+          <h3>Paper Tape</h3>
+          <div class="muted" id="tapeHint">Entries will appear here.</div>
+        </div>
+      </div>
+
+      <div class="tape-footer">
+        <div class="hint">Keyboard: 0‑9 . + − × ÷  Enter =  Esc=AC  Del=CE  ⌫  S=Subtotal  T=Total  G=GT</div>
+        <div id="gtTag" class="tag" title="Grand Total held">GT: 0.00</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Hidden printable-only copy of the tape (populated at print time) -->
+  <div class="printable sr-only" id="printable"></div>
+
+  <script>
+    // --- Helper: currency in integer cents to avoid FP issues ---
+    const toCents = (str) => {
+      if (!str || str === '.') return 0;
+      const neg = /^-/.test(str);
+      let [intPart, fracPart = ''] = str.replace(/,/g,'').replace(/^-/,'').split('.');
+      intPart = intPart || '0';
+      fracPart = (fracPart + '00').slice(0,2);
+      const cents = parseInt(intPart,10)*100 + parseInt(fracPart,10);
+      return neg ? -cents : cents;
+    };
+    const fromCents = (cents) => {
+      const neg = cents < 0 ? '-' : '';
+      cents = Math.abs(cents);
+      const intPart = Math.floor(cents/100);
+      const frac = (cents%100).toString().padStart(2,'0');
+      const intStr = intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return `${neg}${intStr}.${frac}`;
+    };
+    const applyOp = (op, a, b) => {
+      switch(op){
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return Math.round((a * b) / 100);
+        case '/': return b === 0 ? NaN : Math.round((a * 100) / b);
+        default: return b;
+      }
+    };
+
+    // --- State ---
+    const screen = document.getElementById('screen');
+    const status = document.getElementById('status');
+    const tape = document.getElementById('tape');
+    const tapeHint = document.getElementById('tapeHint');
+    const gtTag = document.getElementById('gtTag');
+    const tapeDate = document.getElementById('tapeDate');
+
+    let entry = '0';
+    let accumulator = null;
+    let pendingOp = null;
+    let replaceEntry = true;
+    let grandTotal = 0;
+
+    const refreshHeaderDate = () => { tapeDate.textContent = new Date().toLocaleString(); };
+    refreshHeaderDate();
+
+    const setScreen = (str) => { screen.textContent = formatEntry(str); };
+    const formatEntry = (str) => { const c = toCents(str.toString()); return fromCents(c); };
+    const updateStatus = (text) => { status.textContent = text; };
+    const ensureTapeHintHidden = () => { if (tapeHint) tapeHint.remove(); };
+
+    const addTapeLine = (numCents, opText = '', desc = '') => {
+      ensureTapeHintHidden();
+      const line = document.createElement('div');
+      line.className = 'line';
+      const descSpan = document.createElement('span');
+      descSpan.className = 'desc';
+      descSpan.textContent = desc;
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = fromCents(numCents);
+      const op = document.createElement('span');
+      op.className = 'op';
+      op.textContent = opText;
+      line.append(descSpan, num, op);
+      tape.appendChild(line);
+      const wrap = document.querySelector('.tape-wrap');
+      wrap.scrollTop = wrap.scrollHeight;  // scroll the container, not the tape itself
+    };
+    const addRule = (double=false) => {
+      const rule = document.createElement('div');
+      rule.className = 'rule' + (double ? ' double' : '');
+      tape.appendChild(rule);
+      const wrap = document.querySelector('.tape-wrap');
+      wrap.scrollTop = wrap.scrollHeight;
+    };
+
+    const printSubtotal = (valueCents, label='SUBTOTAL') => { addRule(false); addTapeLine(valueCents, '', label); addRule(false); };
+    const printTotal = (valueCents, label='TOTAL') => { addRule(true); addTapeLine(valueCents, '', label); addRule(true); };
+
+    const commitNumberWithOp = (op) => { const n = toCents(entry); addTapeLine(n, op, ''); };
+
+    const computeIfPossible = () => {
+      const n = toCents(entry);
+      if (accumulator === null) { accumulator = n; }
+      else if (pendingOp) { accumulator = applyOp(pendingOp, accumulator, n); }
+      else { accumulator = n; }
+      setScreen(fromCents(accumulator));
+    };
+
+    const pressDigit = (d) => {
+      if (replaceEntry) { entry = (d === '.') ? '0.' : String(d); replaceEntry = false; }
+      else { if (d === '.' && entry.includes('.')) return; entry += String(d); }
+      setScreen(entry); updateStatus('Entering');
+    };
+
+    const pressBackspace = () => { if (replaceEntry) return; entry = entry.length > 1 ? entry.slice(0,-1) : '0'; if (entry === '-' || entry === '-0') entry = '0'; setScreen(entry); };
+    const pressSign = () => { if (entry.startsWith('-')) entry = entry.slice(1); else if (entry !== '0') entry = '-' + entry; setScreen(entry); };
+    const pressCE = () => { entry = '0'; setScreen(entry); updateStatus('CE'); };
+    const pressAC = () => { entry = '0'; accumulator = null; pendingOp = null; replaceEntry = true; updateStatus('Cleared'); setScreen('0'); };
+
+    const pressOp = (op) => {
+      if (replaceEntry && pendingOp && accumulator !== null) { pendingOp = op; updateStatus(`Op: ${op}`); return; }
+      commitNumberWithOp(op);
+      if (accumulator === null) accumulator = toCents(entry);
+      else if (pendingOp) accumulator = applyOp(pendingOp, accumulator, toCents(entry));
+      pendingOp = op;
+      setScreen(fromCents(accumulator));
+      entry = fromCents(toCents(entry));
+      replaceEntry = true;
+      updateStatus(`Op: ${op}`);
+    };
+
+    const pressEqualsLike = (kind) => {
+      const n = toCents(entry);
+      if (pendingOp === null && accumulator === null) { accumulator = n; }
+      else if (pendingOp !== null) { addTapeLine(n, '='); accumulator = applyOp(pendingOp, accumulator, n); }
+      if (kind === 'subtotal') { printSubtotal(accumulator, 'SUBTOTAL'); }
+      else if (kind === 'total') { printTotal(accumulator, 'TOTAL'); grandTotal += accumulator; refreshGT(); }
+      else { addRule(false); addTapeLine(accumulator, '', 'RESULT'); }
+      setScreen(fromCents(accumulator));
+      entry = fromCents(accumulator);
+      replaceEntry = true;
+      pendingOp = null;
+      if (kind === 'total') { accumulator = null; }
+      updateStatus(kind.toUpperCase());
+    };
+
+    const pressEquals = () => pressEqualsLike('equals');
+    const pressSubtotal = () => pressEqualsLike('subtotal');
+    const pressTotal = () => pressEqualsLike('total');
+
+    const refreshGT = () => { gtTag.textContent = 'GT: ' + fromCents(grandTotal); };
+    const pressGT = () => { printTotal(grandTotal, 'GRAND TOTAL'); };
+    const pressGTClear = () => { grandTotal = 0; refreshGT(); updateStatus('GT cleared'); };
+
+    const pressFeed = () => { addTapeLine(0, '', ''); };
+    const pressStamp = () => { addTapeLine(0, '', new Date().toLocaleString()); };
+
+    const pressTax = (sign = +1) => {
+      const rate = parseFloat(document.getElementById('taxRate').value || '0');
+      const rateFactor = 1 + sign * (rate/100);
+      const n = toCents(entry);
+      const taxed = Math.round(n * rateFactor);
+      addTapeLine(n, sign > 0 ? 'Tx+' : 'Tx−', `@ ${rate.toFixed(2)}%`);
+      addRule(false);
+      addTapeLine(taxed, '', 'AFTER TAX');
+      entry = fromCents(taxed);
+      setScreen(entry);
+      replaceEntry = true;
+      updateStatus('Tax applied');
+    };
+
+    const downloadTape = () => {
+      const lines = [...tape.querySelectorAll('.line')].map(line => {
+        const desc = line.querySelector('.desc')?.textContent?.trim() || '';
+        const num = line.querySelector('.num')?.textContent?.trim() || '';
+        const op = line.querySelector('.op')?.textContent?.trim() || '';
+        return `${desc ? desc + '\t' : ''}${num}\t${op}`.trim();
+      });
+      const blob = new Blob([lines.join('\n') + '\n'], {type:'text/plain'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'tape.txt';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(a.href);
+    };
+
+    const printTape = () => {
+      const pr = document.getElementById('printable');
+      pr.classList.remove('sr-only');
+      pr.innerHTML = '';
+      const clone = tape.cloneNode(true);
+      clone.style.maxWidth = '620px';
+      clone.style.margin = '20px auto';
+      clone.style.boxShadow = 'none';
+      pr.appendChild(clone);
+      window.print();
+      setTimeout(() => pr.classList.add('sr-only'), 0);
+    };
+
+    // --- Wire up buttons ---
+    document.getElementById('keys').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      const num = b.getAttribute('data-num');
+      const op = b.getAttribute('data-op');
+      const act = b.getAttribute('data-act');
+      if (num !== null) return pressDigit(num);
+      if (op) return pressOp(op);
+      switch(act){
+        case 'dot': return pressDigit('.');
+        case 'back': return pressBackspace();
+        case 'sign': return pressSign();
+        case 'ce': return pressCE();
+        case 'ac': return pressAC();
+        case 'equals': return pressEquals();
+        case 'subtotal': return pressSubtotal();
+        case 'total': return pressTotal();
+        case 'gt': return pressGT();
+        case 'gtc': return pressGTClear();
+      }
+    });
+
+    // Tape toolbar actions
+    document.querySelector('.tape-toolbar').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      const act = b.getAttribute('data-act');
+      switch(act){
+        case 'feed': return pressFeed();
+        case 'stamp': return pressStamp();
+        case 'download': return downloadTape();
+        case 'print': return printTape();
+        case 'tax+': return pressTax(+1);
+        case 'tax-': return pressTax(-1);
+      }
+    });
+
+    // --- Keyboard support ---
+    window.addEventListener('keydown', (e) => {
+      const k = e.key;
+      if (/^[0-9]$/.test(k)) { pressDigit(k); return; }
+      if (k === '.') { pressDigit('.'); return; }
+      if (k === '+') { pressOp('+'); return; }
+      if (k === '-') { if (e.shiftKey) { pressTax(-1); } else { pressOp('-'); } return; }
+      if (k === '*') { pressOp('*'); return; }
+      if (k === '/') { pressOp('/'); return; }
+      if (k === 'Enter' || k === '=') { if (e.shiftKey) { pressTax(+1); } else { pressEquals(); } return; }
+      if (k === 'Backspace') { pressBackspace(); e.preventDefault(); return; }
+      if (k === 'Escape') { pressAC(); return; }
+      if (k === 'Delete') { pressCE(); return; }
+      if (k.toLowerCase() === 's') { pressSubtotal(); return; }
+      if (k.toLowerCase() === 't') { pressTotal(); return; }
+      if (k.toLowerCase() === 'g') { pressGT(); return; }
+      if (k.toLowerCase() === 'p') { printTape(); return; }
+    });
+
+    // Initial paint
+    setScreen('0');
+    updateStatus('Ready');
+  </script>
 </body>
 </html>
