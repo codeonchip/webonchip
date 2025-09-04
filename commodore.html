@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Commodore‑64 BASIC (Web)</title>
+  <style>
+    :root {
+      --c64-blue: #1a37b8;        /* screen background */
+      --c64-light: #7ab6ff;       /* border / light text */
+      --c64-text: #c2c3ff;        /* main text */
+      --c64-shadow: #0c1a5a;      /* inner shadow */
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #0d0f1a;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    .wrap {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .c64 {
+      width: min(960px, 95vw);
+      aspect-ratio: 4 / 3;
+      background: var(--c64-light);
+      padding: 16px;
+      box-shadow: 0 0 0 8px var(--c64-shadow), 0 0 0 14px #000, 0 20px 80px rgba(0,0,0,.6);
+      border-radius: 6px;
+      position: relative;
+      user-select: none;
+    }
+
+    .screen {
+      height: 100%;
+      width: 100%;
+      background: var(--c64-blue);
+      color: var(--c64-text);
+      padding: 24px 28px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      letter-spacing: 0.7px;
+      position: relative;
+      border-radius: 2px;
+      /* very subtle scanlines */
+      background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.08) 0px,
+        rgba(0,0,0,0.08) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    }
+
+    .crt-glow {
+      position:absolute; inset:0; pointer-events:none;
+      box-shadow: inset 0 0 120px rgba(255,255,255,0.04);
+      border-radius: 2px;
+    }
+
+    #output {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: clamp(14px, 2.2vw, 20px);
+      line-height: 1.25;
+      overflow: hidden;
+    }
+
+    .status {
+      font-size: clamp(14px, 2.2vw, 20px);
+      padding-top: 8px;
+      border-top: 1px dashed rgba(255,255,255,0.2);
+      display: flex;
+      gap: 8px;
+      color: var(--c64-light);
+      opacity: 0.9;
+    }
+
+    .kbd-line { display: inline; }
+
+    .cursor {
+      display: inline-block;
+      width: 0.6ch;
+      height: 1.1em;
+      margin-left: 1px;
+      background: var(--c64-light);
+      animation: blink 1s steps(1) infinite;
+      vertical-align: -2px;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* hidden real input to capture keys reliably */
+    #hidden-input {
+      position: absolute; left: -9999px; top: -9999px;
+      opacity: 0; width: 0; height: 0;
+    }
+
+    .topbar {
+      position: absolute; inset: 8px 8px auto auto; display: flex; gap: 6px;
+    }
+    .btn {
+      background: #0b1d80; color: #cfe3ff; border: 1px solid #8fb6ff55;
+      padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+    }
+    .btn:hover { filter: brightness(1.1); }
+
+    .helpbox {
+      position:absolute; left: 12px; bottom: 12px; right: 12px;
+      color:#a9c5ff; font-size: clamp(10px, 1.7vw, 13px);
+      opacity:.75;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="c64" id="c64">
+      <div class="topbar">
+        <button class="btn" id="btn-demo">Load DEMO</button>
+        <button class="btn" id="btn-clear">CLS</button>
+        <button class="btn" id="btn-save">SAVE</button>
+        <button class="btn" id="btn-load">LOAD</button>
+      </div>
+      <div class="screen" id="screen" tabindex="0" aria-label="Commodore 64 BASIC screen">
+        <div id="output" aria-live="polite"></div>
+        <div class="status">
+          <span>TYPE <b>HELP</b> FOR COMMANDS</span>
+        </div>
+        <div class="crt-glow"></div>
+      </div>
+    </div>
+  </div>
+
+  <input id="hidden-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+
+  <script>
+    // --- Commodore‑ish BASIC shell (minimal) -------------------------------
+    const outEl = document.getElementById('output');
+    const screen = document.getElementById('screen');
+    const hidden = document.getElementById('hidden-input');
+
+    const program = new Map();      // lineNumber -> source (string after number)
+    let vars = Object.create(null); // variable table (UPPERCASE names)
+
+    let currentLine = "";           // typing buffer
+    let running = false;            // program RUN state
+    let pcOrder = [];               // sorted line numbers during RUN
+    let pcIndex = 0;                // index in pcOrder
+    let halted = false;             // stop flag
+    const MAX_STEPS = 20000;        // hard cap to avoid endless loops
+
+    // Persistent storage key
+    const STORAGE_KEY = 'c64_basic_program_v1';
+
+    function boot() {
+      clearScreen();
+      printLine("**** COMMODORE 64 BASIC V2 ****");
+      printLine(" 64K RAM SYSTEM  38911 BASIC BYTES FREE");
+      printLine("");
+      printReady();
+      focusKbd();
+    }
+
+    function clearScreen() {
+      outEl.innerHTML = '';
+    }
+
+    function printLine(s = '') {
+      outEl.appendChild(document.createTextNode(s + "\n"));
+      outEl.scrollTop = outEl.scrollHeight;
+    }
+
+    function printReady() {
+      printLine("READY.");
+      showInput();
+    }
+
+    function showInput() {
+      const line = document.createElement('div');
+      line.className = 'kbd-line';
+      line.id = 'kbd-line';
+      line.textContent = currentLine;
+
+      const cursor = document.createElement('span');
+      cursor.className = 'cursor';
+      cursor.id = 'cursor';
+
+      outEl.appendChild(line);
+      outEl.appendChild(cursor);
+      outEl.appendChild(document.createTextNode("\n"));
+      scrollToBottom();
+    }
+
+    function refreshInput() {
+      const k = document.getElementById('kbd-line');
+      if (k) k.textContent = currentLine;
+      scrollToBottom();
+    }
+
+    function removeInputLine() {
+      const k = document.getElementById('kbd-line');
+      const c = document.getElementById('cursor');
+      if (k) k.remove();
+      if (c) c.remove();
+    }
+
+    function scrollToBottom(){
+      outEl.scrollTop = outEl.scrollHeight;
+    }
+
+    function focusKbd(){
+      hidden.focus();
+      screen.focus();
+    }
+
+    // Beep (short WebAudio bleep)
+    function beep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = 880;
+        gain.gain.value = 0.03;
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        setTimeout(() => { osc.stop(); ctx.close(); }, 80);
+      } catch {}
+    }
+
+    // --- Input handling ----------------------------------------------------
+    screen.addEventListener('mousedown', focusKbd);
+    window.addEventListener('keydown', (e) => {
+      // keep focus on hidden input to receive keys consistently
+      if (document.activeElement !== hidden) hidden.focus();
+    });
+
+    hidden.addEventListener('keydown', (e) => {
+      if (running) return; // ignore input while program is running
+
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        currentLine = currentLine.slice(0, -1);
+        refreshInput();
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const line = currentLine.trim();
+        removeInputLine();
+        currentLine = '';
+        executeTyped(line);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        currentLine = '';
+        refreshInput();
+        return;
+      }
+
+      // Basic: force uppercase, map some keys
+      if (e.key.length === 1) {
+        e.preventDefault();
+        const ch = e.key;
+        // Allow standard symbols, numbers, space; translate to uppercase
+        const allowed = /[\x20-\x7E]/.test(ch);
+        if (allowed) {
+          currentLine += ch.toUpperCase();
+          refreshInput();
+        } else {
+          beep();
+        }
+      }
+    });
+
+    function executeTyped(line) {
+      if (line.length === 0) { printReady(); return; }
+      printLine(line);
+
+      // Program line (starts with number)
+      const m = line.match(/^(\d+)\s*(.*)$/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        const body = m[2] || '';
+        if (body.length) program.set(n, body);
+        else program.delete(n); // delete line if empty body
+        printReady();
+        return;
+      }
+
+      // Immediate command(s) — split by ':' like BASIC
+      const parts = splitStatements(line);
+      for (let i = 0; i < parts.length; i++) {
+        const ok = runStatement(parts[i], /*immediate*/ true);
+        if (!ok) break; // on error, stop processing chain
+      }
+      printReady();
+    }
+
+    function splitStatements(s) {
+      // naive split by ':' (not inside quotes)
+      const res = [];
+      let buf = '';
+      let inStr = false;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (ch === '"') inStr = !inStr;
+        if (ch === ':' && !inStr) { res.push(buf.trim()); buf = ''; }
+        else buf += ch;
+      }
+      if (buf.trim().length) res.push(buf.trim());
+      return res;
+    }
+
+    // --- Statement execution ----------------------------------------------
+    function runStatement(stmt, immediate = false) {
+      if (!stmt) return true;
+      const s = stmt.trim();
+      if (!s) return true;
+
+      // assignment like:  A=10 or LET A=10
+      if (/^(LET\s+)?[A-Z][A-Z0-9]*\s*=/.test(s)) {
+        const eq = s.replace(/^LET\s+/, '');
+        const [name, rhs] = eq.split(/=(.*)/).filter(Boolean);
+        const vname = name.trim();
+        const val = evalExpr(rhs.trim());
+        if (val === undefined) { printLine("?SYNTAX  ERROR"); beep(); return false; }
+        vars[vname] = val;
+        return true;
+      }
+
+      // Commands
+      if (/^PRINT\b/.test(s) || s === '?' || /^\?\b/.test(s)) {
+        const arg = s.replace(/^PRINT\s*/, '').replace(/^\?\s*/, '');
+        const endsWithSemicolon = /;\s*$/.test(arg);
+        const clean = arg.replace(/;\s*$/, '');
+        const val = evalExprOrString(clean);
+        if (val === undefined) { printLine("?SYNTAX  ERROR"); beep(); return false; }
+        if (endsWithSemicolon) outEl.appendChild(document.createTextNode(String(val)));
+        else printLine(String(val));
+        return true;
+      }
+
+      if (/^LIST\b/.test(s)) {
+        const lines = [...program.keys()].sort((a,b)=>a-b);
+        if (!lines.length) { printLine("EMPTY"); return true; }
+        for (const n of lines) printLine(`${n} ${program.get(n)}`);
+        return true;
+      }
+
+      if (/^NEW\b/.test(s)) {
+        program.clear(); vars = Object.create(null);
+        printLine("NEW PROGRAM");
+        return true;
+      }
+
+      if (/^RUN\b/.test(s)) {
+        runProgram();
+        return true;
+      }
+
+      if (/^GOTO\b/.test(s)) {
+        const m = s.match(/^GOTO\s+(\d+)/);
+        if (!m) { printLine("?SYNTAX  ERROR"); beep(); return false; }
+        if (!immediate) {
+          const target = parseInt(m[1],10);
+          const idx = pcOrder.indexOf(target);
+          if (idx === -1) { printLine("?UNDEF'D STATEMENT ERROR"); beep(); return false; }
+          pcIndex = idx; // next step will execute target line
+          return true;
+        } else {
+          printLine("?CAN'T DO THAT IN DIRECT MODE"); beep();
+          return false;
+        }
+      }
+
+      if (/^IF\b/.test(s)) {
+        // IF <expr> THEN <lineno|command>
+        const im = s.match(/^IF\s+(.+)\s+THEN\s+(.+)$/);
+        if (!im) { printLine("?SYNTAX  ERROR"); beep(); return false; }
+        const cond = evalExpr(im[1].trim());
+        if (cond) {
+          const action = im[2].trim();
+          if (/^\d+$/.test(action)) {
+            if (!immediate) {
+              const target = parseInt(action,10);
+              const idx = pcOrder.indexOf(target);
+              if (idx === -1) { printLine("?UNDEF'D STATEMENT ERROR"); beep(); return false; }
+              pcIndex = idx; // jump
+              return true;
+            } else {
+              printLine("?CAN'T DO THAT IN DIRECT MODE"); beep(); return false;
+            }
+          } else {
+            return runStatement(action, immediate);
+          }
+        }
+        return true;
+      }
+
+      if (/^(END|STOP)\b/.test(s)) {
+        if (!immediate) { halted = true; running = false; printLine("READY."); }
+        else printLine("OK");
+        return true;
+      }
+
+      if (/^(CLS|CLEAR)\b/.test(s)) { clearScreen(); return true; }
+
+      if (/^(HELP|\?)$/.test(s)) { showHelp(); return true; }
+
+      printLine("?SYNTAX  ERROR"); beep();
+      return false;
+    }
+
+    function showHelp(){
+      printLine("COMMANDS: PRINT or ?  |  LIST  |  NEW  |  RUN  |  GOTO <n>  |  IF <expr> THEN <n|cmd>  |  END");
+      printLine("ASSIGN:   LET A=10  or  A=10");
+      printLine("PRINT:    PRINT \"HELLO\"  |  PRINT 2+3*4  |  PRINT A ;  (no newline)");
+      printLine("NOTES:    Use line numbers to store program lines (e.g., 10 PRINT \"HI\").");
+    }
+
+    function runProgram(){
+      if (!program.size) { printLine("?NOTHING TO RUN"); beep(); return; }
+      running = true; halted = false; pcOrder = [...program.keys()].sort((a,b)=>a-b); pcIndex = 0;
+      let steps = 0;
+      const step = () => {
+        if (halted || !running) { running = false; halted = false; return; }
+        if (pcIndex >= pcOrder.length) { running = false; printLine("READY."); return; }
+        if (++steps > MAX_STEPS) { running = false; printLine("?OVERFLOW  ERROR"); beep(); printLine("READY."); return; }
+
+        const lineNo = pcOrder[pcIndex];
+        const src = program.get(lineNo);
+        const parts = splitStatements(src);
+
+        for (let i=0;i<parts.length;i++) {
+          const ok = runStatement(parts[i], /*immediate*/ false);
+          if (!ok) { running = false; printLine("READY."); return; }
+          if (halted) { running = false; halted = false; return; }
+        }
+        pcIndex++;
+        setTimeout(step, 0); // yield to UI
+      };
+      step();
+    }
+
+    // --- Expressions -------------------------------------------------------
+    function evalExprOrString(s){
+      s = s.trim();
+      if (s.startsWith('"') && s.endsWith('"')) return s.slice(1,-1);
+      return evalExpr(s);
+    }
+
+    function evalExpr(s){
+      // replace BASIC operators with JS equivalents
+      // handle NOT/AND/OR minimal (optional)
+      let js = s
+        .replace(/<>/g, '!=')
+        .replace(/\^/g, '**')
+        .replace(/=+/g, '=='); // simple equality (assignment handled elsewhere)
+
+      // Guard: ensure only allowed tokens (numbers, ops, parens, quotes, letters, spaces, dots, commas)
+      // Strip quoted strings first for safety check
+      const stripped = js.replace(/"[^"]*"/g, '');
+      if (/[^A-Z0-9_+\-*/%()!<>=\.\s,\[\]]/i.test(stripped)) {
+        return undefined;
+      }
+
+      // Expose variables via a Proxy; missing vars -> 0 like BASIC
+      const scope = new Proxy(vars, {
+        get: (obj, prop) => {
+          if (typeof prop === 'string') {
+            const name = prop.toUpperCase();
+            return (name in obj) ? obj[name] : 0;
+          }
+          return undefined;
+        }
+      });
+
+      try {
+        // Use Function with 'with' to resolve bare identifiers to scope
+        // eslint-disable-next-line no-new-func
+        const fn = new Function('scope', `with(scope){ return (${js}); }`);
+        return fn(scope);
+      } catch {
+        return undefined;
+      }
+    }
+
+    // --- Toolbar actions ---------------------------------------------------
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      clearScreen();
+      printReady();
+      focusKbd();
+    });
+
+    document.getElementById('btn-demo').addEventListener('click', () => {
+      program.clear(); vars = Object.create(null);
+      program.set(10, 'PRINT "HELLO, WORLD!"');
+      program.set(20, 'IF A=0 THEN A=1');
+      program.set(30, 'PRINT "COUNT:" ; A');
+      program.set(40, 'A=A+1');
+      program.set(50, 'IF A<6 THEN 30');
+      program.set(60, 'END');
+      printLine("DEMO PROGRAM LOADED. TYPE RUN");
+      focusKbd();
+    });
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      const obj = { program: [...program.entries()], vars };
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+        printLine("SAVED.");
+      } catch { printLine("?SAVE  ERROR"); beep(); }
+      focusKbd();
+    });
+
+    document.getElementById('btn-load').addEventListener('click', () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) { printLine("?NOTHING SAVED"); beep(); focusKbd(); return; }
+        const obj = JSON.parse(raw);
+        program.clear();
+        for (const [k,v] of obj.program || []) program.set(Number(k), v);
+        vars = obj.vars || Object.create(null);
+        printLine("LOADED.");
+      } catch { printLine("?LOAD  ERROR"); beep(); }
+      focusKbd();
+    });
+
+    // Boot
+    boot();
+  </script>
+  <div class="helpbox">TIP: Try typing <b>10 PRINT "HELLO"</b>, then <b>20 GOTO 10</b>, then <b>RUN</b>. Use <b>NEW</b> to clear the program.</div>
+</body>
+</html>
