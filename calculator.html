@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Printing Calculator (Paper Tape)</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#0b1020; --fg:#e2e8f0; --muted:#9fb3c8; --key:#0b1220; --keyb:#1e293b; --acc:#38bdf8;
+    --paper:#f8fafc; --ink:#0f172a; --inkmuted:#64748b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; background:var(--bg); color:var(--fg)}
+  header{position:sticky; top:0; z-index:10; background:var(--panel); border-bottom:1px solid #0b1220; padding:12px 14px}
+  h1{margin:0 0 6px; font-size:18px; color:#e5f3ff}
+  .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  input, select, button{background:var(--key); color:var(--fg); border:1px solid var(--keyb); border-radius:10px; padding:8px 10px; font-size:14px}
+  input:focus,select:focus,button:focus{outline:2px solid #124d74; border-color:#0ea5e9}
+  button{cursor:pointer}
+  button.primary{background:#0ea5e9; color:#071422; border-color:#0ea5e9; font-weight:700}
+  main{display:grid; grid-template-columns: 380px 1fr; min-height: calc(100dvh - 72px)}
+  aside{border-right:1px solid #0b1220; padding:14px}
+  .grid{display:grid; grid-template-columns: repeat(4, 1fr); gap:8px}
+  .key{padding:14px 10px; border-radius:10px; background:var(--key); border:1px solid var(--keyb); text-align:center; font-weight:700}
+  .key.op{background:#102235}
+  .key.wide{grid-column: span 2;}
+  .key.tall{grid-row: span 2;}
+  .display{background:#071224; border:1px solid #112036; border-radius:10px; padding:10px 12px; font-family:monospace; font-size:22px; text-align:right; margin-bottom:12px}
+  .small{font-size:12px; color:var(--muted)}
+  .section{margin-bottom:12px}
+  label.inline{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted)}
+
+  #tapeWrap{background:linear-gradient(90deg,#e2e8f0 0 2px, #ffffff00 2px 100%), var(--paper); padding:20px;}
+  #tape{max-width:720px; margin:16px auto; background:var(--paper); color:var(--ink); border:1px solid #d1d9e6; box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  #tapeHeader{padding:12px 16px; border-bottom:1px dashed #cbd5e1; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:13px; color:var(--inkmuted); display:flex; justify-content:space-between}
+  #tapeBody{padding:16px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:16px; white-space:pre; line-height:1.5;}
+  #tapeFooter{padding:10px 16px; border-top:1px dashed #cbd5e1; font-size:12px; color:#475569}
+  .strike{text-decoration:line-through; color:#9ca3af}
+  .tot{font-weight:800}
+  .sub{font-weight:700}
+  .gt{font-weight:800; border-top:1px solid #94a3b8; display:inline-block; padding-top:4px}
+  .mut{color:#64748b}
+
+  .toolbar{display:flex; flex-wrap:wrap; gap:8px; padding:10px 14px; border-top:1px solid #0b1220; background:#0a0f1a}
+
+  @media (max-width:1000px){ main{grid-template-columns:1fr} aside{border-right:none; border-bottom:1px solid #0b1220} }
+
+  /* Print only the tape */
+  @media print{
+    body{background:white}
+    header, aside, .toolbar{display:none}
+    #tapeWrap{padding:0; background:white}
+    #tape{box-shadow:none; border:none; margin:0; max-width:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Printing Calculator (Paper Tape)</h1>
+  <div class="row small">
+    <span>Keyboard: digits, <b>+</b> <b>-</b> <b>*</b> <b>/</b>, <b>Enter</b>=Total, <b>S</b>=Subtotal, <b>V</b>=Void last, <b>F</b>=Feed, <b>T</b>=Tax+, <b>G</b>=GT, <b>M</b>=MR</span>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="display" id="disp">0</div>
+
+    <div class="section grid" id="keys">
+      <button class="key" data-k="7">7</button>
+      <button class="key" data-k="8">8</button>
+      <button class="key" data-k="9">9</button>
+      <button class="key op" data-op="/">÷</button>
+
+      <button class="key" data-k="4">4</button>
+      <button class="key" data-k="5">5</button>
+      <button class="key" data-k="6">6</button>
+      <button class="key op" data-op="*">×</button>
+
+      <button class="key" data-k="1">1</button>
+      <button class="key" data-k="2">2</button>
+      <button class="key" data-k="3">3</button>
+      <button class="key op" data-op="-">−</button>
+
+      <button class="key" data-k="0">0</button>
+      <button class="key" data-k=".">.</button>
+      <button class="key op" data-op="%">%</button>
+      <button class="key op" data-op="+">+</button>
+
+      <button class="key" data-act="pm">±</button>
+      <button class="key" data-act="bs">⌫</button>
+      <button class="key" data-act="s">S</button>
+      <button class="key primary" data-act="t">TOTAL</button>
+
+      <button class="key" data-act="tx+">TAX+</button>
+      <button class="key" data-act="tx-">TAX−</button>
+      <button class="key" data-act="ic">IC</button>
+      <button class="key" data-act="feed">FEED</button>
+
+      <button class="key" data-act="m+">M+</button>
+      <button class="key" data-act="m-">M−</button>
+      <button class="key" data-act="mr">MR</button>
+      <button class="key" data-act="mc">MC</button>
+
+      <button class="key" data-act="gt">GT</button>
+      <button class="key" data-act="gtc">GT CLR</button>
+      <button class="key" data-act="c">C</button>
+      <button class="key" data-act="ac">AC</button>
+    </div>
+
+    <div class="section">
+      <div class="row">
+        <label class="inline">Decimals
+          <select id="dec">
+            <option value="F">F</option>
+            <option value="0">0</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <label class="inline">Rounding
+          <select id="rnd">
+            <option value="HALF">5/4</option>
+            <option value="UP">UP</option>
+            <option value="DOWN">DOWN</option>
+          </select>
+        </label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="inline">Tax % <input id="tax" type="number" step="0.01" value="8.25" style="width:90px"></label>
+      </div>
+    </div>
+  </aside>
+
+  <section id="tapeWrap">
+    <div id="tape">
+      <div id="tapeHeader"><span id="hdrL"></span><span id="hdrR"></span></div>
+      <div id="tapeBody"></div>
+      <div id="tapeFooter">⎯ Paper tape simulation — print from your browser (Ctrl/Cmd+P).  Settings affect printed values.</div>
+    </div>
+
+    <div class="toolbar">
+      <button id="btnPrint">🖨️ Print Tape</button>
+      <button id="btnCopy">📋 Copy Tape</button>
+      <button id="btnDownload">⬇️ Download .txt</button>
+      <span class="small">Double‑click tape to add a separator line.</span>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+  // Elements
+  const disp = document.getElementById('disp');
+  const tapeBody = document.getElementById('tapeBody');
+  const hdrL = document.getElementById('hdrL');
+  const hdrR = document.getElementById('hdrR');
+  const decSel = document.getElementById('dec');
+  const rndSel = document.getElementById('rnd');
+  const taxInput = document.getElementById('tax');
+
+  // Header
+  function refreshHeader(){
+    const now = new Date();
+    hdrL.textContent = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+    hdrR.textContent = 'TAX ' + Number(taxInput.value||0).toFixed(2) + '%  DEC ' + decSel.value + '  RND ' + rndSel.value;
+  }
+  refreshHeader(); setInterval(refreshHeader, 1000);
+
+  // State
+  let entry = '0';
+  let pendingOp = null; // '+','-','*','/'
+  let acc = 0; // running accumulator for this calculation batch
+  let itemCount = 0; // for IC
+  let memory = 0; // M
+  let grandTotal = 0; // GT collects totals
+  let lastPosted = null; // {signed, textNode}
+
+  // Helpers: rounding & formatting
+  function toNumber(s){ if(!s || s==='-') return 0; return Number(s); }
+  function roundWithMode(v, places, mode){
+    if(places === 'F') return v;
+    const p = Number(places);
+    const m = Math.pow(10, p);
+    const n = v * m;
+    if(mode === 'UP') return (n>0? Math.ceil(n) : Math.floor(n)) / m;
+    if(mode === 'DOWN') return (n>0? Math.floor(n) : Math.ceil(n)) / m;
+    // HALF (5/4) — away from zero on .5
+    if(n>=0) return Math.floor(n + 0.5)/m; else return Math.ceil(n - 0.5)/m;
+  }
+  function fmt(v){
+    const places = decSel.value;
+    const mode = rndSel.value;
+    const rv = roundWithMode(v, places, mode);
+    if(places === 'F'){
+      // show up to 8 decimals, trim zeros
+      let s = rv.toFixed(8); s = s.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+      return s;
+    }
+    return rv.toFixed(Number(places));
+  }
+  function right(text, width){ const s = String(text); return s.length >= width ? s : ' '.repeat(width - s.length) + s; }
+  function left(text, width){ const s = String(text); return s.length >= width ? s : s + ' '.repeat(width - s.length); }
+
+  // Tape rendering
+  function addLine(text, css=''){
+    const ln = document.createElement('div'); ln.textContent = text; if(css) ln.className = css; tapeBody.appendChild(ln); tapeBody.parentElement.scrollTop = tapeBody.parentElement.scrollHeight; return ln;
+  }
+  function addSep(){ addLine(''.padEnd(32, '·'), 'mut'); }
+
+  function postEntryLine(val, op){
+    const s = right(fmt(val), 14) + '  ' + op;
+    const node = addLine(s);
+    lastPosted = { signed: (op==='+'||op==='×' || op==='÷')? +val : -val, node };
+    itemCount++;
+  }
+
+  function printSubtotal(){ addLine(right(fmt(acc), 14) + '   S', 'sub'); }
+  function printTotal(){ addLine(right(fmt(acc), 14) + '   T', 'tot'); grandTotal += acc; }
+  function printGT(){ addLine(right(fmt(grandTotal), 14) + '  GT', 'gt'); }
+  function printIC(){ addLine(left('IC ' + itemCount, 10)); }
+  function printTX(amount, sign){ addLine(right(fmt(amount), 14) + '  ' + (sign>0? 'TX+':'TX-')); }
+  function printMR(){ addLine(right(fmt(memory),14) + '  MR'); }
+
+  // Core math apply
+  function applyPending(withVal){
+    const v = withVal;
+    if(pendingOp === '+') acc = acc + v;
+    else if(pendingOp === '-') acc = acc - v;
+    else if(pendingOp === '*') acc = acc * v;
+    else if(pendingOp === '/') acc = acc / v;
+    else acc = v; // first entry
+  }
+
+  function commitOp(opSymbol){
+    const v = toNumber(entry);
+    postEntryLine(v, opSymbol);
+    applyPending(v);
+    entry = '0'; // clear entry for next number
+    pendingOp = opSymbol === '×' ? '*' : opSymbol === '÷' ? '/' : opSymbol; // store program op
+    updateDisplay();
+  }
+
+  function finalize(subtotal){
+    if(entry !== '0' || pendingOp){
+      const v = toNumber(entry);
+      if(entry !== '0'){ // if user typed something, print it with '=' role
+        postEntryLine(v, '=');
+      }
+      applyPending(v);
+      entry = '0'; pendingOp = null;
+    }
+    if(subtotal) printSubtotal(); else { printTotal(); itemCount = 0; acc = 0; }
+    updateDisplay();
+  }
+
+  // Entry helpers
+  function updateDisplay(){ disp.textContent = fmt(toNumber(entry)); }
+  function pushDigit(d){ if(entry==='0') entry = String(d); else entry += String(d); updateDisplay(); }
+  function pushDot(){ if(!entry.includes('.')) entry += '.'; updateDisplay(); }
+  function toggleSign(){ if(entry.startsWith('-')) entry = entry.slice(1); else if(entry!=='0') entry = '-' + entry; updateDisplay(); }
+  function backspace(){ if(entry.length<=1 || (entry.length===2 && entry.startsWith('-'))){ entry='0'; } else { entry = entry.slice(0,-1); } updateDisplay(); }
+
+  // Actions
+  function doPercent(){
+    const base = acc; // standard printing-calc percent: treat entry as % of accumulator
+    const p = toNumber(entry);
+    const val = base * (p/100);
+    entry = String(val);
+    updateDisplay();
+  }
+  function doTax(sign){
+    const rate = Number(taxInput.value||0) / 100;
+    const base = toNumber(entry);
+    const tax = base * rate * (sign);
+    printTX(Math.abs(tax), sign);
+    acc += tax;
+    updateDisplay();
+  }
+  function doVoid(){
+    if(!lastPosted) return;
+    lastPosted.node.classList.add('strike');
+    // reverse the last signed amount from accumulator
+    acc -= lastPosted.signed;
+    addLine(right(fmt(-lastPosted.signed), 14) + '  COR');
+    lastPosted = null; updateDisplay();
+  }
+
+  function clearEntry(){ entry = '0'; updateDisplay(); }
+  function allClear(){ entry='0'; pendingOp=null; acc=0; itemCount=0; lastPosted=null; addSep(); updateDisplay(); }
+
+  // Memory
+  function mPlus(){ memory += toNumber(entry); addLine(right(fmt(toNumber(entry)),14) + '  M+'); }
+  function mMinus(){ memory -= toNumber(entry); addLine(right(fmt(toNumber(entry)),14) + '  M-'); }
+  function mRecall(){ printMR(); entry = String(memory); updateDisplay(); }
+  function mClear(){ memory = 0; addLine('M 0', 'mut'); }
+
+  // GT
+  function gtPrint(){ printGT(); }
+  function gtClear(){ grandTotal = 0; addLine('GT 0', 'mut'); }
+
+  // Initialize tape with header line
+  addLine('PRINTING CALCULATOR — PAPER TAPE', 'mut'); addSep();
+
+  // Buttons
+  document.getElementById('keys').addEventListener('click', (e)=>{
+    const b = e.target.closest('button.key'); if(!b) return;
+    const k = b.dataset.k; const op = b.dataset.op; const act = b.dataset.act;
+    if(k){ if(k==='.') pushDot(); else pushDigit(k); return; }
+    if(op){
+      if(op==='%'){ doPercent(); return; }
+      const symbol = op==='*' ? '×' : op==='/' ? '÷' : op;
+      commitOp(symbol); return;
+    }
+    if(act){
+      if(act==='pm') toggleSign();
+      else if(act==='bs') backspace();
+      else if(act==='s') finalize(true);
+      else if(act==='t') finalize(false);
+      else if(act==='tx+') doTax(+1);
+      else if(act==='tx-') doTax(-1);
+      else if(act==='ic') printIC();
+      else if(act==='feed') addLine('');
+      else if(act==='m+') mPlus();
+      else if(act==='m-') mMinus();
+      else if(act==='mr') mRecall();
+      else if(act==='mc') mClear();
+      else if(act==='gt') gtPrint();
+      else if(act==='gtc') gtClear();
+      else if(act==='c') clearEntry();
+      else if(act==='ac') allClear();
+    }
+  });
+
+  // Keyboard
+  window.addEventListener('keydown', (e)=>{
+    const k = e.key;
+    if((k>='0' && k<='9')){ pushDigit(k); return; }
+    if(k==='.' || k===','){ pushDot(); return; }
+    if(k==='+' || k==='-' || k==='*' || k==='/' ){
+      commitOp(k==='*'?'×':k==='/':'÷'); return;
+    }
+    if(k==='Enter'){ finalize(false); return; }
+    if(k==='s' || k==='S'){ finalize(true); return; }
+    if(k==='v' || k==='V'){ doVoid(); return; }
+    if(k==='f' || k==='F'){ addLine(''); return; }
+    if(k==='t' || k==='T'){ doTax(+1); return; }
+    if(k==='g' || k==='G'){ gtPrint(); return; }
+    if(k==='m' || k==='M'){ mRecall(); return; }
+    if(k==='Backspace'){ backspace(); return; }
+    if(k==='Escape'){ clearEntry(); return; }
+  });
+
+  // Tape utilities
+  document.getElementById('btnPrint').addEventListener('click', ()=> window.print());
+  document.getElementById('btnCopy').addEventListener('click', async()=>{
+    const text = Array.from(tapeBody.childNodes).map(n=>n.textContent).join('\n');
+    try{ await navigator.clipboard.writeText(text); }catch{ /* ignore */ }
+  });
+  document.getElementById('btnDownload').addEventListener('click', ()=>{
+    const text = Array.from(tapeBody.childNodes).map(n=>n.textContent).join('\n');
+    const blob = new Blob([text+'\n'], {type:'text/plain'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'paper_tape.txt'; a.click(); URL.revokeObjectURL(a.href);
+  });
+  document.getElementById('tape').addEventListener('dblclick', addSep);
+
+  // Display initial 0
+  updateDisplay();
+})();
+</script>
+</body>
+</html>
