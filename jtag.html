@@ -2,209 +2,604 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>JTAG TAP State Machine Visual</title>
-  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/styles/vis-network.min.css" rel="stylesheet" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JTAG Playground (TAP + IR/DR + Pinout)</title>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 2rem;
-      text-align: center;
+    :root{
+      --bg:#0f1115; --panel:#171a21; --muted:#8b94a7; --text:#e6eaf2; --accent:#82e0ff; --accent2:#b48bff; --good:#8affc1; --warn:#ffd27d; --bad:#ff7d99;
+      --border: #273043;
     }
-    #network {
-      width: 100%;
-      height: 600px;
-      border: 1px solid #ccc;
-      margin: auto;
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background:var(--bg); color:var(--text)}
+    h1{font-size:1.25rem; margin:0 0 .75rem}
+    h2{font-size:1.05rem; margin:.2rem 0 .6rem; color:var(--muted)}
+    .app{max-width:1300px; margin:0 auto; padding:18px}
+    header{display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:14px}
+    .brand{font-weight:700; letter-spacing:.2px}
+    .pill{font-size:.8rem; color:#0b1220; background:linear-gradient(90deg,var(--accent),var(--accent2)); padding:4px 10px; border-radius:999px}
+
+    .grid{display:grid; grid-template-columns: 360px 1fr 420px; gap:12px}
+    @media (max-width: 1100px){ .grid{grid-template-columns:1fr} }
+
+    .panel{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px; box-shadow: 0 6px 18px rgba(0,0,0,.25)}
+    .row{display:flex; align-items:center; gap:10px}
+    .row.wrap{flex-wrap:wrap}
+    .row.space{justify-content:space-between}
+    .muted{color:var(--muted)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+    .small{font-size:.86rem}
+
+    button, input[type="number"], input[type="text"], select{
+      background:#10131a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 10px; font-size:.95rem;
     }
-    button {
-      margin: 0.3rem;
-      padding: 0.4rem 1rem;
-      font-size: 1rem;
-      border: none;
-      border-radius: 5px;
-      background: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-    .log {
-      background: black;
-      color: lime;
-      font-family: monospace;
-      padding: 1rem;
-      margin-top: 1rem;
-      height: 120px;
-      overflow-y: auto;
-      border-radius: 5px;
-      text-align: left;
-      font-size: 0.9em;
-    }
-    .buffer {
-      margin-top: 1rem;
-      font-family: monospace;
-    }
-    .buffer span {
-      display: inline-block;
-      width: 100px;
-      text-align: center;
-      font-weight: bold;
-    }
-    .buffer input {
-      width: 300px;
-      font-family: monospace;
-      text-align: center;
-    }
+    button{cursor:pointer}
+    button:hover{border-color:#3a4661}
+    button.primary{background:linear-gradient(90deg, #4bb7ff, #9a72ff); color:#06101a; font-weight:700}
+    .btnbar{display:flex; gap:8px; flex-wrap:wrap}
+    .switch{--h:26px; width:54px; height:var(--h); background:#0c0f15; border:1px solid var(--border); border-radius:999px; position:relative; cursor:pointer}
+    .knob{position:absolute; top:2px; left:2px; width:22px; height:22px; background:#243047; border-radius:999px; transition:left .12s ease}
+    .switch.on .knob{left:30px; background:#36d7ff}
+
+    .meter{display:flex; align-items:center; gap:10px}
+    input[type="range"]{width:180px}
+
+    /* SVG state machine */
+    .tap-svg{width:100%; height:480px; background:#0b0e14; border-radius:12px; border:1px solid var(--border)}
+    .state-node{fill:#162133; stroke:#2b374e; stroke-width:1}
+    .state-node.current{stroke:#56daff; stroke-width:2; filter: drop-shadow(0 0 8px #56daff55)}
+    .state-label{font-size:10px; fill:#c9d2e3}
+    .edge{stroke:#2a3551; stroke-width:1; opacity:.85}
+    .edge.tms1{stroke:#4b2e5f}
+
+    .kv{display:grid; grid-template-columns: 1fr auto; gap:8px 10px; align-items:center}
+    .box{background:#0f141e; border:1px dashed #2a3855; border-radius:12px; padding:8px 10px}
+    .bits{display:flex; flex-wrap:wrap; gap:4px; font-size:.85rem}
+    .bit{background:#0b0f16; border:1px solid #1b2740; padding:3px 6px; border-radius:6px}
+
+    .table{width:100%; border-collapse:collapse; font-size:.92rem}
+    .table th,.table td{border-bottom:1px solid #263149; padding:6px 8px; text-align:left}
+    .table th{color:var(--muted); font-weight:600; background:#0f131c}
+
+    .log{height:220px; overflow:auto; background:#0c1119; border:1px solid var(--border); border-radius:10px; padding:8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.9rem}
+
+    .tag{display:inline-block; padding:2px 6px; border-radius:999px; font-size:.75rem; border:1px solid #2a3550; color:#cfe0ff}
+    .tag.good{background:#0b1a15; color:#b5ffe0; border-color:#1b4d3a}
+    .tag.warn{background:#1d170b; color:#ffe6ad; border-color:#5a4a2a}
+
+    .foot{color:#8fa0c5; font-size:.88rem; margin-top:8px}
+    .sep{height:10px}
   </style>
 </head>
 <body>
-  <h1>JTAG TAP FSM Visual Simulator</h1>
-  <div>
-    <button onclick="step(0)">TMS = 0</button>
-    <button onclick="step(1)">TMS = 1</button>
+  <div class="app">
+    <header>
+      <div class="row wrap">
+        <div class="brand">🧪 JTAG Playground</div>
+        <span class="pill">TAP • IR/DR • Pinout</span>
+      </div>
+      <div class="small muted">Educational single‑file demo (LSB‑first shifting)</div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: Controls -->
+      <section class="panel">
+        <h1>Clock & Signals</h1>
+        <div class="row wrap">
+          <div>
+            <div class="small muted">TMS</div>
+            <div id="swTMS" class="switch"><div class="knob"></div></div>
+          </div>
+          <div>
+            <div class="small muted">TDI</div>
+            <div id="swTDI" class="switch"><div class="knob"></div></div>
+          </div>
+          <div>
+            <div class="small muted">TDO</div>
+            <div id="tdoLamp" class="tag">0</div>
+          </div>
+        </div>
+        <div class="sep"></div>
+        <div class="btnbar">
+          <button id="btnStep">Step TCK ↑</button>
+          <button id="btnRun">Run</button>
+          <button id="btnResetTLR">TMS reset (5×1)</button>
+          <button id="btnTRST">TRST pulse</button>
+        </div>
+        <div class="meter" style="margin-top:10px">
+          <span class="small muted">Clock rate</span>
+          <input id="clkRate" type="range" min="1" max="30" step="1" value="10" />
+          <span id="clkHz" class="mono small">10 Hz</span>
+        </div>
+        <div class="foot">TCK edges: <span id="tickCount" class="mono">0</span></div>
+
+        <div class="sep"></div>
+        <h2>Quick paths</h2>
+        <div class="btnbar">
+          <button id="btnToShiftIR">→ Shift‑IR</button>
+          <button id="btnToShiftDR">→ Shift‑DR</button>
+          <button id="btnGotoIdle">→ Run‑Test/Idle</button>
+        </div>
+
+        <div class="sep"></div>
+        <h2>Scan Helpers</h2>
+        <div class="kv">
+          <label>IR length (bits)</label>
+          <input id="irLen" type="number" min="2" max="64" value="4" />
+          <label>DR length (bits)</label>
+          <input id="drLen" type="number" min="1" max="1024" value="32" />
+          <label>IDCODE (hex)</label>
+          <input id="idcodeHex" type="text" value="149511C3" class="mono" />
+        </div>
+        <div class="btnbar" style="margin-top:8px">
+          <button id="btnReadIDCODE" class="primary">Read IDCODE</button>
+        </div>
+
+        <div class="sep"></div>
+        <div class="kv">
+          <label>Scan IR (hex, LSB‑first)</label>
+          <input id="scanIRHex" type="text" placeholder="e.g., E or 0xE" />
+          <label>Scan DR (hex, LSB‑first)</label>
+          <input id="scanDRHex" type="text" placeholder="e.g., 1234ABCD" />
+        </div>
+        <div class="btnbar" style="margin-top:8px">
+          <button id="btnDoScanIR">Do IR scan</button>
+          <button id="btnDoScanDR">Do DR scan</button>
+        </div>
+
+        <div class="sep"></div>
+        <div class="box small">
+          <div class="muted">Notes</div>
+          <ul>
+            <li>Shifts are <b>LSB‑first</b>; TDO shows the bit leaving the LSB.</li>
+            <li>Capture‑IR puts <span class="mono">...0101</span> pattern in IR (LSB=1, next=0).</li>
+            <li>IDCODE is captured to DR when the current IR equals your IDCODE instruction value.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- CENTER: State machine -->
+      <section class="panel">
+        <h1 class="row space">TAP State Machine <span class="tag" id="stateTag">—</span></h1>
+        <svg id="tapSvg" class="tap-svg" viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg" aria-label="JTAG TAP diagram"></svg>
+      </section>
+
+      <!-- RIGHT: IR/DR + Pinout + Log -->
+      <section class="panel">
+        <h1>IR / DR Registers</h1>
+        <div class="kv">
+          <label>Current IR (latched)</label>
+          <div id="irLatched" class="mono tag">0x0</div>
+          <label>IR shift buffer</label>
+          <div id="irBits" class="bits"></div>
+          <label>Current DR (latched)</label>
+          <div id="drLatched" class="mono tag">0x0</div>
+          <label>DR shift buffer</label>
+          <div id="drBits" class="bits"></div>
+          <label>Last scan TDO (hex, LSB‑first)</label>
+          <input id="lastScanHex" class="mono" type="text" readonly />
+        </div>
+
+        <div class="sep"></div>
+        <h2>Pinout Mapper</h2>
+        <div class="row wrap" style="gap:8px">
+          <select id="pinoutPreset">
+            <option value="custom">Custom (edit below)</option>
+            <option value="arm20">ARM 20‑pin (typical)</option>
+            <option value="ti14">TI 14‑pin (typical)</option>
+          </select>
+          <button id="btnMirror">Mirror pins</button>
+        </div>
+        <table class="table" style="margin-top:8px">
+          <thead><tr><th>Pin</th><th>Signal</th><th>Note</th></tr></thead>
+          <tbody id="pinTable"></tbody>
+        </table>
+        <div class="small muted" style="margin-top:6px">These presets are common patterns. Always check your target’s datasheet/vendor guide.</div>
+
+        <div class="sep"></div>
+        <h2>Event Log</h2>
+        <div id="log" class="log" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <div class="foot">Tip: Use the quick buttons to jump to <b>Shift‑IR</b>/<b>Shift‑DR</b>, then step or run the clock.
+      This simulator focuses on a <b>single device</b> chain for clarity.</div>
   </div>
-  <div id="network"></div>
-  <div class="buffer">
-    <div><span>IR Shift</span> <input id="irShift" value="0000" /></div>
-    <div><span>DR Shift</span> <input id="drShift" value="00000000" /></div>
-  </div>
-  <div class="log" id="log">[System] Ready<br></div>
 
   <script>
-    const container = document.getElementById("network");
-    const log = document.getElementById("log");
-    const irShift = document.getElementById("irShift");
-    const drShift = document.getElementById("drShift");
+  // ---------- Utilities ----------
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const clamp = (n,min,max)=> Math.max(min, Math.min(max,n));
+  const asHex = (num, bits=32)=> '0x'+(Number(num>>>0).toString(16).toUpperCase()).padStart(Math.ceil(bits/4),'0');
+  const bitsToHexLSB = (bits)=>{ // bits[0] is LSB
+    // group into 4 bits
+    const padded = bits.slice();
+    while(padded.length % 4 !== 0) padded.push(0);
+    let hex = '';
+    for(let i=0;i<padded.length;i+=4){
+      const nib = padded[i] | (padded[i+1]<<1) | (padded[i+2]<<2) | (padded[i+3]<<3);
+      hex = (nib.toString(16) + hex); // reverse because bits[0] is LSB
+    }
+    return '0x'+hex.toUpperCase();
+  }
+  const hexToBitsLSB = (hex, len)=>{
+    let s = (hex||'').toString().trim();
+    if(s.startsWith('0x')||s.startsWith('0X')) s=s.slice(2);
+    if(s==='') s='0';
+    let bits=[];
+    for(let i=s.length-1;i>=0;i--){
+      const v=parseInt(s[i],16);
+      bits.push(v&1, (v>>1)&1, (v>>2)&1, (v>>3)&1);
+    }
+    bits = bits.slice(0, len);
+    while(bits.length < len) bits.push(0);
+    return bits;
+  }
 
-    const nodes = new vis.DataSet([
-      { id: "Test-Logic-Reset", label: "Test-Logic-Reset" },
-      { id: "Run-Test/Idle", label: "Run-Test/Idle" },
-      { id: "Select-DR-Scan", label: "Select-DR-Scan" },
-      { id: "Capture-DR", label: "Capture-DR" },
-      { id: "Shift-DR", label: "Shift-DR" },
-      { id: "Exit1-DR", label: "Exit1-DR" },
-      { id: "Pause-DR", label: "Pause-DR" },
-      { id: "Exit2-DR", label: "Exit2-DR" },
-      { id: "Update-DR", label: "Update-DR" },
-      { id: "Select-IR-Scan", label: "Select-IR-Scan" },
-      { id: "Capture-IR", label: "Capture-IR" },
-      { id: "Shift-IR", label: "Shift-IR" },
-      { id: "Exit1-IR", label: "Exit1-IR" },
-      { id: "Pause-IR", label: "Pause-IR" },
-      { id: "Exit2-IR", label: "Exit2-IR" },
-      { id: "Update-IR", label: "Update-IR" }
-    ]);
+  // ---------- TAP Machine ----------
+  const STATES = [
+    'TEST_LOGIC_RESET','RUN_TEST_IDLE','SELECT_DR_SCAN','CAPTURE_DR','SHIFT_DR','EXIT1_DR','PAUSE_DR','EXIT2_DR','UPDATE_DR',
+    'SELECT_IR_SCAN','CAPTURE_IR','SHIFT_IR','EXIT1_IR','PAUSE_IR','EXIT2_IR','UPDATE_IR'
+  ];
+  const NEXT = {
+    TEST_LOGIC_RESET:{0:'RUN_TEST_IDLE',1:'TEST_LOGIC_RESET'},
+    RUN_TEST_IDLE:{0:'RUN_TEST_IDLE',1:'SELECT_DR_SCAN'},
+    SELECT_DR_SCAN:{0:'CAPTURE_DR',1:'SELECT_IR_SCAN'},
+    CAPTURE_DR:{0:'SHIFT_DR',1:'EXIT1_DR'},
+    SHIFT_DR:{0:'SHIFT_DR',1:'EXIT1_DR'},
+    EXIT1_DR:{0:'PAUSE_DR',1:'UPDATE_DR'},
+    PAUSE_DR:{0:'PAUSE_DR',1:'EXIT2_DR'},
+    EXIT2_DR:{0:'SHIFT_DR',1:'UPDATE_DR'},
+    UPDATE_DR:{0:'RUN_TEST_IDLE',1:'SELECT_DR_SCAN'},
+    SELECT_IR_SCAN:{0:'CAPTURE_IR',1:'TEST_LOGIC_RESET'},
+    CAPTURE_IR:{0:'SHIFT_IR',1:'EXIT1_IR'},
+    SHIFT_IR:{0:'SHIFT_IR',1:'EXIT1_IR'},
+    EXIT1_IR:{0:'PAUSE_IR',1:'UPDATE_IR'},
+    PAUSE_IR:{0:'PAUSE_IR',1:'EXIT2_IR'},
+    EXIT2_IR:{0:'SHIFT_IR',1:'UPDATE_IR'},
+    UPDATE_IR:{0:'RUN_TEST_IDLE',1:'SELECT_DR_SCAN'},
+  };
 
-    const edges = new vis.DataSet([
-      { from: "Test-Logic-Reset", to: "Test-Logic-Reset", label: "TMS=1" },
-      { from: "Test-Logic-Reset", to: "Run-Test/Idle", label: "TMS=0" },
-      { from: "Run-Test/Idle", to: "Select-DR-Scan", label: "TMS=1" },
-      { from: "Run-Test/Idle", to: "Run-Test/Idle", label: "TMS=0" },
-      { from: "Select-DR-Scan", to: "Capture-DR", label: "TMS=0" },
-      { from: "Select-DR-Scan", to: "Select-IR-Scan", label: "TMS=1" },
-      { from: "Capture-DR", to: "Shift-DR", label: "TMS=0" },
-      { from: "Capture-DR", to: "Exit1-DR", label: "TMS=1" },
-      { from: "Shift-DR", to: "Shift-DR", label: "TMS=0" },
-      { from: "Shift-DR", to: "Exit1-DR", label: "TMS=1" },
-      { from: "Exit1-DR", to: "Pause-DR", label: "TMS=0" },
-      { from: "Exit1-DR", to: "Update-DR", label: "TMS=1" },
-      { from: "Pause-DR", to: "Pause-DR", label: "TMS=0" },
-      { from: "Pause-DR", to: "Exit2-DR", label: "TMS=1" },
-      { from: "Exit2-DR", to: "Shift-DR", label: "TMS=0" },
-      { from: "Exit2-DR", to: "Update-DR", label: "TMS=1" },
-      { from: "Update-DR", to: "Run-Test/Idle", label: "TMS=0" },
-      { from: "Update-DR", to: "Select-DR-Scan", label: "TMS=1" },
+  class Tap {
+    constructor(){
+      this.state = 'TEST_LOGIC_RESET';
+      this.tms = 1; this.tdi = 0; this.tdo = 0;
+      this.ticks = 0;
+      this.irLen = 4; this.drLen = 32;
+      this.irShift = Array(this.irLen).fill(0);
+      this.drShift = Array(this.drLen).fill(0);
+      this.irLatched = 0; // current instruction
+      this.drLatched = 0; // user data register
+      this.idcode = 0x149511C3;
+      this.idcodeInstr = 0xE; // default IR value for IDCODE (example)
+      this.running = false; this.timer = null; this.hz = 10;
+      this.onTick = ()=>{}; this.onState = ()=>{}; this.onScanDone = ()=>{};
+    }
+    setIRLen(n){ this.irLen=n|0; this.irShift = Array(this.irLen).fill(0); }
+    setDRLen(n){ this.drLen=n|0; this.drShift = Array(this.drLen).fill(0); }
+    setIDCODE(hex){ this.idcode = Number.parseInt(hex,16)>>>0; }
 
-      { from: "Select-IR-Scan", to: "Capture-IR", label: "TMS=0" },
-      { from: "Select-IR-Scan", to: "Test-Logic-Reset", label: "TMS=1" },
-      { from: "Capture-IR", to: "Shift-IR", label: "TMS=0" },
-      { from: "Capture-IR", to: "Exit1-IR", label: "TMS=1" },
-      { from: "Shift-IR", to: "Shift-IR", label: "TMS=0" },
-      { from: "Shift-IR", to: "Exit1-IR", label: "TMS=1" },
-      { from: "Exit1-IR", to: "Pause-IR", label: "TMS=0" },
-      { from: "Exit1-IR", to: "Update-IR", label: "TMS=1" },
-      { from: "Pause-IR", to: "Pause-IR", label: "TMS=0" },
-      { from: "Pause-IR", to: "Exit2-IR", label: "TMS=1" },
-      { from: "Exit2-IR", to: "Shift-IR", label: "TMS=0" },
-      { from: "Exit2-IR", to: "Update-IR", label: "TMS=1" },
-      { from: "Update-IR", to: "Run-Test/Idle", label: "TMS=0" },
-      { from: "Update-IR", to: "Select-DR-Scan", label: "TMS=1" }
-    ]);
-
-    const data = { nodes, edges };
-    const options = {
-      nodes: {
-        shape: "box",
-        color: {
-          background: "#eee",
-          border: "#999"
-        },
-        font: {
-          color: "black"
+    // One TCK rising edge
+    step(){
+      // Compute TDO before shift if in shift states
+      if(this.state==='SHIFT_IR'){
+        this.tdo = this.irShift[0] | 0;
+        // shift right LSB -> out, TDI into MSB
+        this.irShift = [this.tdi, ...this.irShift.slice(0, this.irLen-1)];
+      } else if(this.state==='SHIFT_DR'){
+        this.tdo = this.drShift[0] | 0;
+        this.drShift = [this.tdi, ...this.drShift.slice(0, this.drLen-1)];
+      } else if(this.state==='CAPTURE_IR'){
+        // Load ...01 pattern on capture
+        this.irShift = Array(this.irLen).fill(0);
+        this.irShift[0] = 1; // LSB=1
+        this.irShift[1] = 0; // Next=0
+        this.tdo = this.irShift[0];
+      } else if(this.state==='CAPTURE_DR'){
+        // Load DR depending on current instruction
+        const isID = (this.irLatched === (this.idcodeInstr & ((1<<this.irLen)-1)));
+        if(isID){
+          this.drShift = hexToBitsLSB(this.idcode.toString(16), this.drLen);
+        } else if(this.irLatched === ((1<<this.irLen)-1)) { // BYPASS = all 1s
+          this.drShift = Array(this.drLen).fill(0);
+        } else {
+          this.drShift = hexToBitsLSB(this.drLatched.toString(16), this.drLen);
         }
-      },
-      edges: {
-        arrows: "to",
-        font: { align: "middle" }
-      },
-      layout: {
-        improvedLayout: true,
-        hierarchical: {
-          enabled: true,
-          direction: "UD",
-          sortMethod: "hubsize"
-        }
-      },
-      physics: false
-    };
-
-    const network = new vis.Network(container, data, options);
-
-    const tapTransitions = {
-      "Test-Logic-Reset": ["Run-Test/Idle", "Test-Logic-Reset"],
-      "Run-Test/Idle": ["Run-Test/Idle", "Select-DR-Scan"],
-      "Select-DR-Scan": ["Capture-DR", "Select-IR-Scan"],
-      "Capture-DR": ["Shift-DR", "Exit1-DR"],
-      "Shift-DR": ["Shift-DR", "Exit1-DR"],
-      "Exit1-DR": ["Pause-DR", "Update-DR"],
-      "Pause-DR": ["Pause-DR", "Exit2-DR"],
-      "Exit2-DR": ["Shift-DR", "Update-DR"],
-      "Update-DR": ["Run-Test/Idle", "Select-DR-Scan"],
-      "Select-IR-Scan": ["Capture-IR", "Test-Logic-Reset"],
-      "Capture-IR": ["Shift-IR", "Exit1-IR"],
-      "Shift-IR": ["Shift-IR", "Exit1-IR"],
-      "Exit1-IR": ["Pause-IR", "Update-IR"],
-      "Pause-IR": ["Pause-IR", "Exit2-IR"],
-      "Exit2-IR": ["Shift-IR", "Update-IR"],
-      "Update-IR": ["Run-Test/Idle", "Select-DR-Scan"]
-    };
-
-    let currentState = "Test-Logic-Reset";
-
-    function step(tms) {
-      const next = tapTransitions[currentState][tms];
-      log.innerHTML += `[${new Date().toLocaleTimeString()}] ${currentState} -> ${next} (TMS=${tms})<br>`;
-      log.scrollTop = log.scrollHeight;
-
-      if (next === "Shift-DR") {
-        let dr = drShift.value;
-        dr = dr.slice(1) + (tms ? "1" : "0");
-        drShift.value = dr;
-      } else if (next === "Shift-IR") {
-        let ir = irShift.value;
-        ir = ir.slice(1) + (tms ? "1" : "0");
-        irShift.value = ir;
+        this.tdo = this.drShift[0] | 0;
+      } else if(this.state==='UPDATE_IR'){
+        // Latch IR on update
+        this.irLatched = this.bitsToInt(this.irShift);
+      } else if(this.state==='UPDATE_DR'){
+        this.drLatched = this.bitsToInt(this.drShift);
+      } else {
+        this.tdo = 0;
       }
 
-      currentState = next;
-
-      nodes.update({ id: currentState, color: { background: "#4caf50", border: "#2e7d32" }, font: { color: "white" } });
-      setTimeout(() => {
-        nodes.update({ id: currentState, color: { background: "#eee", border: "#999" }, font: { color: "black" } });
-      }, 1000);
+      // Advance state after the work
+      const prev = this.state;
+      this.state = NEXT[this.state][this.tms];
+      this.ticks++;
+      this.onTick(this);
+      if(prev!==this.state){ this.onState(this); }
+      return this.tdo;
     }
+    bitsToInt(bits){
+      let v=0; for(let i=bits.length-1;i>=0;i--){ v=(v<<1)|bits[i]; } return v>>>0;
+    }
+    // Sequences
+    trst(){ const was=this.state; this.state='TEST_LOGIC_RESET'; this.onState(this); log(`TRST → ${this.state}`,'warn'); return was; }
+    tmsReset(){ // drive 1 for >=5 TCK edges
+      const prev=this.state; for(let i=0;i<5;i++){ this.tms=1; this.step(); }
+      log(`TMS reset (5×1): ${prev} → ${this.state}`,'warn');
+    }
+    gotoIdle(){
+      // robust path: go to TLR then to idle
+      for(let i=0;i<6;i++){ this.tms=1; this.step(); }
+      this.tms=0; this.step();
+    }
+    gotoShiftIR(){
+      this.gotoIdle(); // from idle: 1,1,0,0 -> Shift-IR
+      this.tms=1; this.step(); // Select-DR
+      this.tms=1; this.step(); // Select-IR
+      this.tms=0; this.step(); // Capture-IR
+      this.tms=0; this.step(); // Shift-IR
+    }
+    gotoShiftDR(){
+      this.gotoIdle(); // from idle: 1,0,0 -> Shift-DR
+      this.tms=1; this.step(); // Select-DR
+      this.tms=0; this.step(); // Capture-DR
+      this.tms=0; this.step(); // Shift-DR
+    }
+    // Scan helpers (valueBits: LSB-first array of 0/1)
+    scanIR(valueBits){
+      this.gotoShiftIR();
+      const out=[];
+      for(let i=0;i<valueBits.length;i++){
+        const last = (i===valueBits.length-1);
+        this.tdi = valueBits[i];
+        this.tms = last?1:0; // exit on last bit
+        const bit = this.step(); out.push(bit);
+      }
+      // Exit1-IR -> Update-IR -> Idle
+      this.tms=1; this.step(); // Update-IR
+      this.tms=0; this.step(); // Idle
+      this.onScanDone('IR', out);
+      return out;
+    }
+    scanDR(valueBits){
+      this.gotoShiftDR();
+      const out=[];
+      for(let i=0;i<valueBits.length;i++){
+        const last=(i===valueBits.length-1);
+        this.tdi = valueBits[i];
+        this.tms = last?1:0;
+        const bit = this.step(); out.push(bit);
+      }
+      this.tms=1; this.step(); // Update-DR
+      this.tms=0; this.step(); // Idle
+      this.onScanDone('DR', out);
+      return out;
+    }
+    start(){ if(this.running) return; this.running=true; this.loop(); }
+    stop(){ this.running=false; if(this.timer) { clearTimeout(this.timer); this.timer=null; } }
+    loop(){ if(!this.running) return; this.step(); this.timer=setTimeout(()=>this.loop(), 1000/this.hz); }
+  }
+
+  // ---------- Drawing State Machine ----------
+  const layout = {
+    TEST_LOGIC_RESET:{x:90,y:60}, RUN_TEST_IDLE:{x:230,y:60},
+    SELECT_DR_SCAN:{x:360,y:60}, CAPTURE_DR:{x:480,y:60}, SHIFT_DR:{x:610,y:60}, EXIT1_DR:{x:760,y:60}, PAUSE_DR:{x:760,y:140}, EXIT2_DR:{x:760,y:220}, UPDATE_DR:{x:610,y:220},
+    SELECT_IR_SCAN:{x:360,y:320}, CAPTURE_IR:{x:480,y:320}, SHIFT_IR:{x:610,y:320}, EXIT1_IR:{x:760,y:320}, PAUSE_IR:{x:760,y:400}, EXIT2_IR:{x:760,y:480}, UPDATE_IR:{x:610,y:480}
+  };
+  function drawTap(svg, current){
+    svg.innerHTML='';
+    // edges (tms=0 solid blue, tms=1 purple)
+    const edges=[
+      ['TEST_LOGIC_RESET','RUN_TEST_IDLE',0],['TEST_LOGIC_RESET','TEST_LOGIC_RESET',1],
+      ['RUN_TEST_IDLE','RUN_TEST_IDLE',0],['RUN_TEST_IDLE','SELECT_DR_SCAN',1],
+      ['SELECT_DR_SCAN','CAPTURE_DR',0],['SELECT_DR_SCAN','SELECT_IR_SCAN',1],
+      ['CAPTURE_DR','SHIFT_DR',0],['CAPTURE_DR','EXIT1_DR',1],
+      ['SHIFT_DR','SHIFT_DR',0],['SHIFT_DR','EXIT1_DR',1],
+      ['EXIT1_DR','PAUSE_DR',0],['EXIT1_DR','UPDATE_DR',1],
+      ['PAUSE_DR','PAUSE_DR',0],['PAUSE_DR','EXIT2_DR',1],
+      ['EXIT2_DR','SHIFT_DR',0],['EXIT2_DR','UPDATE_DR',1],
+      ['UPDATE_DR','RUN_TEST_IDLE',0],['UPDATE_DR','SELECT_DR_SCAN',1],
+      ['SELECT_IR_SCAN','CAPTURE_IR',0],['SELECT_IR_SCAN','TEST_LOGIC_RESET',1],
+      ['CAPTURE_IR','SHIFT_IR',0],['CAPTURE_IR','EXIT1_IR',1],
+      ['SHIFT_IR','SHIFT_IR',0],['SHIFT_IR','EXIT1_IR',1],
+      ['EXIT1_IR','PAUSE_IR',0],['EXIT1_IR','UPDATE_IR',1],
+      ['PAUSE_IR','PAUSE_IR',0],['PAUSE_IR','EXIT2_IR',1],
+      ['EXIT2_IR','SHIFT_IR',0],['EXIT2_IR','UPDATE_IR',1],
+      ['UPDATE_IR','RUN_TEST_IDLE',0],['UPDATE_IR','SELECT_DR_SCAN',1],
+    ];
+    for(const [a,b,t] of edges){
+      const p1=layout[a], p2=layout[b]; if(!p1||!p2) continue;
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',p1.x); line.setAttribute('y1',p1.y);
+      line.setAttribute('x2',p2.x); line.setAttribute('y2',p2.y);
+      line.setAttribute('class','edge '+(t? 'tms1':''));
+      svg.appendChild(line);
+    }
+    for(const name of STATES){
+      const p=layout[name]; if(!p) continue;
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',p.x); c.setAttribute('cy',p.y); c.setAttribute('r',22);
+      c.setAttribute('class','state-node'+(name===current?' current':''));
+      const lab = document.createElementNS('http://www.w3.org/2000/svg','text');
+      lab.setAttribute('x', p.x); lab.setAttribute('y', p.y+3);
+      lab.setAttribute('text-anchor','middle'); lab.setAttribute('class','state-label');
+      lab.textContent = name.replaceAll('_','\u202F');
+      g.appendChild(c); g.appendChild(lab); svg.appendChild(g);
+    }
+  }
+
+  // ---------- Pinout Mapper ----------
+  const pinout = {
+    custom:[
+      {pin:1, signal:'VTREF', note:'Target Vref'},
+      {pin:2, signal:'GND', note:''},
+      {pin:3, signal:'TMS', note:''},
+      {pin:4, signal:'TCK', note:''},
+      {pin:5, signal:'TDI', note:''},
+      {pin:6, signal:'TDO', note:''},
+      {pin:7, signal:'TRST_n', note:'optional'},
+      {pin:8, signal:'SRST_n', note:'optional'},
+      {pin:9, signal:'NC', note:''},
+      {pin:10, signal:'GND', note:''},
+    ],
+    arm20:[
+      {pin:1, signal:'VTREF', note:''},{pin:2, signal:'GND', note:''},
+      {pin:3, signal:'TRST_n', note:'opt'},{pin:4, signal:'GND', note:''},
+      {pin:5, signal:'TDI', note:''},{pin:6, signal:'GND', note:''},
+      {pin:7, signal:'TMS/SWDIO', note:''},{pin:8, signal:'GND', note:''},
+      {pin:9, signal:'TCK/SWCLK', note:''},{pin:10, signal:'GND', note:''},
+      {pin:11, signal:'RTCK', note:'opt'},{pin:12, signal:'GND', note:''},
+      {pin:13, signal:'TDO/SWO', note:''},{pin:14, signal:'GND', note:''},
+      {pin:15, signal:'nRESET', note:''},{pin:16, signal:'GND', note:''},
+      {pin:17, signal:'DBGRQ', note:'opt'},{pin:18, signal:'GND', note:''},
+      {pin:19, signal:'DBGACK', note:'opt'},{pin:20, signal:'GND', note:''},
+    ],
+    ti14:[
+      {pin:1, signal:'TMS', note:''},{pin:2, signal:'TCK', note:''},
+      {pin:3, signal:'TDO', note:''},{pin:4, signal:'GND', note:''},
+      {pin:5, signal:'TDI', note:''},{pin:6, signal:'GND', note:''},
+      {pin:7, signal:'EMU0', note:'opt'},{pin:8, signal:'EMU1', note:'opt'},
+      {pin:9, signal:'TRST_n', note:'opt'},{pin:10, signal:'GND', note:''},
+      {pin:11, signal:'NC', note:''},{pin:12, signal:'GND', note:''},
+      {pin:13, signal:'VTREF', note:''},{pin:14, signal:'GND', note:''},
+    ],
+  };
+  let mirrored=false;
+  function renderPinTable(preset){
+    const tbody = $('#pinTable'); tbody.innerHTML='';
+    let rows = JSON.parse(JSON.stringify(pinout[preset] || pinout.custom));
+    if(mirrored){ rows = rows.map(r=>({...r, pin: r.pin })) .sort((a,b)=>b.pin-a.pin); }
+    for(const r of rows){
+      const tr=document.createElement('tr');
+      const td1=document.createElement('td'); td1.textContent=r.pin; td1.className='mono';
+      const td2=document.createElement('td');
+      const sel=document.createElement('input'); sel.type='text'; sel.value=r.signal; sel.size=12;
+      sel.addEventListener('change',()=>{ r.signal=sel.value; });
+      td2.appendChild(sel);
+      const td3=document.createElement('td');
+      const note=document.createElement('input'); note.type='text'; note.value=r.note; note.size=18; note.addEventListener('change',()=>{ r.note=note.value; });
+      td3.appendChild(note);
+      tr.append(td1,td2,td3); tbody.appendChild(tr);
+    }
+  }
+
+  // ---------- UI Wiring ----------
+  const tap = new Tap();
+  const swTMS = $('#swTMS'); const swTDI = $('#swTDI');
+  const tdoLamp = $('#tdoLamp'); const tickCount = $('#tickCount'); const stateTag=$('#stateTag');
+  const btnStep=$('#btnStep'), btnRun=$('#btnRun'), btnTRST=$('#btnTRST'), btnResetTLR=$('#btnResetTLR');
+  const clkRate=$('#clkRate'), clkHz=$('#clkHz');
+  const btnToShiftIR=$('#btnToShiftIR'), btnToShiftDR=$('#btnToShiftDR'), btnGotoIdle=$('#btnGotoIdle');
+  const irLen=$('#irLen'), drLen=$('#drLen'), idcodeHex=$('#idcodeHex');
+  const btnReadIDCODE=$('#btnReadIDCODE');
+  const scanIRHex=$('#scanIRHex'), scanDRHex=$('#scanDRHex');
+  const btnDoScanIR=$('#btnDoScanIR'), btnDoScanDR=$('#btnDoScanDR');
+  const lastScanHex=$('#lastScanHex');
+  const irLatchedEl=$('#irLatched'), drLatchedEl=$('#drLatched');
+  const irBits=$('#irBits'), drBits=$('#drBits');
+  const logEl=$('#log');
+  const tapSvg=$('#tapSvg');
+  const pinoutPreset=$('#pinoutPreset'); const pinTable=$('#pinTable'); const btnMirror=$('#btnMirror');
+
+  function setSwitch(el, on){ el.classList.toggle('on', !!on); }
+  function getSwitch(el){ return el.classList.contains('on')?1:0; }
+
+  function log(msg, kind){
+    const line=document.createElement('div');
+    const ts = new Date().toLocaleTimeString();
+    line.innerHTML = `<span class="muted">[${ts}]</span> ${msg}`;
+    if(kind==='good') line.style.color = '#b5ffe0';
+    if(kind==='warn') line.style.color = '#ffe2a8';
+    logEl.appendChild(line); logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function renderBits(container, bits){
+    container.innerHTML='';
+    bits.forEach((b,i)=>{
+      const d=document.createElement('div'); d.className='bit mono'; d.textContent=b; if(i===0) d.style.borderColor='#355'; container.appendChild(d);
+    });
+  }
+
+  tap.onTick = (t)=>{
+    tdoLamp.textContent = String(t.tdo);
+    tdoLamp.className = 'tag ' + (t.tdo? 'good':'');
+    tickCount.textContent = String(t.ticks);
+    renderBits(irBits, t.irShift); renderBits(drBits, t.drShift);
+  };
+  tap.onState = (t)=>{
+    stateTag.textContent = t.state;
+    drawTap(tapSvg, t.state);
+  };
+  tap.onScanDone = (kind, outBits)=>{
+    const hex = bitsToHexLSB(outBits);
+    lastScanHex.value = hex;
+    log(`${kind} scan TDO = <span class="mono">${hex}</span>`, 'good');
+  }
+
+  // Switches
+  swTMS.addEventListener('click',()=>{ setSwitch(swTMS, !getSwitch(swTMS)); tap.tms=getSwitch(swTMS); });
+  swTDI.addEventListener('click',()=>{ setSwitch(swTDI, !getSwitch(swTDI)); tap.tdi=getSwitch(swTDI); });
+
+  // Buttons
+  btnStep.addEventListener('click',()=>{ tap.step(); });
+  btnRun.addEventListener('click',()=>{
+    if(tap.running){ tap.stop(); btnRun.textContent='Run'; log('Run stopped'); }
+    else { tap.hz = Number(clkRate.value); tap.start(); btnRun.textContent='Stop'; log(`Run started @ ${tap.hz} Hz`,'warn'); }
+  });
+  btnTRST.addEventListener('click',()=>{ tap.trst(); });
+  btnResetTLR.addEventListener('click',()=>{ tap.tmsReset(); setSwitch(swTMS, true); tap.tms=1; });
+
+  clkRate.addEventListener('input',()=>{ clkHz.textContent = `${clkRate.value} Hz`; tap.hz=Number(clkRate.value); });
+
+  btnToShiftIR.addEventListener('click',()=>{ tap.gotoShiftIR(); });
+  btnToShiftDR.addEventListener('click',()=>{ tap.gotoShiftDR(); });
+  btnGotoIdle.addEventListener('click',()=>{ tap.gotoIdle(); });
+
+  irLen.addEventListener('change',()=>{ tap.setIRLen(clamp(irLen.value|0,2,64)); log(`IR length = ${tap.irLen} bits`); });
+  drLen.addEventListener('change',()=>{ tap.setDRLen(clamp(drLen.value|0,1,1024)); log(`DR length = ${tap.drLen} bits`); });
+  idcodeHex.addEventListener('change',()=>{ const v=idcodeHex.value.trim().replace(/^0x/i,''); tap.setIDCODE(v); log(`IDCODE = 0x${v.toUpperCase()}`); });
+
+  btnReadIDCODE.addEventListener('click',()=>{
+    // Ensure IDCODE instruction is active, then read DR of drLen bits
+    const idIR = tap.idcodeInstr & ((1<<tap.irLen)-1);
+    const bitsIR = hexToBitsLSB(idIR.toString(16), tap.irLen);
+    const outIR = tap.scanIR(bitsIR);
+    log(`IR<=IDCODE (0x${idIR.toString(16).toUpperCase()}); TDO(out)=${bitsToHexLSB(outIR)}`);
+    const outDR = tap.scanDR(Array(tap.drLen).fill(0)); // shift in zeros while reading
+    // outDR holds IDCODE (if DR length matches)
+  });
+
+  function doScan(kind, hexStr){
+    const len = kind==='IR'? tap.irLen : tap.drLen;
+    const bits = hexToBitsLSB(hexStr, len);
+    const out = (kind==='IR')? tap.scanIR(bits) : tap.scanDR(bits);
+    log(`${kind}<=${(hexStr||'0').toString()} ; TDO(out)=${bitsToHexLSB(out)}`);
+  }
+  btnDoScanIR.addEventListener('click',()=>{ doScan('IR', scanIRHex.value.trim()); });
+  btnDoScanDR.addEventListener('click',()=>{ doScan('DR', scanDRHex.value.trim()); });
+
+  // Pinout
+  pinoutPreset.addEventListener('change',()=>{ renderPinTable(pinoutPreset.value); });
+  btnMirror.addEventListener('click',()=>{ mirrored=!mirrored; renderPinTable(pinoutPreset.value); });
+
+  // Initial paint
+  setSwitch(swTMS,true); setSwitch(swTDI,false); tap.tms=1; tap.tdi=0; drawTap(tapSvg, tap.state); stateTag.textContent=tap.state;
+  renderPinTable('custom');
+  irLatchedEl.textContent = asHex(tap.irLatched, tap.irLen);
+  drLatchedEl.textContent = asHex(tap.drLatched, tap.drLen);
+
+  // Keep IR/DR latched labels fresh after updates
+  const _upd = tap.onState;
+  tap.onState = (t)=>{ _upd(t); irLatchedEl.textContent=asHex(t.irLatched, t.irLen); drLatchedEl.textContent=asHex(t.drLatched, t.drLen); };
+
+  log('Ready. Use Step/Run, or try Read IDCODE.');
   </script>
 </body>
 </html>
