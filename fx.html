@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Function Grapher</title>
+<style>
+  :root { --bg:#0f172a; --fg:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --grid:#1f2937; --axis:#64748b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding: 14px 16px; border-bottom: 1px solid #0b1220; background: #0b1020; position: sticky; top: 0; z-index: 1; }
+  h1 { margin:0 0 6px; font-size: 18px; font-weight: 600; color:#e5f3ff; }
+  .row { display:flex; flex-wrap: wrap; gap:10px; align-items: center; }
+  label { font-size: 12px; color: var(--muted); }
+  input, select, button {
+    background:#0b1220; color:var(--fg); border:1px solid #1e293b; border-radius:8px; padding:8px 10px; font-size:14px;
+  }
+  input:focus, select:focus { outline: 2px solid #124d74; border-color:#0ea5e9; }
+  button { cursor: pointer; background:#0ea5e9; border-color:#0ea5e9; color:#0b1220; font-weight:600; }
+  button.secondary { background: transparent; border-color:#334155; color:#cbd5e1; }
+  main { display:grid; grid-template-columns: 320px 1fr; min-height: calc(100dvh - 72px); }
+  aside { border-right:1px solid #0b1220; padding:14px; }
+  .group { margin-bottom:12px; }
+  .hint { font-size:12px; color:#9fb3c8; line-height:1.3; }
+  canvas { width:100%; height:100%; display:block; background: #0a0f1a; }
+  #panel { display:grid; grid-template-rows: auto 1fr; }
+  #errors { color:#fca5a5; white-space: pre-wrap; font-size:12px; min-height: 1.2em; }
+  .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  .kbd { padding:0 6px; border:1px solid #334155; border-radius:6px; font-size:12px; color:#a8c5db; }
+  footer { padding:10px 14px; border-top:1px solid #0b1220; color:#8daac1; font-size:12px; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } aside { border-right:none; border-bottom:1px solid #0b1220; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Function Grapher</h1>
+  <div class="row">
+    <label>f(x): <input id="expr" size="40" placeholder="e.g., sin(x) + 0.5*cos(3x) or x^2 - 4"/></label>
+    <select id="preset">
+      <option value="">Presets…</option>
+      <option>sin(x)</option>
+      <option>cos(x)</option>
+      <option>tan(x)</option>
+      <option>x^2</option>
+      <option>x^3 - 6x</option>
+      <option>exp(x)</option>
+      <option>ln(x)</option>
+      <option>sin(x)/x</option>
+      <option>abs(x)</option>
+      <option>sqrt(abs(x))</option>
+      <option>sin(x)+0.5*cos(3x)</option>
+      <option>1/(x-1)</option>
+    </select>
+    <button id="plot">Plot</button>
+    <button id="reset" class="secondary">Reset View</button>
+    <span id="errors"></span>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="group">
+      <div class="grid-2">
+        <label>x-min <input id="xmin" type="number" step="any" value="-10"></label>
+        <label>x-max <input id="xmax" type="number" step="any" value="10"></label>
+      </div>
+    </div>
+    <div class="group">
+      <div class="grid-2">
+        <label>y-min <input id="ymin" type="number" step="any" value="-5"></label>
+        <label>y-max <input id="ymax" type="number" step="any" value="5"></label>
+      </div>
+    </div>
+    <div class="group">
+      <label>Samples <input id="samples" type="number" min="100" max="5000" value="1200"></label>
+    </div>
+    <div class="group">
+      <button id="apply">Apply Range</button>
+    </div>
+    <div class="group">
+      <div class="hint">
+        <strong>Syntax</strong><br/>
+        • Operators: <span class="kbd">+ - * / % ^</span> (use <span class="kbd">^</span> for power)<br/>
+        • Functions: sin, cos, tan, asin, acos, atan, ln (natural log), log10, exp, sqrt, abs, floor, ceil, round, min, max, sign, pow(a,b)<br/>
+        • Constants: <span class="kbd">pi</span> (3.14159…), <span class="kbd">e</span> (2.71828…)<br/>
+        • Examples: <code>sin(x)</code>, <code>x^2 - 4</code>, <code>exp(-x^2)</code>, <code>sin(x)/x</code><br/>
+      </div>
+    </div>
+    <div class="group">
+      <div class="hint">
+        <strong>Mouse</strong><br/>
+        • Zoom: mouse wheel<br/>
+        • Pan: drag<br/>
+        • Reset: double-click or “Reset View”
+      </div>
+    </div>
+  </aside>
+
+  <section id="panel">
+    <canvas id="canvas"></canvas>
+    <footer>
+      Tip: If the curve looks jagged, increase “Samples”. For very steep or discontinuous functions (e.g., <code>1/(x-1)</code>), consider narrower x-ranges around the area of interest.
+    </footer>
+  </section>
+</main>
+
+<script>
+(function(){
+  const exprInput   = document.getElementById('expr');
+  const presetSel   = document.getElementById('preset');
+  const plotBtn     = document.getElementById('plot');
+  const resetBtn    = document.getElementById('reset');
+  const applyBtn    = document.getElementById('apply');
+  const errSpan     = document.getElementById('errors');
+  const xminInput   = document.getElementById('xmin');
+  const xmaxInput   = document.getElementById('xmax');
+  const yminInput   = document.getElementById('ymin');
+  const ymaxInput   = document.getElementById('ymax');
+  const samplesInput= document.getElementById('samples');
+  const canvas      = document.getElementById('canvas');
+  const ctx         = canvas.getContext('2d');
+
+  let view = { xmin:-10, xmax:10, ymin:-5, ymax:5 };
+  let compiled = null;
+  let exprText = "sin(x)";
+
+  // Resize canvas to device pixels
+  function fitCanvas(){
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const bounds = canvas.getBoundingClientRect();
+    canvas.width  = Math.floor(bounds.width * dpr);
+    canvas.height = Math.floor((window.innerHeight - document.querySelector('header').offsetHeight - 40) * dpr);
+    canvas.style.height = Math.floor(canvas.height / dpr) + "px";
+    ctx.setTransform(dpr,0,0,dpr,0,0); // logical px coordinates
+  }
+  window.addEventListener('resize', ()=>{ fitCanvas(); draw(); });
+
+  // Safe-ish compiler: allow math operators, x, numbers, parentheses, commas, and whitelisted names.
+  const allowedNames = new Set([
+    // Math.* (via with(Math))
+    "sin","cos","tan","asin","acos","atan",
+    "log","log10","exp","sqrt","abs","floor","ceil","round","min","max","pow","sign",
+    // our constants/aliases
+    "ln","pi","e","x"
+  ]);
+  const forbiddenSnippets = ["constructor","__proto__","prototype","window","document","self","globalThis","Function","eval","import","new","class","=>","XML","fetch"];
+
+  function sanitize(expr){
+    const raw = expr.trim();
+    if (forbiddenSnippets.some(s => raw.toLowerCase().includes(s))) {
+      throw new Error("Expression contains forbidden keyword.");
+    }
+    // Replace ^ with ** for exponent
+    let s = raw.replace(/\^/g, "**");
+
+    // Replace ln(...) -> log(...)
+    s = s.replace(/\bln\s*\(/gi, "log(");
+
+    // Disallow quotes and semicolons to reduce injection surface
+    if (/[`"';]/.test(s)) throw new Error("Please avoid quotes or semicolons.");
+
+    // Token check: ensure all identifiers are in the allowlist
+    const idents = s.match(/[A-Za-z_]\w*/g) || [];
+    for (const id of idents) {
+      // Allow Math via with(Math), but users shouldn't type 'Math'—still tolerate it
+      if (id === "Math") continue;
+      if (!allowedNames.has(id)) {
+        // Permit scientific notation like 1e-3 (the 'e' is caught as identifier). We'll allow standalone 'e' too.
+        if (id === "E") continue;
+        // In cases like 'xmax' in ranges or typos, block:
+        if (!(id === "x")) throw new Error(`Unknown identifier: ${id}`);
+      }
+    }
+    return s;
+  }
+
+  function compile(expr){
+    const s = sanitize(expr);
+    // Build function with Math in scope and define pi/e constants
+    const src = `with (Math) { const pi=PI, e=E; return (${s}); }`;
+    // eslint-disable-next-line no-new-func
+    const fn = new Function("x", src);
+    // quick test
+    fn(0);
+    return fn;
+  }
+
+  // Coordinate transforms
+  function xToPx(x){ return (x - view.xmin) * canvas.width  / (view.xmax - view.xmin); }
+  function yToPy(y){ return canvas.height - (y - view.ymin) * canvas.height / (view.ymax - view.ymin); }
+  function pxToX(px){ return view.xmin + px * (view.xmax - view.xmin) / canvas.width; }
+  function pyToY(py){ return view.ymin + (canvas.height - py) * (view.ymax - view.ymin) / canvas.height; }
+
+  function drawGrid(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // background
+    ctx.fillStyle = "#071224";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // choose grid step based on range
+    const niceStep = (span) => {
+      const rough = span / 10;
+      const pow10 = Math.pow(10, Math.floor(Math.log10(rough)));
+      const candidates = [1,2,5,10];
+      let best = pow10;
+      for (const c of candidates) {
+        const st = c * pow10;
+        if (Math.abs(rough - st) < Math.abs(rough - best)) best = st;
+      }
+      return best;
+    };
+
+    const xStep = niceStep(view.xmax - view.xmin);
+    const yStep = niceStep(view.ymax - view.ymin);
+
+    ctx.lineWidth = 1;
+
+    // vertical grid
+    ctx.strokeStyle = "#0f2138";
+    ctx.fillStyle = "#8aa7c2";
+    ctx.font = "12px system-ui, sans-serif";
+    for (let x = Math.ceil(view.xmin / xStep) * xStep; x <= view.xmax; x += xStep) {
+      const px = xToPx(x) + 0.5;
+      ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,canvas.height); ctx.stroke();
+      // label
+      if (px >= 24 && px <= canvas.width - 24) {
+        ctx.fillStyle = "#6b93b3";
+        ctx.fillText(Number(x.toFixed(6)).toString(), px + 4, canvas.height - 6);
+      }
+    }
+
+    // horizontal grid
+    for (let y = Math.ceil(view.ymin / yStep) * yStep; y <= view.ymax; y += yStep) {
+      const py = yToPy(y) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(canvas.width,py); ctx.stroke();
+      // label
+      if (py >= 14 && py <= canvas.height - 8) {
+        ctx.fillStyle = "#6b93b3";
+        ctx.fillText(Number(y.toFixed(6)).toString(), 6, py - 4);
+      }
+    }
+
+    // axes
+    ctx.strokeStyle = "#3b5168";
+    ctx.lineWidth = 1.5;
+    // y axis (x=0)
+    if (view.xmin < 0 && view.xmax > 0) {
+      const px = xToPx(0) + 0.5;
+      ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,canvas.height); ctx.stroke();
+    }
+    // x axis (y=0)
+    if (view.ymin < 0 && view.ymax > 0) {
+      const py = yToPy(0) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(canvas.width,py); ctx.stroke();
+    }
+  }
+
+  function drawCurve(){
+    if (!compiled) return;
+    const n = Math.max(100, Math.min(5000, Number(samplesInput.value) || 1200));
+    const dx = (view.xmax - view.xmin) / (n - 1);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#38bdf8";
+    ctx.beginPath();
+
+    let move = true;
+    for (let i = 0; i < n; i++) {
+      const x = view.xmin + i * dx;
+      let y = compiled(x);
+      // guard against infinities/NaN/huge values
+      if (!isFinite(y) || Math.abs(y) > 1e12) { move = true; continue; }
+      const px = xToPx(x), py = yToPy(y);
+      if (move) { ctx.moveTo(px, py); move = false; }
+      else { ctx.lineTo(px, py); }
+    }
+    ctx.stroke();
+  }
+
+  function draw(){
+    drawGrid();
+    try {
+      drawCurve();
+      errSpan.textContent = "";
+    } catch (e) {
+      errSpan.textContent = e.message || String(e);
+    }
+  }
+
+  function applyInputsToView(){
+    const xmin = Number(xminInput.value), xmax = Number(xmaxInput.value);
+    const ymin = Number(yminInput.value), ymax = Number(ymaxInput.value);
+    if (!(isFinite(xmin) && isFinite(xmax) && xmax > xmin)) throw new Error("Invalid x-range.");
+    if (!(isFinite(ymin) && isFinite(ymax) && ymax > ymin)) throw new Error("Invalid y-range.");
+    view = { xmin, xmax, ymin, ymax };
+  }
+
+  function updateInputsFromView(){
+    xminInput.value = view.xmin;
+    xmaxInput.value = view.xmax;
+    yminInput.value = view.ymin;
+    ymaxInput.value = view.ymax;
+  }
+
+  // Compile current expression
+  function recompile(){
+    compiled = compile(exprText);
+  }
+
+  // Mouse interactions: pan & zoom
+  let isDragging = false;
+  let dragStart = { x:0, y:0 };
+  let viewStart = null;
+
+  canvas.addEventListener('mousedown', (e)=>{
+    isDragging = true;
+    dragStart = { x: e.offsetX, y: e.offsetY };
+    viewStart = { ...view };
+  });
+  window.addEventListener('mouseup', ()=>{ isDragging = false; });
+  window.addEventListener('mousemove', (e)=>{
+    if (!isDragging) return;
+    const dxPx = e.offsetX - dragStart.x;
+    const dyPx = e.offsetY - dragStart.y;
+    const dx = dxPx * (viewStart.xmax - viewStart.xmin) / canvas.getBoundingClientRect().width;
+    const dy = dyPx * (viewStart.ymax - viewStart.ymin) / canvas.getBoundingClientRect().height;
+    view.xmin = viewStart.xmin - dx;
+    view.xmax = viewStart.xmax - dx;
+    view.ymin = viewStart.ymin + dy;
+    view.ymax = viewStart.ymax + dy;
+    updateInputsFromView();
+    draw();
+  });
+
+  // Wheel zoom (around cursor)
+  canvas.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const px = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const py = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    const zx = pxToX(px), zy = pyToY(py);
+
+    const scale = (e.deltaY < 0) ? 0.9 : 1.1;
+    const nxmin = zx + (view.xmin - zx) * scale;
+    const nxmax = zx + (view.xmax - zx) * scale;
+    const nymin = zy + (view.ymin - zy) * scale;
+    const nymax = zy + (view.ymax - zy) * scale;
+
+    view = { xmin:nxmin, xmax:nxmax, ymin:nymin, ymax:nymax };
+    updateInputsFromView();
+    draw();
+  }, { passive:false });
+
+  // Double-click reset
+  canvas.addEventListener('dblclick', ()=>{
+    view = { xmin:-10, xmax:10, ymin:-5, ymax:5 };
+    updateInputsFromView();
+    draw();
+  });
+
+  // Controls
+  plotBtn.addEventListener('click', ()=>{
+    try {
+      exprText = exprInput.value.trim() || "sin(x)";
+      recompile();
+      draw();
+    } catch (e) { errSpan.textContent = e.message || String(e); }
+  });
+
+  presetSel.addEventListener('change', ()=>{
+    if (!presetSel.value) return;
+    exprInput.value = presetSel.value;
+    plotBtn.click();
+  });
+
+  applyBtn.addEventListener('click', ()=>{
+    try {
+      applyInputsToView();
+      draw();
+    } catch (e) { errSpan.textContent = e.message || String(e); }
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    view = { xmin:-10, xmax:10, ymin:-5, ymax:5 };
+    updateInputsFromView();
+    draw();
+  });
+
+  // Live compile on Enter
+  exprInput.addEventListener('keydown', (e)=>{
+    if (e.key === "Enter") plotBtn.click();
+  });
+
+  // Initial setup
+  exprInput.value = "sin(x)";
+  exprText = exprInput.value;
+  try { recompile(); } catch (e) { errSpan.textContent = e.message; }
+  fitCanvas();
+  updateInputsFromView();
+  draw();
+})();
+</script>
+</body>
+</html>
