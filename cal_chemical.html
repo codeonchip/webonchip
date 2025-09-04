@@ -1,1 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chemical Engineer Calculator – Fluids, Heat, Mass, Reactors</title>
+  <style>
+    :root{--bg:#0b1022;--panel:#0f172a;--panel2:#111827;--ink:#e5e7eb;--muted:#94a3b8;--accent:#22d3ee;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(160deg,#0b1024,#0c122b 35%,#0b0f22);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial;display:grid;place-items:center;min-height:100vh}
+    .app{width:min(1200px,96vw);background:var(--panel);border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.05) inset;overflow:hidden;display:grid;grid-template-columns: 260px 1px 1fr;max-height:92vh}
+    .divider{background:linear-gradient(180deg,transparent,rgba(255,255,255,.08),transparent)}
+    .sidebar{background:linear-gradient(180deg,#0e142b,#111827);padding:14px;display:flex;flex-direction:column;gap:10px}
+    .brand{font-weight:800;letter-spacing:.06em;color:var(--accent);text-transform:uppercase;font-size:13px}
+    .nav{overflow:auto}
+    .nav button{width:100%;text-align:left;padding:10px 12px;border-radius:10px;background:var(--panel2);color:var(--ink);border:0;cursor:pointer;font-weight:700;margin-bottom:8px}
+    .nav button[aria-current="page"]{outline:2px solid rgba(34,211,238,.4);background:#0b2d36}
+    .nav small{color:var(--muted);display:block;margin-top:2px}
+    .content{padding:16px 18px 24px 18px;max-height:92vh;overflow:auto}
+    h1{margin:.2em 0 .6em 0;font-size:20px}
+    h2{margin:1.2em 0 .4em 0;font-size:16px;color:var(--accent)}
+    fieldset{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;margin:10px 0;background:rgba(255,255,255,.02)}
+    legend{padding:0 6px;color:var(--muted)}
+    label{display:flex;gap:8px;align-items:center;margin:6px 0}
+    input,select{flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--ink);font-weight:600}
+    .row{display:grid;grid-template-columns: repeat(2, minmax(0,1fr));gap:10px}
+    .row3{display:grid;grid-template-columns: repeat(3, minmax(0,1fr));gap:10px}
+    .row4{display:grid;grid-template-columns: repeat(4, minmax(0,1fr));gap:10px}
+    .row5{display:grid;grid-template-columns: repeat(5, minmax(0,1fr));gap:10px}
+    .row6{display:grid;grid-template-columns: repeat(6, minmax(0,1fr));gap:10px}
+    button.action{background:#0b3d4a;color:var(--ink);border:0;border-radius:10px;padding:10px 12px;font-weight:800;cursor:pointer}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px dashed rgba(255,255,255,.12);padding:6px 8px;text-align:right}
+    th:first-child,td:first-child{text-align:left}
+    .chip{display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-weight:800}
+    .note{font-size:12px;color:var(--muted)}
+    .ok{color:var(--ok)}.bad{color:var(--bad)}
+    .kbd{padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.1);font-family:ui-monospace,Menlo,Consolas,monospace}
+    #err{position:fixed;left:12px;bottom:12px;max-width:90vw;background:#3d0b12;color:#ffe3e3;border:1px solid #ef4444;padding:8px 10px;border-radius:8px;display:none;z-index:10}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Chemical Engineer Calculator">
+    <aside class="sidebar">
+      <div class="brand">Chem Eng Calculator</div>
+      <div class="nav">
+        <button data-view="fluids" aria-current="page">Pipe Flow & ΔP<br><small>Re, f, ΔP, head loss</small></button>
+        <button data-view="pump">Pump Power & NPSH<br><small>Pump sizing basics</small></button>
+        <button data-view="heat">Heat Transfer (LMTD)<br><small>Q = U·A·F·LMTD</small></button>
+        <button data-view="energy">Energy/Mass Balances<br><small>Q=m·Cp·ΔT; mixing</small></button>
+        <button data-view="reactor">Reactor Sizing (1st‑order)<br><small>CSTR / PFR</small></button>
+        <button data-view="vle">Binary VLE (Raoult)
+          <br><small>y‑x @ T, P</small></button>
+        <button data-view="dimensionless">Dimensionless #
+          <br><small>Re, Pr, Sc, Nu (D‑B)</small></button>
+        <button data-view="convert">Unit Converters<br><small>Flow, length, pressure</small></button>
+      </div>
+      <div class="note" style="margin-top:auto">Tip: press <span class="kbd">/</span> to jump to the first input.</div>
+    </aside>
+    <div class="divider"></div>
+
+    <main class="content" id="content" tabindex="-1"></main>
+  </div>
+
+  <div id="err"></div>
+
+<script>
+// ---------- Helpers ----------
+if(!Math.log10){ Math.log10 = x => Math.log(x)/Math.LN10; }
+const $c = id => document.getElementById(id);
+const showErr = (msg)=>{ const e=$c('err'); e.textContent=msg; e.style.display='block'; };
+window.addEventListener('error', ev=>{ showErr('JS error: '+(ev.message||'unknown')); });
+const isNum = v => Number.isFinite(v);
+
+// ---------- Views ----------
+const content = document.getElementById('content');
+
+const views = {
+  fluids(){
+    content.innerHTML = `
+      <h1>Pipe Flow, Reynolds Number, Friction & Pressure Drop</h1>
+      <fieldset>
+        <legend>Fluid & Pipe</legend>
+        <div class="row6">
+          <label>Density ρ (kg/m³)<input id="f_rho" type="number" step="any" value="997"></label>
+          <label>Viscosity μ (Pa·s)<input id="f_mu" type="number" step="any" value="0.001"></label>
+          <label>Roughness ε (m)<input id="f_eps" type="number" step="any" value="0.000045"></label>
+          <label>Diameter D (m)<input id="f_D" type="number" step="any" value="0.05"></label>
+          <label>Length L (m)<input id="f_L" type="number" step="any" value="10"></label>
+          <label>Flow <select id="f_mode"><option value="Q">Q (m³/s)</option><option value="v">v (m/s)</option></select>
+            <input id="f_Qv" type="number" step="any" value="0.005"></label>
+        </div>
+        <div class="note">f via Swamee–Jain for turbulent, 64/Re for laminar. ΔP = f·(L/D)·(ρ v²/2). Head loss h<sub>f</sub>=ΔP/(ρg).</div>
+      </fieldset>
+      <button class="action" id="f_calc">Calculate</button>
+      <h2>Results</h2>
+      <div class="row4">
+        <div><span class="chip">Area</span> <span id="f_A">—</span> m²</div>
+        <div><span class="chip">Velocity v</span> <span id="f_v">—</span> m/s</div>
+        <div><span class="chip">Re</span> <span id="f_Re">—</span></div>
+        <div><span class="chip">f</span> <span id="f_f">—</span></div>
+      </div>
+      <div class="row4">
+        <div><span class="chip">ΔP</span> <span id="f_dp">—</span> Pa</div>
+        <div><span class="chip">Head loss</span> <span id="f_hl">—</span> m</div>
+        <div><span class="chip">Flow Q</span> <span id="f_Q">—</span> m³/s</div>
+        <div><span class="chip">Regime</span> <span id="f_reg">—</span></div>
+      </div>
+    `;
+    const g=9.80665;
+    const calc=()=>{
+      const rho=+content.querySelector('#f_rho').value;
+      const mu=+content.querySelector('#f_mu').value;
+      const eps=+content.querySelector('#f_eps').value;
+      const D=+content.querySelector('#f_D').value;
+      const L=+content.querySelector('#f_L').value;
+      const mode=content.querySelector('#f_mode').value;
+      const Qv=+content.querySelector('#f_Qv').value;
+      if(![rho,mu,eps,D,L,Qv].every(isNum) || D<=0 || L<=0 || rho<=0 || mu<=0){ showErr('Enter positive numbers'); return; }
+      const A=Math.PI*D*D/4;
+      const v = (mode==='Q') ? (Qv/A) : Qv;
+      const Q = v*A;
+      const Re = rho*v*D/mu;
+      let f;
+      if(Re<2300) f=64/Re; else {
+        // Swamee-Jain explicit
+        f = 0.25/Math.pow(Math.log10(eps/(3.7*D) + 5.74/Math.pow(Re,0.9)),2);
+      }
+      const dP = f*(L/D)*(rho*v*v/2);
+      const hl = dP/(rho*g);
+      content.querySelector('#f_A').textContent=A.toExponential(4);
+      content.querySelector('#f_v').textContent=v.toFixed(5);
+      content.querySelector('#f_Re').textContent=Re.toFixed(0);
+      content.querySelector('#f_f').textContent=f.toFixed(5);
+      content.querySelector('#f_dp').textContent=dP.toFixed(2);
+      content.querySelector('#f_hl').textContent=hl.toFixed(4);
+      content.querySelector('#f_Q').textContent=Q.toExponential(4);
+      content.querySelector('#f_reg').textContent= Re<2300? 'Laminar' : (Re<4000? 'Transitional':'Turbulent');
+    };
+    content.querySelector('#f_calc').onclick=calc;
+  },
+
+  pump(){
+    content.innerHTML = `
+      <h1>Pump Power & NPSH</h1>
+      <fieldset>
+        <legend>Inputs</legend>
+        <div class="row4">
+          <label>ρ (kg/m³)<input id="p_rho" type="number" step="any" value="997"></label>
+          <label>Q (m³/s)<input id="p_Q" type="number" step="any" value="0.005"></label>
+          <label>Total head H (m)<input id="p_H" type="number" step="any" value="15"></label>
+          <label>η (efficiency 0–1)<input id="p_eta" type="number" step="any" value="0.7"></label>
+        </div>
+        <div class="row5">
+          <label>P_atm (kPa)<input id="p_patm" type="number" step="any" value="101.325"></label>
+          <label>z_suction (m)<input id="p_z" type="number" step="any" value="0"></label>
+          <label>P_static (kPa)<input id="p_ps" type="number" step="any" value="0"></label>
+          <label>P_vapor (kPa)<input id="p_pv" type="number" step="any" value="3.17"></label>
+          <label>h_f (m losses)<input id="p_hf" type="number" step="any" value="1"></label>
+        </div>
+        <div class="note">Power P = ρ g Q H / η. NPSH<sub>A</sub> = P_atm/(ρg) + z + P_static/(ρg) − P_vap/(ρg) − h<sub>f</sub>.</div>
+      </fieldset>
+      <button class="action" id="p_calc">Calculate</button>
+      <h2>Results</h2>
+      <div class="row3">
+        <div><span class="chip">Pump Power</span> <span id="p_P">—</span> W</div>
+        <div><span class="chip">NPSH<sub>A</sub></span> <span id="p_npsh">—</span> m</div>
+        <div><span class="chip">Hydraulic Power</span> <span id="p_Ph">—</span> W</div>
+      </div>
+    `;
+    const g=9.80665;
+    content.querySelector('#p_calc').onclick=()=>{
+      const rho=+content.querySelector('#p_rho').value,
+            Q=+content.querySelector('#p_Q').value,
+            H=+content.querySelector('#p_H').value,
+            eta=+content.querySelector('#p_eta').value,
+            patm=+content.querySelector('#p_patm').value*1000,
+            z=+content.querySelector('#p_z').value,
+            ps=+content.querySelector('#p_ps').value*1000,
+            pv=+content.querySelector('#p_pv').value*1000,
+            hf=+content.querySelector('#p_hf').value;
+      if(![rho,Q,H,eta,patm,z,ps,pv,hf].every(isNum) || rho<=0 || Q<=0 || H<0 || eta<=0){ showErr('Enter positive values'); return; }
+      const Ph = rho*g*Q*H; // hydraulic
+      const P = Ph/eta;
+      const NPSHA = patm/(rho*g) + z + ps/(rho*g) - pv/(rho*g) - hf;
+      content.querySelector('#p_Ph').textContent = Ph.toFixed(2);
+      content.querySelector('#p_P').textContent = P.toFixed(2);
+      content.querySelector('#p_npsh').textContent = NPSHA.toFixed(3);
+    };
+  },
+
+  heat(){
+    content.innerHTML = `
+      <h1>Heat Exchanger (LMTD Method)</h1>
+      <fieldset>
+        <legend>Temperatures</legend>
+        <div class="row4">
+          <label>ΔT₁ = T<sub>h,in</sub> − T<sub>c,out</sub> (°C)<input id="h_dt1" type="number" step="any"></label>
+          <label>ΔT₂ = T<sub>h,out</sub> − T<sub>c,in</sub> (°C)<input id="h_dt2" type="number" step="any"></label>
+          <label>U (W/m²·K)<input id="h_U" type="number" step="any"></label>
+          <label>A (m²)<input id="h_A" type="number" step="any"></label>
+        </div>
+        <div class="row3">
+          <label>Correction F (0–1)<input id="h_F" type="number" step="any" value="1"></label>
+          <label>Known Q (W) <small class="muted">(optional)</small><input id="h_Q" type="number" step="any"></label>
+          <div style="display:flex;align-items:center"><button class="action" id="h_calc">Calculate</button></div>
+        </div>
+        <div class="note">LMTD = (ΔT₁−ΔT₂)/ln(ΔT₁/ΔT₂). Q = U·A·F·LMTD. If Q provided, you can solve for required A or U by leaving one blank.</div>
+      </fieldset>
+      <h2>Results</h2>
+      <div class="row3">
+        <div><span class="chip">LMTD</span> <span id="h_lmtd">—</span> K</div>
+        <div><span class="chip">Q</span> <span id="h_q">—</span> W</div>
+        <div><span class="chip">Check</span> <span id="h_info">—</span></div>
+      </div>
+    `;
+    content.querySelector('#h_calc').onclick=()=>{
+      const dt1=+content.querySelector('#h_dt1').value,
+            dt2=+content.querySelector('#h_dt2').value,
+            U = +content.querySelector('#h_U').value,
+            A = +content.querySelector('#h_A').value,
+            F = +content.querySelector('#h_F').value,
+            Qin= content.querySelector('#h_Q').value? +content.querySelector('#h_Q').value : null;
+      if(![dt1,dt2].every(isNum) || dt1<=0 || dt2<=0 || dt1===dt2){ showErr('Provide positive ΔT₁, ΔT₂ and they cannot be equal.'); return; }
+      const LMTD = (dt1-dt2)/Math.log(dt1/dt2);
+      let Q = null, info='';
+      if(Qin!==null && isNum(U) && isNum(A) && isNum(F)){
+        Q = U*A*F*LMTD;
+        info='Computed Q from U, A, F.';
+      } else if(Qin!==null && isNum(U) && isNum(F) && !isNum(A)){
+        A = Qin/(U*F*LMTD); info='Solved A from Q, U, F.'; content.querySelector('#h_A').value=A.toFixed(4);
+        Q = Qin;
+      } else if(Qin!==null && isNum(A) && isNum(F) && !isNum(U)){
+        U = Qin/(A*F*LMTD); info='Solved U from Q, A, F.'; content.querySelector('#h_U').value=U.toFixed(4);
+        Q = Qin;
+      } else if(isNum(U) && isNum(A) && isNum(F)){
+        Q = U*A*F*LMTD; info='Computed Q from U, A, F.';
+      } else {
+        info='Enter enough inputs to compute Q or solve for U/A.';
+      }
+      content.querySelector('#h_lmtd').textContent=LMTD.toFixed(4);
+      content.querySelector('#h_q').textContent= (Q!==null && isNum(Q)) ? Q.toFixed(2): '—';
+      content.querySelector('#h_info').textContent=info;
+    };
+  },
+
+  energy(){
+    content.innerHTML = `
+      <h1>Energy & Mass Balances</h1>
+      <fieldset>
+        <legend>Sensible Heat</legend>
+        <div class="row4">
+          <label>ṁ (kg/s)<input id="e_mdot" type="number" step="any" value="1"></label>
+          <label>Cp (kJ/kg·K)<input id="e_cp" type="number" step="any" value="4.18"></label>
+          <label>ΔT (K)<input id="e_dT" type="number" step="any" value="10"></label>
+          <div style="display:flex;align-items:center"><button class="action" id="e_qcalc">Compute Q</button></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Two‑Stream Mixing (mass fraction)</legend>
+        <div class="row4">
+          <label>ṁ₁ (kg/s)<input id="m_m1" type="number" step="any"></label>
+          <label>w₁ (mass frac of A)<input id="m_w1" type="number" step="any"></label>
+          <label>ṁ₂ (kg/s)<input id="m_m2" type="number" step="any"></label>
+          <label>w₂ (mass frac of A)<input id="m_w2" type="number" step="any"></label>
+        </div>
+        <button class="action" id="m_calc">Mix</button>
+      </fieldset>
+      <h2>Results</h2>
+      <div class="row3">
+        <div><span class="chip">Q</span> <span id="e_Q">—</span> kW</div>
+        <div><span class="chip">ṁ<sub>mix</sub></span> <span id="m_mmix">—</span> kg/s</div>
+        <div><span class="chip">w<sub>A,mix</sub></span> <span id="m_wmix">—</span></div>
+      </div>
+    `;
+    content.querySelector('#e_qcalc').onclick=()=>{
+      const md=+content.querySelector('#e_mdot').value,
+            cp=+content.querySelector('#e_cp').value,
+            dT=+content.querySelector('#e_dT').value;
+      if(![md,cp,dT].every(isNum)) { showErr('Fill sensible heat inputs'); return; }
+      const Q = md*cp*dT; // kW since Cp is kJ/kg K
+      content.querySelector('#e_Q').textContent=Q.toFixed(4);
+    };
+    content.querySelector('#m_calc').onclick=()=>{
+      const m1=+content.querySelector('#m_m1').value,
+            w1=+content.querySelector('#m_w1').value,
+            m2=+content.querySelector('#m_m2').value,
+            w2=+content.querySelector('#m_w2').value;
+      if(![m1,m2,w1,w2].every(isNum)) { showErr('Fill mixing inputs'); return; }
+      const mmix=m1+m2;
+      const wmix=(m1*w1 + m2*w2)/mmix;
+      content.querySelector('#m_mmix').textContent=mmix.toFixed(5);
+      content.querySelector('#m_wmix').textContent=wmix.toFixed(6);
+    };
+  },
+
+  reactor(){
+    content.innerHTML = `
+      <h1>Reactor Sizing – First‑Order A → products</h1>
+      <fieldset>
+        <legend>Feed & Kinetics</legend>
+        <div class="row4">
+          <label>F<sub>A0</sub> (mol/s)<input id="r_FA0" type="number" step="any" value="1"></label>
+          <label>C<sub>A0</sub> (mol/m³)<input id="r_CA0" type="number" step="any" value="1000"></label>
+          <label>k (1/s)<input id="r_k" type="number" step="any" value="0.2"></label>
+          <label>Target X (0–1)<input id="r_X" type="number" step="any" value="0.9"></label>
+        </div>
+        <div class="note">CSTR: V = F<sub>A0</sub> X / (k C<sub>A0</sub> (1−X)). PFR: V = (F<sub>A0</sub>/(k C<sub>A0</sub>)) ln(1/(1−X)).</div>
+      </fieldset>
+      <button class="action" id="r_calc">Calculate</button>
+      <h2>Volumes</h2>
+      <div class="row2">
+        <div><span class="chip">V<sub>CSTR</sub></span> <span id="r_vcstr">—</span> m³</div>
+        <div><span class="chip">V<sub>PFR</sub></span> <span id="r_vpfr">—</span> m³</div>
+      </div>
+    `;
+    content.querySelector('#r_calc').onclick=()=>{
+      const FA0=+content.querySelector('#r_FA0').value,
+            CA0=+content.querySelector('#r_CA0').value,
+            k=+content.querySelector('#r_k').value,
+            X=+content.querySelector('#r_X').value;
+      if(![FA0,CA0,k,X].every(isNum) || X<=0 || X>=1 || k<=0 || CA0<=0 || FA0<=0){ showErr('Check inputs (0<X<1; positives)'); return; }
+      const VCSTR = FA0*X/(k*CA0*(1-X));
+      const VPFR = (FA0/(k*CA0))*Math.log(1/(1-X));
+      content.querySelector('#r_vcstr').textContent=VCSTR.toFixed(6);
+      content.querySelector('#r_vpfr').textContent=VPFR.toFixed(6);
+    };
+  },
+
+  vle(){
+    content.innerHTML = `
+      <h1>Binary VLE – Raoult's Law (isothermal)</h1>
+      <fieldset>
+        <legend>Components & Conditions</legend>
+        <div class="row4">
+          <label>Component 1
+            <select id="v_c1"></select>
+          </label>
+          <label>Component 2
+            <select id="v_c2"></select>
+          </label>
+          <label>T (°C)<input id="v_T" type="number" step="any" value="78"></label>
+          <label>P total (kPa)<input id="v_P" type="number" step="any" value="101.325"></label>
+        </div>
+        <div class="row3">
+          <label>x₁ (liquid mole frac)<input id="v_x1" type="number" step="any" value="0.5"></label>
+          <div style="display:flex;align-items:center"><button class="action" id="v_calc">Compute y & P</button></div>
+          <div class="note">Antoine Eq: log₁₀(Psat/mmHg)=A−B/(C+T). yᵢ = xᵢ Psatᵢ / P. Assumes ideal solution.</div>
+        </div>
+      </fieldset>
+      <h2>Results</h2>
+      <div class="row4">
+        <div><span class="chip">P₁ᵗˢᵃᵗ</span> <span id="v_p1">—</span> kPa</div>
+        <div><span class="chip">P₂ᵗˢᵃᵗ</span> <span id="v_p2">—</span> kPa</div>
+        <div><span class="chip">y₁</span> <span id="v_y1">—</span></div>
+        <div><span class="chip">y₂</span> <span id="v_y2">—</span></div>
+      </div>
+    `;
+    // Small Antoine database (°C, mmHg)
+    const Antoine = {
+      Water:{A:8.14019,B:1810.94,C:244.485},
+      Ethanol:{A:8.20417,B:1642.89,C:230.300},
+      Acetone:{A:7.11714,B:1210.595,C:229.664},
+      Benzene:{A:6.90565,B:1211.033,C:220.790},
+      Toluene:{A:6.95464,B:1344.800,C:219.480}
+    };
+    const names=Object.keys(Antoine);
+    const c1=content.querySelector('#v_c1'), c2=content.querySelector('#v_c2');
+    names.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; c1.appendChild(o.cloneNode(true)); c2.appendChild(o); });
+    c1.value='Ethanol'; c2.value='Water';
+
+    const psat_kPa = (comp,T)=>{ const {A,B,C}=Antoine[comp]; const mmHg = Math.pow(10, A - B/(C+T)); return mmHg*0.133322; };
+    content.querySelector('#v_calc').onclick=()=>{
+      const T=+content.querySelector('#v_T').value,
+            P=+content.querySelector('#v_P').value,
+            x1=+content.querySelector('#v_x1').value,
+            comp1=c1.value, comp2=c2.value;
+      if(comp1===comp2){ showErr('Choose two different components'); return; }
+      if(![T,P,x1].every(isNum) || x1<0 || x1>1){ showErr('Check T, P, and x1∈[0,1]'); return; }
+      const x2=1-x1;
+      const P1=psat_kPa(comp1,T), P2=psat_kPa(comp2,T);
+      // bubble-point pressure at given x
+      const Pbubble = x1*P1 + x2*P2;
+      // vapor composition at system pressure P (assume P≈Pbubble)
+      const y1 = (x1*P1)/P;
+      const y2 = 1-y1;
+      content.querySelector('#v_p1').textContent=P1.toFixed(3);
+      content.querySelector('#v_p2').textContent=P2.toFixed(3);
+      content.querySelector('#v_y1').textContent=y1.toFixed(4);
+      content.querySelector('#v_y2').textContent=y2.toFixed(4);
+    };
+  },
+
+  dimensionless(){
+    content.innerHTML = `
+      <h1>Dimensionless Numbers & Correlations</h1>
+      <fieldset>
+        <legend>Properties</legend>
+        <div class="row5">
+          <label>ρ (kg/m³)<input id="d_rho" type="number" step="any" value="997"></label>
+          <label>μ (Pa·s)<input id="d_mu" type="number" step="any" value="0.001"></label>
+          <label>k (W/m·K)<input id="d_k" type="number" step="any" value="0.6"></label>
+          <label>Cp (kJ/kg·K)<input id="d_cp" type="number" step="any" value="4.18"></label>
+          <label>D or L (m)<input id="d_L" type="number" step="any" value="0.05"></label>
+        </div>
+        <div class="row3">
+          <label>Velocity v (m/s)<input id="d_v" type="number" step="any" value="1"></label>
+          <label>n (Dittus‑Boelter exp)<select id="d_n"><option value="0.4">0.4 (heating)</option><option value="0.3">0.3 (cooling)</option></select></label>
+          <div style="display:flex;align-items:center"><button class="action" id="d_calc">Calculate</button></div>
+        </div>
+        <div class="note">Re = ρvL/μ; Pr = μCp/k (Cp in kJ→J); Nu = 0.023 Re^0.8 Pr^n (turbulent internal flow).</div>
+      </fieldset>
+      <div class="row4">
+        <div><span class="chip">Re</span> <span id="d_Re">—</span></div>
+        <div><span class="chip">Pr</span> <span id="d_Pr">—</span></div>
+        <div><span class="chip">Nu</span> <span id="d_Nu">—</span></div>
+        <div><span class="chip">h</span> <span id="d_h">—</span> W/m²·K</div>
+      </div>
+    `;
+    content.querySelector('#d_calc').onclick=()=>{
+      const rho=+content.querySelector('#d_rho').value,
+            mu=+content.querySelector('#d_mu').value,
+            k=+content.querySelector('#d_k').value,
+            Cp=+content.querySelector('#d_cp').value*1000,
+            L=+content.querySelector('#d_L').value,
+            v=+content.querySelector('#d_v').value,
+            n=+content.querySelector('#d_n').value;
+      if(![rho,mu,k,Cp,L,v,n].every(isNum)) { showErr('Fill all properties'); return; }
+      const Re=rho*v*L/mu;
+      const Pr=mu*Cp/k;
+      const Nu=0.023*Math.pow(Re,0.8)*Math.pow(Pr,n);
+      const h=Nu*k/L;
+      content.querySelector('#d_Re').textContent=Re.toFixed(0);
+      content.querySelector('#d_Pr').textContent=Pr.toFixed(3);
+      content.querySelector('#d_Nu').textContent=Nu.toFixed(2);
+      content.querySelector('#d_h').textContent=h.toFixed(1);
+    };
+  },
+
+  convert(){
+    content.innerHTML = `
+      <h1>Unit Converters</h1>
+      <fieldset>
+        <legend>Volumetric Flow</legend>
+        <div class="row4">
+          <label>m³/s <input id="u_m3s" type="number" step="any"></label>
+          <label>m³/h <input id="u_m3h" type="number" step="any"></label>
+          <label>L/min <input id="u_lpm" type="number" step="any"></label>
+          <label>gpm (US) <input id="u_gpm" type="number" step="any"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Length</legend>
+        <div class="row4">
+          <label>m <input id="u_m" type="number" step="any"></label>
+          <label>mm <input id="u_mm" type="number" step="any"></label>
+          <label>in <input id="u_in" type="number" step="any"></label>
+          <label>ft <input id="u_ft" type="number" step="any"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Pressure</legend>
+        <div class="row4">
+          <label>Pa <input id="u_Pa" type="number" step="any"></label>
+          <label>kPa <input id="u_kPa" type="number" step="any"></label>
+          <label>bar <input id="u_bar" type="number" step="any"></label>
+          <label>psi <input id="u_psi" type="number" step="any"></label>
+        </div>
+      </fieldset>
+    `;
+    const $=q=>content.querySelector(q);
+    const set=(id,val)=>{ const el=$(id); if(document.activeElement!==el) el.value=(isNum(val)? val:''); };
+    // Flow
+    $('#u_m3s').addEventListener('input',()=>{ const v=parseFloat($('#u_m3s').value); if(!isNum(v)) return; set('#u_m3h', v*3600); set('#u_lpm', v*60000); set('#u_gpm', v*15850.3231); });
+    $('#u_m3h').addEventListener('input',()=>{ const v=parseFloat($('#u_m3h').value); if(!isNum(v)) return; set('#u_m3s', v/3600); set('#u_lpm', v*1000/60); set('#u_gpm', (v/3600)*15850.3231); });
+    $('#u_lpm').addEventListener('input',()=>{ const v=parseFloat($('#u_lpm').value); if(!isNum(v)) return; set('#u_m3s', v/60000); set('#u_m3h', v/1000*60); set('#u_gpm', v*0.264172052); });
+    $('#u_gpm').addEventListener('input',()=>{ const v=parseFloat($('#u_gpm').value); if(!isNum(v)) return; set('#u_m3s', v/15850.3231); set('#u_m3h', (v/15850.3231)*3600); set('#u_lpm', v/0.264172052); });
+    // Length
+    $('#u_m').addEventListener('input',()=>{ const v=parseFloat($('#u_m').value); if(!isNum(v)) return; set('#u_mm', v*1000); set('#u_in', v*39.3700787); set('#u_ft', v*3.2808399); });
+    $('#u_mm').addEventListener('input',()=>{ const v=parseFloat($('#u_mm').value); if(!isNum(v)) return; set('#u_m', v/1000); set('#u_in', v*0.0393700787); set('#u_ft', v*0.0032808399); });
+    $('#u_in').addEventListener('input',()=>{ const v=parseFloat($('#u_in').value); if(!isNum(v)) return; set('#u_m', v/39.3700787); set('#u_mm', v*25.4); set('#u_ft', v/12); });
+    $('#u_ft').addEventListener('input',()=>{ const v=parseFloat($('#u_ft').value); if(!isNum(v)) return; set('#u_m', v/3.2808399); set('#u_mm', v*304.8); set('#u_in', v*12); });
+    // Pressure
+    $('#u_Pa').addEventListener('input',()=>{ const v=parseFloat($('#u_Pa').value); if(!isNum(v)) return; set('#u_kPa', v/1000); set('#u_bar', v/1e5); set('#u_psi', v/6894.75729); });
+    $('#u_kPa').addEventListener('input',()=>{ const v=parseFloat($('#u_kPa').value); if(!isNum(v)) return; set('#u_Pa', v*1000); set('#u_bar', v/100); set('#u_psi', v*1000/6894.75729); });
+    $('#u_bar').addEventListener('input',()=>{ const v=parseFloat($('#u_bar').value); if(!isNum(v)) return; set('#u_Pa', v*1e5); set('#u_kPa', v*100); set('#u_psi', v*14.5037738); });
+    $('#u_psi').addEventListener('input',()=>{ const v=parseFloat($('#u_psi').value); if(!isNum(v)) return; set('#u_Pa', v*6894.75729); set('#u_kPa', v*6.89475729); set('#u_bar', v/14.5037738); });
+  }
+};
+
+function show(view){
+  views[view]();
+  document.querySelectorAll('.nav button').forEach(b=>{
+    b.setAttribute('aria-current', b.dataset.view===view? 'page': 'false');
+  });
+  setTimeout(()=>{ const first = content.querySelector('input,select,button'); if(first) first.focus(); }, 0);
+}
+
+// Nav
+ document.querySelector('.nav').addEventListener('click', (e)=>{
+  const b = e.target.closest('button[data-view]'); if(!b) return; show(b.dataset.view);
+ });
+
+// Keyboard quick-jump
+ window.addEventListener('keydown', (e)=>{ if(e.key==='/'){ e.preventDefault(); const i=content.querySelector('input,select,button'); if(i) i.focus(); } });
+
+// Start
+show('fluids');
+</script>
+</body>
+</html>
 
