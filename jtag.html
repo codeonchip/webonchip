@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>JTAG TAP State Machine Visual</title>
+  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/styles/vis-network.min.css" rel="stylesheet" />
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      text-align: center;
+    }
+    #network {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #ccc;
+      margin: auto;
+    }
+    button {
+      margin: 0.3rem;
+      padding: 0.4rem 1rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .log {
+      background: black;
+      color: lime;
+      font-family: monospace;
+      padding: 1rem;
+      margin-top: 1rem;
+      height: 120px;
+      overflow-y: auto;
+      border-radius: 5px;
+      text-align: left;
+      font-size: 0.9em;
+    }
+    .buffer {
+      margin-top: 1rem;
+      font-family: monospace;
+    }
+    .buffer span {
+      display: inline-block;
+      width: 100px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .buffer input {
+      width: 300px;
+      font-family: monospace;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>JTAG TAP FSM Visual Simulator</h1>
+  <div>
+    <button onclick="step(0)">TMS = 0</button>
+    <button onclick="step(1)">TMS = 1</button>
+  </div>
+  <div id="network"></div>
+  <div class="buffer">
+    <div><span>IR Shift</span> <input id="irShift" value="0000" /></div>
+    <div><span>DR Shift</span> <input id="drShift" value="00000000" /></div>
+  </div>
+  <div class="log" id="log">[System] Ready<br></div>
+
+  <script>
+    const container = document.getElementById("network");
+    const log = document.getElementById("log");
+    const irShift = document.getElementById("irShift");
+    const drShift = document.getElementById("drShift");
+
+    const nodes = new vis.DataSet([
+      { id: "Test-Logic-Reset", label: "Test-Logic-Reset" },
+      { id: "Run-Test/Idle", label: "Run-Test/Idle" },
+      { id: "Select-DR-Scan", label: "Select-DR-Scan" },
+      { id: "Capture-DR", label: "Capture-DR" },
+      { id: "Shift-DR", label: "Shift-DR" },
+      { id: "Exit1-DR", label: "Exit1-DR" },
+      { id: "Pause-DR", label: "Pause-DR" },
+      { id: "Exit2-DR", label: "Exit2-DR" },
+      { id: "Update-DR", label: "Update-DR" },
+      { id: "Select-IR-Scan", label: "Select-IR-Scan" },
+      { id: "Capture-IR", label: "Capture-IR" },
+      { id: "Shift-IR", label: "Shift-IR" },
+      { id: "Exit1-IR", label: "Exit1-IR" },
+      { id: "Pause-IR", label: "Pause-IR" },
+      { id: "Exit2-IR", label: "Exit2-IR" },
+      { id: "Update-IR", label: "Update-IR" }
+    ]);
+
+    const edges = new vis.DataSet([
+      { from: "Test-Logic-Reset", to: "Test-Logic-Reset", label: "TMS=1" },
+      { from: "Test-Logic-Reset", to: "Run-Test/Idle", label: "TMS=0" },
+      { from: "Run-Test/Idle", to: "Select-DR-Scan", label: "TMS=1" },
+      { from: "Run-Test/Idle", to: "Run-Test/Idle", label: "TMS=0" },
+      { from: "Select-DR-Scan", to: "Capture-DR", label: "TMS=0" },
+      { from: "Select-DR-Scan", to: "Select-IR-Scan", label: "TMS=1" },
+      { from: "Capture-DR", to: "Shift-DR", label: "TMS=0" },
+      { from: "Capture-DR", to: "Exit1-DR", label: "TMS=1" },
+      { from: "Shift-DR", to: "Shift-DR", label: "TMS=0" },
+      { from: "Shift-DR", to: "Exit1-DR", label: "TMS=1" },
+      { from: "Exit1-DR", to: "Pause-DR", label: "TMS=0" },
+      { from: "Exit1-DR", to: "Update-DR", label: "TMS=1" },
+      { from: "Pause-DR", to: "Pause-DR", label: "TMS=0" },
+      { from: "Pause-DR", to: "Exit2-DR", label: "TMS=1" },
+      { from: "Exit2-DR", to: "Shift-DR", label: "TMS=0" },
+      { from: "Exit2-DR", to: "Update-DR", label: "TMS=1" },
+      { from: "Update-DR", to: "Run-Test/Idle", label: "TMS=0" },
+      { from: "Update-DR", to: "Select-DR-Scan", label: "TMS=1" },
+
+      { from: "Select-IR-Scan", to: "Capture-IR", label: "TMS=0" },
+      { from: "Select-IR-Scan", to: "Test-Logic-Reset", label: "TMS=1" },
+      { from: "Capture-IR", to: "Shift-IR", label: "TMS=0" },
+      { from: "Capture-IR", to: "Exit1-IR", label: "TMS=1" },
+      { from: "Shift-IR", to: "Shift-IR", label: "TMS=0" },
+      { from: "Shift-IR", to: "Exit1-IR", label: "TMS=1" },
+      { from: "Exit1-IR", to: "Pause-IR", label: "TMS=0" },
+      { from: "Exit1-IR", to: "Update-IR", label: "TMS=1" },
+      { from: "Pause-IR", to: "Pause-IR", label: "TMS=0" },
+      { from: "Pause-IR", to: "Exit2-IR", label: "TMS=1" },
+      { from: "Exit2-IR", to: "Shift-IR", label: "TMS=0" },
+      { from: "Exit2-IR", to: "Update-IR", label: "TMS=1" },
+      { from: "Update-IR", to: "Run-Test/Idle", label: "TMS=0" },
+      { from: "Update-IR", to: "Select-DR-Scan", label: "TMS=1" }
+    ]);
+
+    const data = { nodes, edges };
+    const options = {
+      nodes: {
+        shape: "box",
+        color: {
+          background: "#eee",
+          border: "#999"
+        },
+        font: {
+          color: "black"
+        }
+      },
+      edges: {
+        arrows: "to",
+        font: { align: "middle" }
+      },
+      layout: {
+        improvedLayout: true,
+        hierarchical: {
+          enabled: true,
+          direction: "UD",
+          sortMethod: "hubsize"
+        }
+      },
+      physics: false
+    };
+
+    const network = new vis.Network(container, data, options);
+
+    const tapTransitions = {
+      "Test-Logic-Reset": ["Run-Test/Idle", "Test-Logic-Reset"],
+      "Run-Test/Idle": ["Run-Test/Idle", "Select-DR-Scan"],
+      "Select-DR-Scan": ["Capture-DR", "Select-IR-Scan"],
+      "Capture-DR": ["Shift-DR", "Exit1-DR"],
+      "Shift-DR": ["Shift-DR", "Exit1-DR"],
+      "Exit1-DR": ["Pause-DR", "Update-DR"],
+      "Pause-DR": ["Pause-DR", "Exit2-DR"],
+      "Exit2-DR": ["Shift-DR", "Update-DR"],
+      "Update-DR": ["Run-Test/Idle", "Select-DR-Scan"],
+      "Select-IR-Scan": ["Capture-IR", "Test-Logic-Reset"],
+      "Capture-IR": ["Shift-IR", "Exit1-IR"],
+      "Shift-IR": ["Shift-IR", "Exit1-IR"],
+      "Exit1-IR": ["Pause-IR", "Update-IR"],
+      "Pause-IR": ["Pause-IR", "Exit2-IR"],
+      "Exit2-IR": ["Shift-IR", "Update-IR"],
+      "Update-IR": ["Run-Test/Idle", "Select-DR-Scan"]
+    };
+
+    let currentState = "Test-Logic-Reset";
+
+    function step(tms) {
+      const next = tapTransitions[currentState][tms];
+      log.innerHTML += `[${new Date().toLocaleTimeString()}] ${currentState} -> ${next} (TMS=${tms})<br>`;
+      log.scrollTop = log.scrollHeight;
+
+      if (next === "Shift-DR") {
+        let dr = drShift.value;
+        dr = dr.slice(1) + (tms ? "1" : "0");
+        drShift.value = dr;
+      } else if (next === "Shift-IR") {
+        let ir = irShift.value;
+        ir = ir.slice(1) + (tms ? "1" : "0");
+        irShift.value = ir;
+      }
+
+      currentState = next;
+
+      nodes.update({ id: currentState, color: { background: "#4caf50", border: "#2e7d32" }, font: { color: "white" } });
+      setTimeout(() => {
+        nodes.update({ id: currentState, color: { background: "#eee", border: "#999" }, font: { color: "black" } });
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
