@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>VxWorks-ish RTOS Simulator (Shell • Tasks • Semaphores • MsgQs • Watchdogs)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0f172a;        /* slate-900 */
+    --panel: #111827;     /* gray-900 */
+    --muted: #94a3b8;     /* slate-400 */
+    --text: #e5e7eb;      /* gray-200 */
+    --accent: #38bdf8;    /* sky-400 */
+    --good: #22c55e;      /* green-500 */
+    --warn: #f59e0b;      /* amber-500 */
+    --bad:  #ef4444;      /* red-500 */
+    --code: #0b1220;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    background: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+    color: var(--text);
+  }
+  header {
+    display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom: 1px solid #1f2937;
+    position: sticky; top: 0; backdrop-filter: blur(6px); background: rgba(15,23,42,0.85);
+  }
+  header h1 { margin:0; font-size: 18px; letter-spacing: .5px; color: #e2e8f0; }
+  header .controls { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+  button, input, select {
+    background:#0b1324; color: var(--text); border:1px solid #243244; padding:6px 10px; border-radius:8px;
+  }
+  button { cursor: pointer; }
+  button.primary { border-color: var(--accent); color: #e0f2fe; }
+  button.good { border-color: var(--good); color:#dcfce7; }
+  button.warn { border-color: var(--warn); color:#fffbeb; }
+  button.bad  { border-color: var(--bad);  color:#fee2e2; }
+  main { padding: 16px; display:grid; grid-template-columns: 1.1fr .9fr; gap: 16px; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  .card {
+    background: #0b1324; border: 1px solid #1f2b3a; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .card h2 { margin:0; padding:12px 14px; font-size:14px; letter-spacing:.6px; border-bottom:1px solid #1f2b3a; color:#cbd5e1; }
+  .card .body { padding: 12px; }
+  .grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; }
+  @media (max-width: 1600px) { .grid { grid-template-columns: 1fr; } }
+  table { width:100%; border-collapse: collapse; font-size: 12px; }
+  th, td { border-bottom: 1px dashed #243244; padding:6px 8px; text-align:left; color:#cbd5e1; }
+  th { color:#93c5fd; font-weight:600; }
+  tr:hover td { background:#0d1730; }
+  .pill { display:inline-block; padding:2px 6px; border:1px solid #243244; border-radius:999px; font-size:11px; color:#cbd5e1; }
+  .state-RUNNING { color:#dcfce7; border-color:#16a34a; }
+  .state-READY { color:#e0f2fe; border-color:#38bdf8; }
+  .state-PENDED { color:#fde68a; border-color:#f59e0b; }
+  .state-DELAY { color:#ddd6fe; border-color:#8b5cf6; }
+  .state-DEAD { color:#fecaca; border-color:#ef4444; }
+  .mono { font-family: inherit; }
+  .term {
+    background:#020617; color:#d1d5db; border:1px solid #1f2937; border-radius: 12px; overflow:hidden;
+  }
+  .term-head { padding:10px 12px; border-bottom:1px solid #1f2937; display:flex; align-items:center; gap:10px; }
+  .dots { display:flex; gap:6px; }
+  .dot { width:10px; height:10px; border-radius:50%; }
+  .dot.r { background:#ef4444; } .dot.y { background:#f59e0b; } .dot.g { background:#22c55e; }
+  #termOut { height: 340px; overflow:auto; padding: 10px 12px; white-space: pre-wrap; background: #030914; }
+  #promptRow { display:flex; padding: 8px 12px; gap:8px; border-top:1px solid #1f2937; align-items:center; }
+  #promptLabel { color:#93c5fd; }
+  #shellInput { flex:1; background:#0b1220; border:1px solid #1f2b3a; padding:8px 10px; border-radius: 8px; color:#e5e7eb; }
+  code { background:#0b1220; color:#93c5fd; padding:2px 6px; border-radius:6px; }
+  .tiny { font-size: 11px; color: var(--muted); }
+  .kbd { border:1px solid #334155; padding:1px 6px; border-radius:6px; background:#0b1220; font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VxWorks-ish RTOS Simulator</h1>
+  <div class="controls">
+    <span class="tiny">Tick (Hz)</span>
+    <input id="hz" type="number" value="10" min="1" max="1000" style="width:90px" />
+    <button id="runBtn" class="primary">Run Clock</button>
+    <button id="stepTickBtn">Step Tick</button>
+    <button id="pauseBtn" class="warn">Pause</button>
+    <span class="tiny">Tick:</span><span id="tickLbl" class="kbd">0</span>
+  </div>
+</header>
+
+<main>
+  <section class="card term">
+    <div class="term-head">
+      <div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+      <div>Wind Shell (mimic)</div>
+      <div class="tiny">Try <code>help</code>, <code>version</code>, <code>sp demoLoop, 20, 5</code>, <code>i</code>, <code>semCreate</code>, <code>msgQCreate</code>, <code>wdStart, 50, print, "woof"</code></div>
+    </div>
+    <div id="termOut"></div>
+    <div id="promptRow">
+      <span id="promptLabel">-&gt;</span>
+      <input id="shellInput" type="text" placeholder="type shell command, press Enter…" autocomplete="off" />
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Tasks</h2>
+      <div class="body">
+        <table id="taskTable">
+          <thead><tr><th>TID</th><th>Name</th><th>Prio</th><th>State</th><th>PC</th><th>Info</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="tiny" style="margin-top:6px">Lower number == higher priority (like VxWorks)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Semaphores</h2>
+      <div class="body">
+        <table id="semTable">
+          <thead><tr><th>SID</th><th>Type</th><th>Count</th><th>PendQ</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Message Queues</h2>
+      <div class="body">
+        <table id="mqTable">
+          <thead><tr><th>QID</th><th>Depth</th><th>Len</th><th>PendRecv</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Watchdogs</h2>
+      <div class="body">
+        <table id="wdTable">
+          <thead><tr><th>WID</th><th>Expires@</th><th>Active</th><th>Handler</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ======================= Core State ======================= */
+const state = {
+  tick: 0,
+  tasks: [],       // {id,name,prio,state,pc,step,wait,info}
+  sems: [],        // {id,type:'bin'|'count',count,pendQ:[]}
+  mqs: [],         // {id,depth,buf:[],pendRecv:[]}
+  wds: [],         // {id,expiresAt,active,handler,arg}
+  nextTid: 1, nextSid: 1, nextQid: 1, nextWid: 1,
+  running: false,  // clock running
+  timer: null
+};
+const TaskState = { READY:'READY', RUNNING:'RUNNING', PENDED:'PENDED', DELAY:'DELAY', DEAD:'DEAD' };
+
+const termOut = document.getElementById('termOut');
+const inputEl = document.getElementById('shellInput');
+const tickLbl = document.getElementById('tickLbl');
+
+/* ======================= Utilities ======================= */
+const pad = (n,w=2)=>String(n).padStart(w,'0');
+const q = sel => document.querySelector(sel);
+const tbody = sel => document.querySelector(sel+' tbody');
+const htmlEsc = s => s.replace(/[<>&]/g,m=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[m]));
+
+/* ======================= Scheduler ======================= */
+function scheduleOneTick(){
+  state.tick++;
+  tickLbl.textContent = state.tick;
+
+  // Wake DELAY tasks
+  for(const t of state.tasks){
+    if(t.state===TaskState.DELAY && state.tick>=t.wakeAt){
+      t.state=TaskState.READY; t.info='delay done';
+    }
+  }
+  // Fire watchdogs
+  for(const wd of state.wds){
+    if(wd.active && state.tick>=wd.expiresAt){
+      wd.active=false;
+      printLine(`wdog ${wd.id} fired -> ${wd.handler}(${repr(wd.arg)})`);
+      // simple handlers
+      if(wd.handler==='print'){
+        printLine(`[wd] ${wd.arg ?? ''}`);
+      } else if(wd.handler==='spDemo'){
+        shell_sp(['demoLoop','10','5']);
+      }
+    }
+  }
+  // Pick highest-priority READY
+  const ready = state.tasks.filter(t=>t.state===TaskState.READY);
+  if(ready.length===0){ renderAll(); return; }
+  ready.sort((a,b)=>a.prio-b.prio || a.id-b.id);
+  const t = ready[0];
+  t.state=TaskState.RUNNING;
+
+  // Run one "step"
+  const res = t.step(t);
+  // Interpret cooperative result
+  if(!res || res.type==='yield'){
+    t.state=TaskState.READY; t.info='yield';
+  } else if(res.type==='delay'){
+    t.state=TaskState.DELAY; t.wakeAt = state.tick + (res.ticks||1);
+    t.info=`delay ${res.ticks||1}`;
+  } else if(res.type==='pend'){
+    t.state=TaskState.PENDED; t.wait = res.wait;
+    if(res.wait.kind==='sem'){
+      const s = findSem(res.wait.id); if(s) s.pendQ.push(t.id);
+      t.info=`pend sem ${res.wait.id}`;
+    } else if(res.wait.kind==='mqRecv'){
+      const mq = findMq(res.wait.id); if(mq) mq.pendRecv.push(t.id);
+      t.info=`pend mq ${res.wait.id}`;
+    }
+  } else if(res.type==='done'){
+    t.state=TaskState.DEAD; t.info='exit';
+  }
+  renderAll();
+}
+
+function startClock(){
+  if(state.running) return;
+  state.running=true;
+  const hz = Math.max(1, Math.min(1000, Number(q('#hz').value)||10));
+  const period = 1000/hz;
+  state.timer = setInterval(scheduleOneTick, period);
+}
+function pauseClock(){
+  state.running=false;
+  clearInterval(state.timer); state.timer=null;
+}
+
+/* ======================= Kernel Primitives ======================= */
+function newTask(name, prio, stepFn){
+  const t = { id: state.nextTid++, name, prio, state: TaskState.READY, pc: 0, step: stepFn, info:'' };
+  state.tasks.push(t);
+  return t.id;
+}
+
+function findTask(id){ return state.tasks.find(t=>t.id===Number(id)); }
+function killTask(id){
+  const t=findTask(id); if(!t) return false;
+  t.state=TaskState.DEAD; t.info='killed'; return true;
+}
+
+/* ----- Semaphores ----- */
+function semCreate(type='bin', init=1){
+  type = (type==='count' || type==='counting')?'count':'bin';
+  const s = { id: state.nextSid++, type, count: Number(init)||0, pendQ:[] };
+  state.sems.push(s); return s.id;
+}
+function findSem(id){ return state.sems.find(s=>s.id===Number(id)); }
+function semGive(id){
+  const s=findSem(id); if(!s) return 'no such sem';
+  if(s.pendQ.length>0){
+    // Wake first pended task
+    const tid = s.pendQ.shift();
+    const t = findTask(tid);
+    if(t && t.state===TaskState.PENDED && t.wait?.kind==='sem' && t.wait.id===s.id){
+      t.state=TaskState.READY; t.wait=null; t.info='sem acquired';
+    }
+  } else {
+    s.count++;
+  }
+  return 'OK';
+}
+function semTake(id){
+  const s=findSem(id); if(!s) return {type:'yield'}; // invalid
+  if(s.count>0){ s.count--; return {type:'yield'}; }
+  return { type:'pend', wait:{kind:'sem', id:s.id} };
+}
+
+/* ----- Message Queues ----- */
+function msgQCreate(depth=8){
+  const mq = { id: state.nextQid++, depth:Number(depth)||8, buf:[], pendRecv:[] };
+  state.mqs.push(mq); return mq.id;
+}
+function findMq(id){ return state.mqs.find(q=>q.id===Number(id)); }
+function msgQSend(id, msg){
+  const mq=findMq(id); if(!mq) return 'no such q';
+  // deliver directly to a pending receiver if any
+  if(mq.pendRecv.length>0){
+    const tid = mq.pendRecv.shift();
+    const t = findTask(tid);
+    if(t && t.state===TaskState.PENDED && t.wait?.kind==='mqRecv' && t.wait.id===mq.id){
+      t.lastMsg = msg; t.state=TaskState.READY; t.wait=null; t.info='msg recv';
+      return 'OK*'; // direct delivery
+    }
+  }
+  if(mq.buf.length < mq.depth){ mq.buf.push(msg); return 'OK'; }
+  return 'FULL';
+}
+function msgQReceive(id){
+  const mq=findMq(id); if(!mq) return {type:'yield'};
+  if(mq.buf.length>0){
+    const msg = mq.buf.shift();
+    this.lastMsg = msg;
+    return { type:'yield' };
+  }
+  return { type:'pend', wait:{kind:'mqRecv', id:mq.id} };
+}
+
+/* ----- Watchdogs ----- */
+function wdStart(ticks, handler='print', arg){
+  const wd = { id: state.nextWid++, expiresAt: state.tick + Math.max(1,Number(ticks)||1), active:true, handler, arg };
+  state.wds.push(wd); return wd.id;
+}
+function wdCancel(id){
+  const wd = state.wds.find(w=>w.id===Number(id));
+  if(!wd) return false; wd.active=false; return true;
+}
+
+/* ======================= Built-in Task Functions ======================= */
+// Each returns a closure `(t)=>Result` where Result is:
+//   {type:'yield'} | {type:'delay', ticks:n} | {type:'pend', wait:{...}} | {type:'done'}
+
+const Builtins = {
+  // demoLoop, [iterations=10], [delayTicks=5]
+  demoLoop: (iters=10, delay=5) => {
+    iters = Number(iters)||10; delay=Number(delay)||5;
+    let i=0;
+    return t=>{
+      if(i>=iters) return {type:'done'};
+      printLine(`[${t.name}] tick=${state.tick} step=${i}`);
+      i++; return {type:'delay', ticks:delay};
+    };
+  },
+
+  // counter, [to=20]
+  counter: (to=20) => {
+    to=Number(to)||20; let i=0;
+    return t=>{
+      if(i>=to) return {type:'done'};
+      printLine(`[${t.name}] ${i}`); i++;
+      return {type:'yield'};
+    };
+  },
+
+  // semWaiter, semId
+  semWaiter: (sid) => {
+    sid = Number(sid)||1;
+    let got=0;
+    return function(t){
+      if(!got){
+        const r = semTake(sid);
+        if(r.type==='pend') return r;
+        printLine(`[${t.name}] took sem ${sid}`);
+        got=1; return {type:'delay', ticks:5};
+      } else {
+        printLine(`[${t.name}] releasing sem ${sid}`);
+        semGive(sid); return {type:'done'};
+      }
+    };
+  },
+
+  // mqRecv, qid
+  mqRecv: (qid) => {
+    qid=Number(qid)||1;
+    return function(t){
+      const r = msgQReceive.call(t, qid);
+      if(r.type==='pend') return r;
+      const msg = t.lastMsg; t.lastMsg=null;
+      printLine(`[${t.name}] recv: ${repr(msg)}`);
+      return {type:'yield'};
+    };
+  },
+
+  // mqSend, qid, msg, [count=5], [delay=3]
+  mqSend: (qid, msg='hello', cnt=5, delay=3) => {
+    qid=Number(qid)||1; cnt=Number(cnt)||5; delay=Number(delay)||3;
+    let i=0;
+    return t=>{
+      if(i>=cnt) return {type:'done'};
+      const status = msgQSend(qid, `${msg}#${i}`);
+      printLine(`[${t.name}] send -> Q${qid} (${status})`);
+      i++; return {type:'delay', ticks:delay};
+    };
+  },
+};
+
+/* ======================= Shell ======================= */
+const history = { buf:[], idx: -1 };
+function printLine(s=''){ termOut.innerHTML += htmlEsc(String(s)) + '\n'; termOut.scrollTop = termOut.scrollHeight; }
+function repr(x){
+  if (typeof x === 'string') return `"${x}"`;
+  return String(x);
+}
+function helpText(){
+  return [
+    'Commands:',
+    '  version                              show version string',
+    '  help                                 this help',
+    '  i [tid]                              task info (all or one)',
+    '  sp <func>[,<arg>...] [-p prio]       spawn task (func in: demoLoop, counter, semWaiter, mqRecv, mqSend)',
+    '  td <tid>                             task delete',
+    '  ts <tid>,<prio>                      set task priority',
+    '  semCreate [bin|count] [init]         create semaphore',
+    '  semGive <sid>                        give semaphore',
+    '  semShow                              list semaphores',
+    '  msgQCreate [depth]                   create message queue',
+    '  msgQSend <qid>,<msg>                 send message (string in quotes or raw)',
+    '  msgQShow                             list message queues',
+    '  wdStart <ticks>,<handler>,[arg]      start watchdog (handlers: print, spDemo)',
+    '  wdCancel <wid>                       cancel watchdog',
+    '  tickAnnounce [n]                     advance n ticks quickly',
+    'Examples:',
+    '  sp demoLoop, 20, 5',
+    '  sp mqRecv, 1    ; sp mqSend, 1, "hi", 3, 2',
+    '  semCreate       ; sp semWaiter, 1   ; semGive 1',
+  ].join('\n');
+}
+function parseArgs(line){
+  // Split by commas/spaces but keep quoted strings
+  const parts = [];
+  let cur='', inQ=false, qch='"';
+  for (let i=0;i<line.length;i++){
+    const c=line[i];
+    if(inQ){
+      if(c===qch){ inQ=false; continue; } else { cur+=c; continue; }
+    }
+    if(c==='"' || c==="\'"){ inQ=true; qch=c; continue; }
+    if(c===',' || c===' ' || c=='\t'){
+      if(cur){ parts.push(cur); cur=''; }
+      continue;
+    }
+    cur+=c;
+  }
+  if(cur) parts.push(cur);
+  return parts.filter(Boolean);
+}
+
+function shell_version(){ printLine('VxWorks mimic 0.1 (browser)'); }
+function shell_i(args){
+  if(args.length===0){
+    const rows = state.tasks.map(t=>`${t.id}\t${t.name}\tprio=${t.prio}\t${t.state}\tpc=${t.pc}\t${t.info||''}`);
+    printLine(rows.length? rows.join('\n') : '(no tasks)');
+  } else {
+    const t=findTask(args[0]);
+    if(!t){ printLine('no such task'); return; }
+    printLine(JSON.stringify(t,null,2));
+  }
+}
+function shell_sp(args){
+  // sp func [,arg... ] [-p prio]  (accepts spaces/commas)
+  let prio = 100;
+  const at = args.findIndex(a=>a==='-p' || a==='-P');
+  if(at>=0 && args[at+1]!=null){ prio = Number(args[at+1])||100; args.splice(at,2); }
+  const funcName = args.shift();
+  if(!funcName){ printLine('usage: sp <func> [args...] [-p prio]'); return; }
+  const fn = Builtins[funcName];
+  if(!fn){ printLine(`unknown func: ${funcName}`); return; }
+  const step = fn(...args);
+  const tid = newTask(`${funcName}`, prio, step);
+  printLine(`task ${tid} spawned (${funcName})`);
+}
+function shell_td(args){ if(!args[0]) return printLine('usage: td <tid>'); printLine(killTask(args[0])?'killed':'no such task'); }
+function shell_ts(args){
+  if(args.length<2){ printLine('usage: ts <tid>,<prio>'); return; }
+  const t=findTask(args[0]); if(!t){ printLine('no such task'); return; }
+  t.prio = Number(args[1])||t.prio; printLine('OK');
+}
+function shell_semCreate(args){
+  const type=(args[0]||'bin'); const init=args[1]|| (type==='bin'?1:0);
+  const sid = semCreate(type, init); printLine(`sem ${sid} created (${type}, init=${init})`);
+}
+function shell_semGive(args){ if(!args[0]) return printLine('usage: semGive <sid>'); printLine(semGive(args[0])); }
+function shell_semShow(){
+  if(!state.sems.length) return printLine('(no semaphores)');
+  for(const s of state.sems){ printLine(`S${s.id}\t${s.type}\tcount=${s.count}\tpend=[${s.pendQ.join(',')}]`); }
+}
+function shell_msgQCreate(args){
+  const depth = args[0]||8; const qid = msgQCreate(depth); printLine(`msgQ ${qid} created (depth ${depth})`);
+}
+function shell_msgQSend(args){
+  if(!args[0]) return printLine('usage: msgQSend <qid>,<msg>');
+  const qid=args[0]; const msg = (args[1]!==undefined? args.slice(1).join(' ') : '');
+  printLine(msgQSend(qid, msg));
+}
+function shell_msgQShow(){
+  if(!state.mqs.length) return printLine('(no msgQs)');
+  for(const q of state.mqs){ printLine(`Q${q.id}\tdepth=${q.depth}\tlen=${q.buf.length}\tpendRecv=[${q.pendRecv.join(',')}]`); }
+}
+function shell_wdStart(args){
+  if(!args[0]) return printLine('usage: wdStart <ticks>,<handler>,[arg]');
+  const ticks=args[0]; const handler=args[1]||'print'; const arg=args[2];
+  const id = wdStart(ticks, handler, arg); printLine(`wd ${id} started, expires@${state.tick+Number(ticks||1)}`);
+}
+function shell_wdCancel(args){ if(!args[0]) return printLine('usage: wdCancel <wid>'); printLine(wdCancel(args[0])?'OK':'no such wd'); }
+function shell_tickAnnounce(args){
+  const n = Math.max(1, Number(args[0]||1));
+  for(let i=0;i<n;i++) scheduleOneTick();
+}
+
+function onShellLine(raw){
+  const line = raw.trim();
+  if(!line) return;
+  history.buf.push(line); history.idx = history.buf.length;
+  printLine(`-> ${line}`);
+  const [cmd, ...rest] = parseArgs(line);
+  switch((cmd||'').toLowerCase()){
+    case 'help': printLine(helpText()); break;
+    case 'version': shell_version(); break;
+    case 'i': shell_i(rest); break;
+    case 'sp': shell_sp(rest); break;
+    case 'td': shell_td(rest); break;
+    case 'ts': shell_ts(rest); break;
+    case 'semcreate': shell_semCreate(rest); break;
+    case 'semgive': shell_semGive(rest); break;
+    case 'semshow': shell_semShow(); break;
+    case 'msgqcreate': shell_msgQCreate(rest); break;
+    case 'msgqsend': shell_msgQSend(rest); break;
+    case 'msgqshow': shell_msgQShow(); break;
+    case 'wdstart': shell_wdStart(rest); break;
+    case 'wdcancel': shell_wdCancel(rest); break;
+    case 'tickannounce': shell_tickAnnounce(rest); break;
+    default: printLine('unknown command (try "help")');
+  }
+}
+
+/* ======================= Rendering ======================= */
+function renderTasks(){
+  const tb = tbody('#taskTable'); tb.innerHTML='';
+  const rows = [...state.tasks].sort((a,b)=>a.prio-b.prio || a.id-b.id);
+  for(const t of rows){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>T${t.id}</td>
+      <td>${htmlEsc(t.name)}</td>
+      <td>${t.prio}</td>
+      <td><span class="pill state-${t.state}">${t.state}</span></td>
+      <td>${t.pc ?? 0}</td>
+      <td class="tiny">${htmlEsc(t.info||'')}</td>
+    `;
+    tb.appendChild(tr);
+  }
+}
+function renderSems(){
+  const tb = tbody('#semTable'); tb.innerHTML='';
+  for(const s of state.sems){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>S${s.id}</td><td>${s.type}</td><td>${s.count}</td>
+      <td class="tiny">[${s.pendQ.join(', ')}]</td>
+    `;
+    tb.appendChild(tr);
+  }
+}
+function renderMqs(){
+  const tb = tbody('#mqTable'); tb.innerHTML='';
+  for(const q of state.mqs){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>Q${q.id}</td><td>${q.depth}</td><td>${q.buf.length}</td>
+      <td class="tiny">[${q.pendRecv.join(', ')}]</td>
+    `;
+    tb.appendChild(tr);
+  }
+}
+function renderWds(){
+  const tb = tbody('#wdTable'); tb.innerHTML='';
+  for(const w of state.wds){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>W${w.id}</td><td>${w.expiresAt}</td><td>${w.active? 'yes':'no'}</td>
+      <td>${w.handler}${w.arg!==undefined? '('+htmlEsc(String(w.arg))+')':''}</td>
+    `;
+    tb.appendChild(tr);
+  }
+}
+function renderAll(){ renderTasks(); renderSems(); renderMqs(); renderWds(); }
+
+/* ======================= Wiring ======================= */
+document.getElementById('runBtn').addEventListener('click', ()=>{ startClock(); });
+document.getElementById('pauseBtn').addEventListener('click', ()=>{ pauseClock(); });
+document.getElementById('stepTickBtn').addEventListener('click', ()=>{ scheduleOneTick(); });
+
+inputEl.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){
+    onShellLine(inputEl.value); inputEl.value='';
+  } else if(e.key==='ArrowUp'){
+    if(history.idx>0){ history.idx--; inputEl.value = history.buf[history.idx]||''; e.preventDefault(); }
+  } else if(e.key==='ArrowDown'){
+    if(history.idx < history.buf.length){ history.idx++; inputEl.value = history.buf[history.idx]||''; e.preventDefault(); }
+  }
+});
+
+/* ======================= Boot Banner ======================= */
+function boot(){
+  printLine('VxWorks mimic 0.1');
+  printLine('Copyright (c) browser');
+  printLine('CPU: MC680x0-ish (pretend)  RAM: infinite (pretend)');
+  printLine('-> type "help" to list commands');
+  renderAll();
+}
+boot();
+</script>
+</body>
+</html>
