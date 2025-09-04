@@ -37,27 +37,9 @@
       user-select: none;
     }
 
-    .screen {
-      height: 100%;
-      width: 100%;
-      background: var(--c64-blue);
-      color: var(--c64-text);
-      padding: 24px 28px;
-      overflow: hidden;
-      display: grid;
-      grid-template-rows: 1fr auto;
-      letter-spacing: 0.7px;
-      position: relative;
-      border-radius: 2px;
-      /* very subtle scanlines */
-      background-image: repeating-linear-gradient(
-        to bottom,
-        rgba(0,0,0,0.08) 0px,
-        rgba(0,0,0,0.08) 1px,
-        transparent 1px,
-        transparent 3px
-      );
-    }
+    $1
+      z-index: 1;
+    $2
 
     .crt-glow {
       position:absolute; inset:0; pointer-events:none;
@@ -105,6 +87,7 @@
 
     .topbar {
       position: absolute; inset: 8px 8px auto auto; display: flex; gap: 6px;
+      z-index: 10; /* keep above screen */
     }
     .btn {
       background: #0b1d80; color: #cfe3ff; border: 1px solid #8fb6ff55;
