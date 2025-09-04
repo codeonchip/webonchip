@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MC68000 Simulator with Flags</title>
+  <style>
+    body { font-family: monospace; background: #f4f4f4; padding: 20px; }
+    textarea { width: 100%; height: 120px; }
+    table { border-collapse: collapse; margin-top: 10px; }
+    td, th { border: 1px solid #ccc; padding: 4px 8px; text-align: center; }
+    button { margin-top: 10px; padding: 5px 10px; }
+    h2 { margin-top: 30px; }
+    pre { background: #fff; padding: 10px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1>MC68000 Mini-Simulator with Flags</h1>
+  <p>Enter 68k-like assembly:</p>
+  <textarea id="code">MOVE #5,D0
+ADD #10,D0
+SUB #15,D0
+BEQ DONE
+MOVE #42,D1
+DONE:
+</textarea>
+  <br>
+  <button onclick="resetAndRun()">Run</button>
+  <button onclick="step()">Step</button>
+  <button onclick="resetSim()">Reset</button>
+
+  <h2>Registers</h2>
+  <table id="regs">
+    <tr><th>D0</th><th>D1</th><th>D2</th><th>D3</th>
+        <th>D4</th><th>D5</th><th>D6</th><th>D7</th></tr>
+    <tr id="drow"></tr>
+    <tr><th>A0</th><th>A1</th><th>A2</th><th>A3</th>
+        <th>A4</th><th>A5</th><th>A6</th><th>A7 (SP)</th></tr>
+    <tr id="arow"></tr>
+    <tr><th colspan="8">PC</th></tr>
+    <tr><td colspan="8" id="pc"></td></tr>
+  </table>
+
+  <h2>Status Register (SR)</h2>
+  <table>
+    <tr><th>Z</th><th>N</th><th>C</th><th>V</th></tr>
+    <tr id="srrow"></tr>
+  </table>
+
+  <h2>Memory (first 256 bytes)</h2>
+  <pre id="memdump"></pre>
+
+<script>
+let D = new Array(8).fill(0);
+let A = new Array(8).fill(0);
+let PC = 0;
+let MEM = new Uint8Array(65536);
+let code = [];
+let labels = {};
+let SR = {Z:0,N:0,C:0,V:0}; // flags
+
+function render() {
+  document.getElementById("drow").innerHTML =
+    D.map(x => `<td>${x}</td>`).join("");
+  document.getElementById("arow").innerHTML =
+    A.map(x => `<td>${x}</td>`).join("");
+  document.getElementById("pc").innerText = PC;
+
+  document.getElementById("srrow").innerHTML =
+    `<td>${SR.Z}</td><td>${SR.N}</td><td>${SR.C}</td><td>${SR.V}</td>`;
+
+  let dump = "";
+  for (let addr = 0; addr < 0x100; addr += 16) {
+    dump += addr.toString(16).padStart(4,"0").toUpperCase() + ": ";
+    for (let i = 0; i < 16; i++) {
+      dump += MEM[addr+i].toString(16).padStart(2,"0") + " ";
+    }
+    dump += "\n";
+  }
+  document.getElementById("memdump").innerText = dump;
+}
+
+function parseOperand(op) {
+  op = op.toUpperCase();
+  if(op.startsWith("#")) return {type:"imm",value:parseInt(op.slice(1))};
+  if(op.startsWith("D")) return {type:"Dn",reg:parseInt(op[1])};
+  if(op.startsWith("A")) return {type:"An",reg:parseInt(op[1])};
+  if(op.startsWith("$")) return {type:"mem",addr:parseInt(op.slice(1),16)&0xFFFF};
+  return null;
+}
+
+function updateFlags(result, carry=0, overflow=0) {
+  SR.Z = (result===0)?1:0;
+  SR.N = (result<0)?1:0;
+  SR.C = carry;
+  SR.V = overflow;
+}
+
+function executeLine(line) {
+  let parts = line.split(/[\s,]+/);
+  let op = parts[0].toUpperCase();
+  let src = parts.length>1 ? parseOperand(parts[1]) : null;
+  let dst = parts.length>2 ? parseOperand(parts[2]) : null;
+
+  if(op==="MOVE") {
+    let val=0;
+    if(src.type==="imm") val=src.value;
+    else if(src.type==="Dn") val=D[src.reg];
+    else if(src.type==="An") val=A[src.reg];
+    else if(src.type==="mem") val=MEM[src.addr];
+
+    if(dst.type==="Dn") D[dst.reg]=val;
+    else if(dst.type==="An") A[dst.reg]=val;
+    else if(dst.type==="mem") MEM[dst.addr]=val&0xFF;
+
+    updateFlags(val);
+  }
+  else if(op==="ADD") {
+    let val = src.type==="imm"?src.value:0;
+    let before = D[dst.reg];
+    D[dst.reg]+=val;
+    updateFlags(D[dst.reg], (D[dst.reg]>0xFFFFFFFF)?1:0, 0);
+  }
+  else if(op==="SUB") {
+    let val = src.type==="imm"?src.value:0;
+    let before = D[dst.reg];
+    D[dst.reg]-=val;
+    updateFlags(D[dst.reg], (before<val)?1:0, 0);
+  }
+  else if(op==="BRA") {
+    PC = labels[parts[1]];
+    return;
+  }
+  else if(op==="BEQ") {
+    if(SR.Z===1) { PC=labels[parts[1]]; return; }
+  }
+  else if(op==="BNE") {
+    if(SR.Z===0) { PC=labels[parts[1]]; return; }
+  }
+  PC++;
+}
+
+function resetSim() {
+  D.fill(0); A.fill(0); PC=0; MEM.fill(0);
+  SR={Z:0,N:0,C:0,V:0};
+  code=document.getElementById("code").value.split(/\n/).map(l=>l.trim());
+  labels={};
+  code.forEach((line,i)=>{ if(line.endsWith(":")) labels[line.replace(":","")]=i; });
+  render();
+}
+
+function step() {
+  if(PC>=code.length) return;
+  let line=code[PC].trim();
+  if(!line||line.endsWith(":")) {PC++; render(); return;}
+  executeLine(line);
+  render();
+}
+
+function resetAndRun() {
+  resetSim();
+  while(PC<code.length) {
+    let line=code[PC].trim();
+    if(!line||line.endsWith(":")) {PC++; continue;}
+    executeLine(line);
+  }
+  render();
+}
+
+resetSim();
+</script>
+</body>
+</html>
+
