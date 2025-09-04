@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RF Engineer Calculator – Lines, Matching, Microstrip, Link Budget, Noise</title>
+  <style>
+    :root{--bg:#0b1022;--panel:#0f172a;--panel2:#111827;--ink:#e5e7eb;--muted:#94a3b8;--accent:#22d3ee;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(160deg,#0b1024,#0c122b 35%,#0b0f22);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial;display:grid;place-items:center;min-height:100vh}
+    .app{width:min(1220px,96vw);background:var(--panel);border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.05) inset;overflow:hidden;display:grid;grid-template-columns: 300px 1px 1fr;max-height:92vh}
+    .divider{background:linear-gradient(180deg,transparent,rgba(255,255,255,.08),transparent)}
+    .sidebar{background:linear-gradient(180deg,#0e142b,#111827);padding:14px;display:flex;flex-direction:column;gap:10px}
+    .brand{font-weight:800;letter-spacing:.06em;color:var(--accent);text-transform:uppercase;font-size:13px}
+    .nav{overflow:auto}
+    .nav button{width:100%;text-align:left;padding:10px 12px;border-radius:10px;background:var(--panel2);color:var(--ink);border:0;cursor:pointer;font-weight:700;margin-bottom:8px}
+    .nav button[aria-current="page"]{outline:2px solid rgba(34,211,238,.4);background:#0b2d36}
+    .nav small{color:var(--muted);display:block;margin-top:2px}
+    .content{padding:16px 18px 24px 18px;max-height:92vh;overflow:auto}
+    h1{margin:.2em 0 .6em 0;font-size:20px}
+    h2{margin:1.2em 0 .4em 0;font-size:16px;color:var(--accent)}
+    fieldset{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;margin:10px 0;background:rgba(255,255,255,.02)}
+    legend{padding:0 6px;color:var(--muted)}
+    label{display:flex;gap:8px;align-items:center;margin:6px 0}
+    input,select,textarea{flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--ink);font-weight:600}
+    textarea{min-height:90px}
+    .row{display:grid;grid-template-columns: repeat(2, minmax(0,1fr));gap:10px}
+    .row3{display:grid;grid-template-columns: repeat(3, minmax(0,1fr));gap:10px}
+    .row4{display:grid;grid-template-columns: repeat(4, minmax(0,1fr));gap:10px}
+    .row5{display:grid;grid-template-columns: repeat(5, minmax(0,1fr));gap:10px}
+    button.action{background:#0b3d4a;color:var(--ink);border:0;border-radius:10px;padding:10px 12px;font-weight:800;cursor:pointer}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px dashed rgba(255,255,255,.12);padding:6px 8px;text-align:right}
+    th:first-child,td:first-child{text-align:left}
+    .chip{display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-weight:800}
+    .note{font-size:12px;color:var(--muted)}
+    .kbd{padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.1);font-family:ui-monospace,Menlo,Consolas,monospace}
+    #err{position:fixed;left:12px;bottom:12px;max-width:90vw;background:#3d0b12;color:#ffe3e3;border:1px solid #ef4444;padding:8px 10px;border-radius:8px;display:none;z-index:10}
+    code{font-family:ui-monospace,Menlo,Consolas,monospace}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="RF Engineer Calculator">
+    <aside class="sidebar">
+      <div class="brand">RF Engineer Calc</div>
+      <div class="nav">
+        <button data-view="basics" aria-current="page">Basics & Conversions<br><small>dBm, λ, VSWR, RL</small></button>
+        <button data-view="tline">Transmission Line<br><small>Zin, Γ, VSWR with loss</small></button>
+        <button data-view="lmatch">L‑Network Matching<br><small>Low‑/High‑pass options</small></button>
+        <button data-view="micro">Microstrip Width (Z0)<br><small>Hammerstad approx</small></button>
+        <button data-view="link">Link Budget<br><small>FSPL, EIRP, SNR, margin</small></button>
+        <button data-view="noise">Noise & IP3 Cascade<br><small>Friis, IIP3</small></button>
+      </div>
+      <div class="note" style="margin-top:auto">Tip: press <span class="kbd">/</span> to jump to the first input.</div>
+    </aside>
+    <div class="divider"></div>
+
+    <main class="content" id="content" tabindex="-1"></main>
+  </div>
+
+  <div id="err"></div>
+
+<script>
+// ---------- Helpers ----------
+const c0 = 299792458; // m/s
+if(!Math.log10){ Math.log10 = x => Math.log(x)/Math.LN10; }
+const isNum = v => Number.isFinite(v);
+const content = document.getElementById('content');
+const $q = sel => content.querySelector(sel);
+const showErr = (msg)=>{ const e=document.getElementById('err'); e.textContent=msg; e.style.display='block'; setTimeout(()=>e.style.display='none', 6000); };
+window.addEventListener('error', ev=>{ showErr('JS error: '+(ev.message||'unknown')); });
+
+// Complex class for TL calcs
+class C{ constructor(re,im){ this.re=re; this.im=im; } static from(x){ return x instanceof C? x : new C(x,0); }
+  add(b){ b=C.from(b); return new C(this.re+b.re, this.im+b.im); }
+  sub(b){ b=C.from(b); return new C(this.re-b.re, this.im-b.im); }
+  mul(b){ b=C.from(b); return new C(this.re*b.re - this.im*b.im, this.re*b.im + this.im*b.re); }
+  div(b){ b=C.from(b); const d=b.re*b.re + b.im*b.im; return new C((this.re*b.re + this.im*b.im)/d, (this.im*b.re - this.re*b.im)/d); }
+  conj(){ return new C(this.re,-this.im); }
+  abs(){ return Math.hypot(this.re,this.im); }
+  ang(){ return Math.atan2(this.im,this.re); }
+  static tanh(z){ // z = a+jb
+    const a=z.re, b=z.im; const denom = Math.cosh(2*a) + Math.cos(2*b);
+    return new C(Math.sinh(2*a)/denom, Math.sin(2*b)/denom);
+  }
+}
+
+function fmtC(z){ const a=z.ang()*180/Math.PI; return `${z.re.toFixed(3)} + j${z.im.toFixed(3)} (|${z.abs().toFixed(3)}| ∠${a.toFixed(1)}°)`; }
+function dB(x){ return 10*Math.log10(x); }
+function undB(xdB){ return Math.pow(10, xdB/10); }
+function dB20(x){ return 20*Math.log10(x); }
+function undB20(xdB){ return Math.pow(10, xdB/20); }
+
+// ---------- Views ----------
+const views = {
+  basics(){
+    content.innerHTML = `
+      <h1>Basics & Conversions</h1>
+      <fieldset>
+        <legend>Power ↔ dBm</legend>
+        <div class="row4">
+          <label>P (W) <input id="b_pw" type="number" step="any" value="0.1"></label>
+          <label>P (mW) <input id="b_pmw" type="number" step="any" value="100"></label>
+          <label>P (dBm) <input id="b_pdbm" type="number" step="any" value="20"></label>
+          <div style="display:flex;align-items:center"><button class="action" id="b_pcalc">Sync</button></div>
+        </div>
+        <div class="note">dBm = 10·log10(mW). 0 dBm = 1 mW. 30 dBm = 1 W.</div>
+      </fieldset>
+      <fieldset>
+        <legend>Frequency, Wavelength & Period</legend>
+        <div class="row4">
+          <label>f (MHz) <input id="b_fMHz" type="number" step="any" value="915"></label>
+          <label>λ (m) <input id="b_lambda" type="number" step="any"></label>
+          <label>T (ns) <input id="b_Tns" type="number" step="any"></label>
+          <div style="display:flex;align-items:center"><button class="action" id="b_fcalc">Compute</button></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Return Loss / VSWR / |Γ|</legend>
+        <div class="row4">
+          <label>Return Loss RL (dB) <input id="b_rl" type="number" step="any" value="20"></label>
+          <label>VSWR <input id="b_vsw" type="number" step="any"></label>
+          <label>|Γ| <input id="b_gamma" type="number" step="any"></label>
+          <div style="display:flex;align-items:center"><button class="action" id="b_rlcalc">Convert</button></div>
+        </div>
+        <div class="note">|Γ| = 10^(−RL/20). VSWR = (1+|Γ|)/(1−|Γ|). Mismatch loss = −10·log10(1−|Γ|²).</div>
+      </fieldset>
+      <h2>Output</h2>
+      <div class="row4">
+        <div><span class="chip">Mismatch loss</span> <span id="b_ml">—</span> dB</div>
+        <div><span class="chip">Notes</span> <span id="b_note">—</span></div>
+        <div></div><div></div>
+      </div>
+    `;
+    // Power sync
+    $q('#b_pcalc').onclick=()=>{
+      const W=+$q('#b_pw').value; const mW=+$q('#b_pmw').value; const dBm=+$q('#b_pdbm').value;
+      if(isNum(W) && W>0){ $q('#b_pmw').value=(W*1000).toFixed(6); $q('#b_pdbm').value=(10*Math.log10(W*1000)).toFixed(3); return; }
+      if(isNum(mW) && mW>0){ $q('#b_pw').value=(mW/1000).toFixed(6); $q('#b_pdbm').value=(10*Math.log10(mW)).toFixed(3); return; }
+      if(isNum(dBm)){ const mW=undB(dBm); $q('#b_pmw').value=mW.toFixed(6); $q('#b_pw').value=(mW/1000).toFixed(6); return; }
+      showErr('Provide a power value');
+    };
+    // Freq
+    $q('#b_fcalc').onclick=()=>{ const fMHz=+$q('#b_fMHz').value; if(!isNum(fMHz)||fMHz<=0) return showErr('Set frequency (MHz)'); const f=fMHz*1e6; const lambda=c0/f; const T=1/f; $q('#b_lambda').value=lambda.toFixed(6); $q('#b_Tns').value=(T*1e9).toFixed(3); };
+    // RL / VSWR
+    $q('#b_rlcalc').onclick=()=>{
+      let RL=$q('#b_rl').value? +$q('#b_rl').value: null; let s=$q('#b_vsw').value? +$q('#b_vsw').value: null; let g=$q('#b_gamma').value? +$q('#b_gamma').value: null;
+      if(RL!==null && isNum(RL)){ g = undB20(-RL); s = (1+g)/(1-g); }
+      else if(s!==null && isNum(s) && s>1){ g=(s-1)/(s+1); RL = -20*Math.log10(g); }
+      else if(g!==null && isNum(g) && g>=0 && g<1){ RL = -20*Math.log10(g); s=(1+g)/(1-g); }
+      else return showErr('Provide RL, VSWR>1, or 0≤|Γ|<1');
+      const ML = -10*Math.log10(1 - g*g);
+      $q('#b_rl').value=RL.toFixed(3); $q('#b_vsw').value=s.toFixed(3); $q('#b_gamma').value=g.toFixed(4); $q('#b_ml').textContent=ML.toFixed(3);
+      $q('#b_note').textContent = RL>=15? 'Decent match': (RL>=10? 'Marginal':'Poor');
+    };
+  },
+
+  tline(){
+    content.innerHTML = `
+      <h1>Transmission Line – Input Impedance & SWR</h1>
+      <fieldset>
+        <legend>Line & Load</legend>
+        <div class="row4">
+          <label>Z₀ (Ω) <input id="tl_Z0" type="number" step="any" value="50"></label>
+          <label>Load R (Ω) <input id="tl_R" type="number" step="any" value="25"></label>
+          <label>Load X (Ω) <input id="tl_X" type="number" step="any" value="0"></label>
+          <label>Length ℓ (m) <input id="tl_L" type="number" step="any" value="1"></label>
+        </div>
+        <div class="row5">
+          <label>Freq (MHz) <input id="tl_f" type="number" step="any" value="915"></label>
+          <label>Velocity factor VF (0–1) <input id="tl_vf" type="number" step="any" value="0.66"></label>
+          <label>Loss (dB/m) <input id="tl_alpha" type="number" step="any" value="0.05"></label>
+          <label>Report at <select id="tl_at"><option value="load">Load</option><option value="input" selected>Input</option></select></label>
+          <div style="display:flex;align-items:center"><button class="action" id="tl_calc">Calculate</button></div>
+        </div>
+        <div class="note">γ = α + jβ, β = 2πf/(c·VF). Z<sub>in</sub> = Z₀ (Z<sub>L</sub> + Z₀ tanh γℓ)/(Z₀ + Z<sub>L</sub> tanh γℓ).</div>
+      </fieldset>
+      <h2>Results</h2>
+      <div class="row4">
+        <div><span class="chip">Γ<sub>L</sub></span> <span id="tl_GL">—</span></div>
+        <div><span class="chip">RL<sub>L</sub></span> <span id="tl_RLL">—</span> dB</div>
+        <div><span class="chip">SWR<sub>L</sub></span> <span id="tl_SWRL">—</span></div>
+        <div><span class="chip">λ<sub>g</sub></span> <span id="tl_lam">—</span> m</div>
+      </div>
+      <div class="row4">
+        <div><span class="chip">Z<sub>in</sub></span> <span id="tl_Zin">—</span></div>
+        <div><span class="chip">Γ<sub>in</sub></span> <span id="tl_Gin">—</span></div>
+        <div><span class="chip">RL<sub>in</sub></span> <span id="tl_RLin">—</span> dB</div>
+        <div><span class="chip">SWR<sub>in</sub></span> <span id="tl_SWRin">—</span></div>
+      </div>
+    `;
+    $q('#tl_calc').onclick=()=>{
+      const Z0=+$q('#tl_Z0').value, R=+$q('#tl_R').value, X=+$q('#tl_X').value, L=+$q('#tl_L').value;
+      const fMHz=+$q('#tl_f').value, VF=+$q('#tl_vf').value, adBpm=+$q('#tl_alpha').value; const at=$q('#tl_at').value;
+      if(![Z0,R,X,L,fMHz,VF,adBpm].every(isNum) || Z0<=0 || VF<=0){ return showErr('Check inputs'); }
+      const ZL = new C(R,X);
+      const f=fMHz*1e6; const v = c0*VF; const beta = 2*Math.PI*f/v; const alpha = adBpm*Math.LN10/20; // Np/m
+      const gamma = new C(alpha, beta);
+      const gl = new C(alpha*L, beta*L);
+      const t = C.tanh(gl);
+      const Z0c = new C(Z0,0);
+      const Zin = Z0c.mul(ZL.add(Z0c.mul(t))).div(Z0c.add(ZL.mul(t)));
+      // reflections
+      const GL = ZL.sub(Z0c).div(ZL.add(Z0c));
+      const RL_L = -20*Math.log10(GL.abs()); const SWR_L = (1+GL.abs())/(1-GL.abs());
+      // at input: Γ_in = Γ_L e^{-2γℓ}
+      const Gin = new C(GL.re, GL.im).mul(new C(Math.exp(-2*alpha*L)*Math.cos(-2*beta*L), Math.exp(-2*alpha*L)*Math.sin(-2*beta*L)));
+      const RL_in = -20*Math.log10(Math.max(Gin.abs(),1e-12)); const SWR_in = (1+Gin.abs())/(1-Gin.abs());
+      const lam_g = 2*Math.PI/beta;
+      $q('#tl_GL').textContent = `${GL.abs().toFixed(4)} ∠ ${(GL.ang()*180/Math.PI).toFixed(1)}°`;
+      $q('#tl_RLL').textContent = RL_L.toFixed(2);
+      $q('#tl_SWRL').textContent = SWR_L>0 && isFinite(SWR_L)? SWR_L.toFixed(3): '—';
+      $q('#tl_lam').textContent = lam_g.toFixed(4);
+      $q('#tl_Zin').textContent = fmtC(Zin) + ' Ω';
+      $q('#tl_Gin').textContent = `${Gin.abs().toFixed(4)} ∠ ${(Gin.ang()*180/Math.PI).toFixed(1)}°`;
+      $q('#tl_RLin').textContent = RL_in.toFixed(2);
+      $q('#tl_SWRin').textContent = SWR_in>0 && isFinite(SWR_in)? SWR_in.toFixed(3): '—';
+    };
+  },
+
+  lmatch(){
+    content.innerHTML = `
+      <h1>L‑Network Impedance Matching (Real Rs, RL)</h1>
+      <fieldset>
+        <legend>Inputs</legend>
+        <div class="row4">
+          <label>R<sub>S</sub> (Ω) <input id="lm_Rs" type="number" step="any" value="50"></label>
+          <label>R<sub>L</sub> (Ω) <input id="lm_Rl" type="number" step="any" value="200"></label>
+          <label>f (MHz) <input id="lm_f" type="number" step="any" value="915"></label>
+          <div style="display:flex;align-items:center"><button class="action" id="lm_calc">Design</button></div>
+        </div>
+        <div class="note">Provides <b>low‑pass</b> (series L, shunt C) and <b>high‑pass</b> (series C, shunt L) options. For R<sub>S</sub>≠R<sub>L</sub> only.</div>
+      </fieldset>
+      <h2>Results</h2>
+      <div class="row">
+        <div>
+          <h3>Low‑pass topology</h3>
+          <table>
+            <tr><th>Series</th><td id="lp_series">—</td></tr>
+            <tr><th>Shunt</th><td id="lp_shunt">—</td></tr>
+          </table>
+        </div>
+        <div>
+          <h3>High‑pass topology</h3>
+          <table>
+            <tr><th>Series</th><td id="hp_series">—</td></tr>
+            <tr><th>Shunt</th><td id="hp_shunt">—</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="note">Reactances are shown as L or C values. Orientation: the shunt element is on the <b>higher‑resistance side</b> of the L‑match.</div>
+    `;
+    function reactToLC(X, fHz, seriesType){
+      if(X>0){ // inductive
+        const L = X/(2*Math.PI*fHz);
+        return `${seriesType? 'L(series)':'L(shunt)'} = ${L*1e9<1? L.toExponential(3): (L*1e9).toFixed(2)+' nH'}`;
+      } else {
+        const C = -1/(2*Math.PI*fHz*X);
+        return `${seriesType? 'C(series)':'C(shunt)'} = ${C*1e12<1? C.toExponential(3): (C*1e12).toFixed(2)+' pF'}`;
+      }
+    }
+    $q('#lm_calc').onclick=()=>{
+      const Rs=+$q('#lm_Rs').value, Rl=+$q('#lm_Rl').value, fMHz=+$q('#lm_f').value; if(![Rs,Rl,fMHz].every(isNum)||Rs<=0||Rl<=0||fMHz<=0) return showErr('Check inputs');
+      if(Rs===Rl){ $q('#lp_series').textContent=$q('#lp_shunt').textContent=$q('#hp_series').textContent=$q('#hp_shunt').textContent='No match needed'; return; }
+      const f=fMHz*1e6; let Rsmall, Rlarge, stepUp = Rl>Rs; Rsmall = stepUp? Rs: Rl; Rlarge = stepUp? Rl: Rs; const Q = Math.sqrt(Rlarge/Rsmall - 1);
+      const Xs = Q*Rsmall; const Xp = Rlarge/Q; // magnitudes
+      // Low-pass: series L (X=+Xs), shunt C (X=-Xp)
+      const lp_series = reactToLC(+Xs, f, true);
+      const lp_shunt = reactToLC(-Xp, f, false);
+      // High-pass: series C (X=-Xs), shunt L (X=+Xp)
+      const hp_series = reactToLC(-Xs, f, true);
+      const hp_shunt = reactToLC(+Xp, f, false);
+      $q('#lp_series').textContent=lp_series; $q('#lp_shunt').textContent=lp_shunt; $q('#hp_series').textContent=hp_series; $q('#hp_shunt').textContent=hp_shunt;
+    };
+  },
+
+  micro(){
+    content.innerHTML = `
+      <h1>Microstrip Width for Target Z₀ (Hammerstad)</h1>
+      <fieldset>
+        <legend>Substrate</legend>
+        <div class="row4">
+          <label>ε<sub>r</sub> <input id="ms_er" type="number" step="any" value="4.4"></label>
+          <label>h (mm) <input id="ms_h" type="number" step="any" value="1.6"></label>
+          <label>t (mm, opt.) <input id="ms_t" type="number" step="any" value="0"></label>
+          <label>Z₀ target (Ω) <input id="ms_Z0" type="number" step="any" value="50"></label>
+        </div>
+        <div class="row3">
+          <div style="display:flex;align-items:center"><button class="action" id="ms_calc">Solve Width</button></div>
+          <div class="note">Uses standard closed‑forms; ignores conductor thickness if t=0. For quick design only.</div>
+        </div>
+      </fieldset>
+      <h2>Results</h2>
+      <div class="row4">
+        <div><span class="chip">W</span> <span id="ms_W">—</span> mm</div>
+        <div><span class="chip">W/h</span> <span id="ms_Wh">—</span></div>
+        <div><span class="chip">ε<sub>eff</sub></span> <span id="ms_eeff">—</span></div>
+        <div><span class="chip">v<sub>p</sub></span> <span id="ms_vp">—</span> m/s</div>
+      </div>
+    `;
+    function eeff(er, u){ // u=W/h
+      return (er+1)/2 + (er-1)/2 * (1/Math.sqrt(1+12/u) + 0.04*(1 - Math.pow(u,2)));
+    }
+    function Z0_from_u(er,u){
+      const e=eeff(er,u);
+      if(u<=1){ return (60/Math.sqrt(e))*Math.log(8/u + u/4); }
+      else{ return (120*Math.PI)/(Math.sqrt(e)*(u + 1.393 + 0.667*Math.log(u + 1.444))); }
+    }
+    function solve_u_for_Z0(er, Z0){
+      // simple binary search on u in [0.05, 20]
+      let lo=0.05, hi=20;
+      for(let i=0;i<60;i++){
+        const mid=(lo+hi)/2; const z=Z0_from_u(er,mid); if(z>Z0) lo=mid; else hi=mid; // Z0 decreases with u
+      }
+      return (lo+hi)/2;
+    }
+    $q('#ms_calc').onclick=()=>{
+      const er=+$q('#ms_er').value, hmm=+$q('#ms_h').value, tmm=+$q('#ms_t').value, Z0=+$q('#ms_Z0').value; if(![er,hmm,Z0].every(isNum)||er<=1||hmm<=0||Z0<=0) return showErr('Check inputs');
+      let u = solve_u_for_Z0(er, Z0); // W/h
+      // crude thickness correction if t>0: Hammerstad ΔW/h
+      if(isNum(tmm) && tmm>0){ const t=tmm/hmm; const du = (t/Math.PI) * Math.log(1 + 4*Math.E/ (t*Math.pow( ( (u+1.1)/ (u+1.1) ),2) )); if(isFinite(du)) u = u + du; }
+      const W = u*hmm; const e=eeff(er,u); const vp = c0/Math.sqrt(e);
+      $q('#ms_W').textContent = W.toFixed(3);
+      $q('#ms_Wh').textContent = u.toFixed(3);
+      $q('#ms_eeff').textContent = e.toFixed(4);
+      $q('#ms_vp').textContent = vp.toFixed(0);
+    };
+  },
+
+  link(){
+    content.innerHTML = `
+      <h1>RF Link Budget</h1>
+      <fieldset>
+        <legend>Parameters</legend>
+        <div class="row5">
+          <label>f (GHz) <input id="lb_f" type="number" step="any" value="2.4"></label>
+          <label>d (km) <input id="lb_d" type="number" step="any" value="1"></label>
+          <label>P<sub>TX</sub> (dBm) <input id="lb_ptx" type="number" step="any" value="20"></label>
+          <label>G<sub>T</sub> (dBi) <input id="lb_gt" type="number" step="any" value="2"></label>
+          <label>G<sub>R</sub> (dBi) <input id="lb_gr" type="number" step="any" value="2"></label>
+        </div>
+        <div class="row5">
+          <label>L<sub>TX</sub> (dB) <input id="lb_ltx" type="number" step="any" value="1"></label>
+          <label>L<sub>RX</sub> (dB) <input id="lb_lrx" type="number" step="any" value="1"></label>
+          <label>Other losses (dB) <input id="lb_oth" type="number" step="any" value="0"></label>
+          <label>BW (MHz) <input id="lb_bw" type="number" step="any" value="1"></label>
+          <label>NF (dB) <input id="lb_nf" type="number" step="any" value="5"></label>
+        </div>
+        <div class="row3">
+          <label>SNR req (dB) <input id="lb_snrq" type="number" step="any" value="10"></label>
+          <div style="display:flex;align-items:center"><button class="action" id="lb_calc">Calculate</button></div>
+          <div class="note">FSPL(dB) ≈ 92.45 + 20log₁₀(d_km) + 20log₁₀(f_GHz). Thermal noise = −174 dBm/Hz + 10log₁₀(BW) + NF.</div>
+        </div>
+      </fieldset>
+      <h2>Results</h2>
+      <div class="row4">
+        <div><span class="chip">FSPL</span> <span id="lb_fspl">—</span> dB</div>
+        <div><span class="chip">EIRP</span> <span id="lb_eirp">—</span> dBm</div>
+        <div><span class="chip">P<sub>RX</sub></span> <span id="lb_prx">—</span> dBm</div>
+        <div><span class="chip">N (noise)</span> <span id="lb_noise">—</span> dBm</div>
+      </div>
+      <div class="row4">
+        <div><span class="chip">SNR</span> <span id="lb_snr">—</span> dB</div>
+        <div><span class="chip">Margin</span> <span id="lb_margin">—</span> dB</div>
+        <div><span class="chip">λ</span> <span id="lb_lambda">—</span> m</div>
+        <div><span class="chip">Far‑field?</span> <span id="lb_far">—</span></div>
+      </div>
+    `;
+    $q('#lb_calc').onclick=()=>{
+      const fGHz=+$q('#lb_f').value, dkm=+$q('#lb_d').value, ptx=+$q('#lb_ptx').value, gt=+$q('#lb_gt').value, gr=+$q('#lb_gr').value, ltx=+$q('#lb_ltx').value, lrx=+$q('#lb_lrx').value, oth=+$q('#lb_oth').value, bwMHz=+$q('#lb_bw').value, nf=+$q('#lb_nf').value, snrq=+$q('#lb_snrq').value;
+      if(![fGHz,dkm,ptx,gt,gr,ltx,lrx,oth,bwMHz,nf,snrq].every(isNum) || fGHz<=0 || dkm<=0 || bwMHz<=0) return showErr('Check inputs');
+      const FSPL = 92.45 + 20*Math.log10(dkm) + 20*Math.log10(fGHz);
+      const EIRP = ptx + gt - ltx;
+      const Prx = EIRP + gr - lrx - oth - FSPL;
+      const N = -174 + 10*Math.log10(bwMHz*1e6) + nf;
+      const SNR = Prx - N; const margin = SNR - snrq;
+      const lambda = c0/(fGHz*1e9);
+      $q('#lb_fspl').textContent=FSPL.toFixed(2);
+      $q('#lb_eirp').textContent=EIRP.toFixed(2);
+      $q('#lb_prx').textContent=Prx.toFixed(2);
+      $q('#lb_noise').textContent=N.toFixed(2);
+      $q('#lb_snr').textContent=SNR.toFixed(2);
+      $q('#lb_margin').textContent=margin.toFixed(2);
+      $q('#lb_lambda').textContent=lambda.toFixed(4);
+      $q('#lb_far').textContent = (dkm*1000 > (2*0.3/*assume 0.3m antenna*/ *0.3)/lambda)? 'Likely' : 'Check D, λ';
+    };
+  },
+
+  noise(){
+    content.innerHTML = `
+      <h1>Noise Figure & IP3 Cascade</h1>
+      <fieldset>
+        <legend>Stages</legend>
+        <div class="note">Enter each stage's <b>gain (dB)</b>, <b>NF (dB)</b>, and optional <b>IIP3 (dBm)</b>. Click <b>Add</b> to append a stage.</div>
+        <div class="row3">
+          <label>Gain (dB) <input id="nz_g" type="number" step="any" value="20"></label>
+          <label>NF (dB) <input id="nz_nf" type="number" step="any" value="2"></label>
+          <label>IIP3 (dBm, opt.) <input id="nz_iip3" type="number" step="any" placeholder="e.g., 5"></label>
+        </div>
+        <div class="row3">
+          <div style="display:flex;gap:10px"><button class="action" id="nz_add">Add</button> <button class="action" id="nz_clear">Clear</button> <button class="action" id="nz_calc">Compute</button></div>
+        </div>
+      </fieldset>
+      <table id="nz_tbl"><thead><tr><th>#</th><th>Gain dB</th><th>NF dB</th><th>IIP3 dBm</th></tr></thead><tbody></tbody></table>
+      <h2>Results</h2>
+      <div class="row4">
+        <div><span class="chip">G<sub>tot</sub></span> <span id="nz_G">—</span> dB</div>
+        <div><span class="chip">NF<sub>tot</sub></span> <span id="nz_NF">—</span> dB</div>
+        <div><span class="chip">IIP3<sub>tot</sub></span> <span id="nz_IIP3">—</span> dBm</div>
+        <div><span class="chip">OIP3<sub>tot</sub></span> <span id="nz_OIP3">—</span> dBm</div>
+      </div>
+    `;
+    const rows=[]; const tb=$q('#nz_tbl tbody');
+    function render(){ tb.innerHTML=''; rows.forEach((r,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${r.g.toFixed(2)}</td><td>${r.nf.toFixed(2)}</td><td>${(r.iip3!=null? r.iip3.toFixed(2):'—')}</td>`; tb.appendChild(tr); }); }
+    $q('#nz_add').onclick=()=>{ const g=+$q('#nz_g').value, nf=+$q('#nz_nf').value; const iip=$q('#nz_iip3').value!==''? +$q('#nz_iip3').value: null; if(![g,nf].every(isNum)) return showErr('Gain & NF required'); rows.push({g, nf, iip3:iip}); render(); };
+    $q('#nz_clear').onclick=()=>{ rows.length=0; render(); };
+    $q('#nz_calc').onclick=()=>{
+      if(rows.length===0) return showErr('Add at least one stage');
+      let Gtot_dB=0; let Ftot=0; let prodG=1; rows.forEach((r,idx)=>{ const G=undB(r.g); const F=undB(r.nf); if(idx===0){ Ftot=F; } else { Ftot = Ftot + (F-1)/prodG; } prodG*=G; Gtot_dB+=r.g; });
+      const NFtot_dB = 10*Math.log10(Ftot);
+      // IIP3 cascade (in): 1/IIP3_tot = 1/IIP3_1 + 1/(G1*IIP3_2) + 1/(G1*G2*IIP3_3) + ... ; convert dBm to mW
+      let invIIP3=0; prodG=1; let haveIP3=false;
+      rows.forEach((r,idx)=>{ if(r.iip3!=null){ haveIP3=true; const I=undB(r.iip3); invIIP3 += 1/(prodG*I); } const G=undB(rows[idx].g); prodG*=G; });
+      let IIP3tot_dBm='—', OIP3tot_dBm='—';
+      if(haveIP3 && invIIP3>0){ const I_mW = 1/invIIP3; IIP3tot_dBm = 10*Math.log10(I_mW); OIP3tot_dBm = IIP3tot_dBm + Gtot_dB; }
+      $q('#nz_G').textContent=Gtot_dB.toFixed(2);
+      $q('#nz_NF').textContent=NFtot_dB.toFixed(2);
+      $q('#nz_IIP3').textContent=typeof IIP3tot_dBm==='string'? IIP3tot_dBm : IIP3tot_dBm.toFixed(2);
+      $q('#nz_OIP3').textContent=typeof OIP3tot_dBm==='string'? OIP3tot_dBm : OIP3tot_dBm.toFixed(2);
+    };
+  }
+};
+
+function show(view){
+  views[view]();
+  document.querySelectorAll('.nav button').forEach(b=>{
+    b.setAttribute('aria-current', b.dataset.view===view? 'page': 'false');
+  });
+  setTimeout(()=>{ const first = content.querySelector('input,select,button'); if(first) first.focus(); }, 0);
+}
+
+document.querySelector('.nav').addEventListener('click', (e)=>{ const b = e.target.closest('button[data-view]'); if(!b) return; show(b.dataset.view); });
+window.addEventListener('keydown', (e)=>{ if(e.key==='/'){ e.preventDefault(); const i=content.querySelector('input,select,button'); if(i) i.focus(); } });
+
+// Start
+show('basics');
+</script>
+</body>
+</html>
