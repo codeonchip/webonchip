@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>i8051 Mini Simulator (Run / Step)</title>
+<style>
+  body { font-family: monospace; background:#f6f7f9; color:#222; margin:0; padding:24px; }
+  h1 { margin:0 0 8px 0; }
+  .row { display:flex; gap:16px; flex-wrap: wrap; }
+  textarea { width: min(900px, 100%); height: 180px; }
+  button { padding:6px 10px; margin-right:6px; }
+  table { border-collapse: collapse; }
+  th, td { border:1px solid #ccc; padding:4px 8px; text-align:center; }
+  pre { background:#fff; border:1px solid #ccc; padding:10px; overflow:auto; max-height:260px; }
+  .panel { background:#fff; border:1px solid #ddd; padding:10px; }
+  .small { font-size: 12px; color:#555; }
+  .pc-line { background:#ffffc0; }
+</style>
+</head>
+<body>
+<h1>i8051 Mini Simulator</h1>
+<div class="small">Type simple 8051 assembly (not machine code). Supported: MOV, ADD, SUBB, ANL/ORL/XRL (A,src), INC/DEC, CLR/CPL/SETB C, SJMP/JZ/JNZ/JC/JNC, DJNZ Rn,label</div>
+
+<textarea id="code">; Demo: add bytes in RAM 0x20..0x23 into A
+; Init data
+MOV 0x20,#1
+MOV 0x21,#2
+MOV 0x22,#3
+MOV 0x23,#4
+
+; Sum loop
+CLR C
+MOV R0,#0x20
+MOV A,#0
+LOOP:
+ADD A,@R0
+INC R0
+CJMP_END: ; (label placeholder / no-op)
+; Stop when R0 == 0x24
+MOV B,#0x24
+CJMP:      ; not implemented CJMP - just a comment label
+; Compare by manual check:
+MOV 0x30,R0
+SUBB A,#0  ; update flags only (borrow uses CY); harmless here
+; If R0 == 0x24 then (R0-0x24)==0 -> we branch using JZ after a compare trick:
+MOV A,R0
+SUBB A,#0x24
+JZ DONE
+MOV A,0x00 ; restore A from somewhere if needed; here we recompute:
+MOV A,@R0  ; (dummy, will be skipped by SJMP if JZ taken)
+SJMP LOOP
+
+DONE:
+; Show result in RAM 0x40
+MOV 0x40,A
+</textarea>
+<br />
+<button onclick="resetSim()">Reset</button>
+<button onclick="step()">Step</button>
+<button onclick="runAll()">Run</button>
+
+<div class="row" style="margin-top:16px;">
+  <div class="panel">
+    <h3>Registers</h3>
+    <table>
+      <tr><th>A</th><th>B</th><th>R0</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>R5</th><th>R6</th><th>R7</th></tr>
+      <tr id="regsRow"></tr>
+      <tr><th colspan="10">PC (line)</th></tr>
+      <tr><td colspan="10" id="pcCell"></td></tr>
+    </table>
+
+    <h3>PSW Flags</h3>
+    <table>
+      <tr><th>CY</th><th>AC</th><th>OV</th><th>P</th></tr>
+      <tr id="pswRow"></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Internal RAM (0x00 - 0x7F)</h3>
+    <pre id="ramDump"></pre>
+  </div>
+
+  <div class="panel">
+    <h3>Source (current line highlighted)</h3>
+    <pre id="srcView"></pre>
+  </div>
+</div>
+
+<script>
+// ---------- State ----------
+let A=0, B=0, R=new Array(8).fill(0);  // R0..R7 (Bank 0)
+let PC=0;                               // program counter (line index)
+let CY=0, AC=0, OV=0, P=0;              // flags
+const RAM = new Uint8Array(0x80);       // 128 bytes internal data RAM
+let lines = [];
+let labels = Object.create(null);
+
+// ---------- Utils ----------
+const u8 = v => ((v|0) & 0xFF);
+const s8 = v => { v=u8(v); return (v&0x80)?(v-256):v; };
+
+function setParityFromA() {
+  // Parity flag = parity of A (1 if even number of 1s). We'll set 1 for even.
+  let x = A, ones=0;
+  for(let i=0;i<8;i++) ones += (x>>i)&1;
+  P = ((ones % 2)===0) ? 1 : 0;
+}
+
+function parseImm(tok) {
+  // #12, #0x2A, #$2A
+  if(!tok || tok[0] !== '#') return null;
+  return parseNumber(tok.slice(1));
+}
+function parseDirect(tok) {
+  // e.g., 30, 0x30, $30
+  if(!tok) return null;
+  if(tok.startsWith('0X')) return parseInt(tok,16)&0xFF;
+  if(tok.startsWith('$'))  return parseInt(tok.slice(1),16)&0xFF;
+  if(/^([0-9]+)$/.test(tok)) return (parseInt(tok,10)&0xFF);
+  if(/^[0-9A-F]+H$/i.test(tok)) return (parseInt(tok.slice(0,-1),16)&0xFF);
+  return null;
+}
+function parseNumber(tok){
+  if(!tok) return 0;
+  tok = tok.toUpperCase();
+  if(tok.startsWith('0X')) return parseInt(tok,16);
+  if(tok.startsWith('$'))  return parseInt(tok.slice(1),16);
+  if(/^[0-9A-F]+H$/.test(tok)) return parseInt(tok.slice(0,-1),16);
+  return parseInt(tok,10);
+}
+function isRn(tok){
+  return /^R[0-7]$/i.test(tok || '');
+}
+function getRnIndex(tok){
+  return parseInt(tok.slice(1),10);
+}
+function isAtR0R1(tok){
+  tok = (tok||'').toUpperCase();
+  return tok==='@R0' || tok==='@R1';
+}
+function readOperand(op){
+  op = (op||'').toUpperCase();
+  if(op==='A') return A;
+  if(op==='B') return B;
+  if(isRn(op)) return R[getRnIndex(op)];
+  if(isAtR0R1(op)){
+    const idx = (op==='@R0'? R[0]:R[1]) & 0x7F;
+    return RAM[idx];
+  }
+  if(op.startsWith('#')) return u8(parseNumber(op.slice(1)));
+  // direct address
+  let d = parseDirect(op);
+  if(d!=null){ return RAM[d]; }
+  return 0;
+}
+function writeOperand(op, val){
+  val=u8(val);
+  op = (op||'').toUpperCase();
+  if(op==='A'){ A=val; setParityFromA(); return; }
+  if(op==='B'){ B=val; return; }
+  if(isRn(op)){ R[getRnIndex(op)] = val; return; }
+  if(isAtR0R1(op)){
+    const idx = (op==='@R0'? R[0]:R[1]) & 0x7F;
+    RAM[idx] = val; return;
+  }
+  let d = parseDirect(op);
+  if(d!=null){ RAM[d]=val; return; }
+}
+
+// Add: sets CY/AC/OV (simplified AC), updates P via setParityFromA
+function addA(srcVal){
+  const a0=A, b0=u8(srcVal);
+  const sum = a0 + b0;
+  const r = u8(sum);
+  // Carry
+  CY = (sum > 0xFF) ? 1 : 0;
+  // Aux carry (bit3 carry) simplified
+  AC = (((a0 & 0x0F) + (b0 & 0x0F)) > 0x0F) ? 1 : 0;
+  // Overflow (signed)
+  const ov = (( (a0^r) & (b0^r) & 0x80) !== 0) ? 1 : 0;
+  OV = ov;
+  A = r; setParityFromA();
+}
+
+// Subb: A = A - src - CY; sets CY as borrow, sets OV; P updated
+function subbA(srcVal){
+  const a0=A, b0=u8(srcVal);
+  const sub = a0 - b0 - (CY?1:0);
+  const r = u8(sub);
+  // Borrow -> CY
+  CY = (sub < 0) ? 1 : 0;
+  // Overflow (signed)
+  const ov = (( (a0^b0) & (a0^r) & 0x80) !== 0) ? 1 : 0;
+  OV = ov;
+  // AC (simplified)
+  AC = (((a0 & 0x0F) - (b0 & 0x0F) - (CY?1:0)) < 0) ? 1 : 0;
+  A = r; setParityFromA();
+}
+
+function dumpRAM(){
+  let out='';
+  for(let row=0; row<0x80; row+=16){
+    out += row.toString(16).padStart(2,'0').toUpperCase() + ': ';
+    for(let i=0;i<16;i++){
+      out += RAM[row+i].toString(16).padStart(2,'0').toUpperCase() + ' ';
+    }
+    out+='\n';
+  }
+  document.getElementById('ramDump').innerText = out;
+}
+
+function renderRegs(){
+  const row = document.getElementById('regsRow');
+  row.innerHTML = [
+    A,B,R[0],R[1],R[2],R[3],R[4],R[5],R[6],R[7]
+  ].map(v=>`<td>${u8(v).toString(16).padStart(2,'0').toUpperCase()}</td>`).join('');
+  document.getElementById('pcCell').innerText = PC;
+  document.getElementById('pswRow').innerHTML =
+    `<td>${CY}</td><td>${AC}</td><td>${OV}</td><td>${P}</td>`;
+}
+
+function renderSrc(){
+  const pre = document.getElementById('srcView');
+  let out='';
+  for(let i=0;i<lines.length;i++){
+    const raw = lines[i];
+    const safe = raw.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if(i===PC) out += `<div class="pc-line">${(i+1).toString().padStart(3,' ')}: ${safe}</div>`;
+    else       out += `<div>${(i+1).toString().padStart(3,' ')}: ${safe}</div>`;
+  }
+  pre.innerHTML = out;
+}
+
+function renderAll(){
+  renderRegs();
+  dumpRAM();
+  renderSrc();
+}
+
+// ---------- Parsing & Control ----------
+function resetSim(){
+  // Clear state
+  A=0; B=0; R.fill(0); CY=0; AC=0; OV=0; setParityFromA(); PC=0;
+  RAM.fill(0);
+
+  // Load code
+  const src = document.getElementById('code').value
+    .split(/\r?\n/).map(l=>l.replace(/;.*$/,'').trim()); // strip comments
+  lines = src;
+  labels = Object.create(null);
+  // Collect labels
+  for(let i=0;i<lines.length;i++){
+    const m = lines[i].match(/^([A-Za-z_]\w*):\s*$/);
+    if(m) labels[m[1].toUpperCase()] = i;
+  }
+  renderAll();
+}
+
+function step(){
+  if(PC<0 || PC>=lines.length){ renderAll(); return; }
+  let line = lines[PC].trim();
+  if(!line || /^[A-Za-z_]\w*:\s*$/.test(line)){ PC++; renderAll(); return; }
+
+  // Tokenize
+  let [mn, rest] = (() => {
+    const sp = line.indexOf(' ');
+    if(sp<0) return [line.toUpperCase(), ''];
+    return [line.slice(0,sp).toUpperCase(), line.slice(sp+1).trim()];
+  })();
+
+  const ops = rest ? rest.split(/\s*,\s*/) : [];
+
+  // Helpers for branches
+  const gotoLabel = (lab) => {
+    const key = (lab||'').toUpperCase();
+    if(labels.hasOwnProperty(key)){ PC = labels[key]; return true; }
+    return false;
+  };
+
+  // Execute
+  switch(mn){
+    case 'MOV': {
+      if(ops.length!==2){ PC++; break; }
+      const [dst, src] = ops;
+      const val = (src[0]==='#') ? u8(parseNumber(src.slice(1))) : readOperand(src);
+      writeOperand(dst, val);
+      PC++;
+      break;
+    }
+    case 'ADD': {
+      if(ops.length!==2 || ops[0].toUpperCase()!=='A'){ PC++; break; }
+      const val = readOperand(ops[1]);
+      addA(val);
+      PC++;
+      break;
+    }
+    case 'SUBB': {
+      if(ops.length!==2 || ops[0].toUpperCase()!=='A'){ PC++; break; }
+      const val = readOperand(ops[1]);
+      subbA(val);
+      PC++;
+      break;
+    }
+    case 'ANL':
+    case 'ORL':
+    case 'XRL': {
+      if(ops.length!==2 || ops[0].toUpperCase()!=='A'){ PC++; break; }
+      const val = readOperand(ops[1]);
+      if(mn==='ANL') A = u8(A & val);
+      if(mn==='ORL') A = u8(A | val);
+      if(mn==='XRL') A = u8(A ^ val);
+      setParityFromA();
+      // Flags CY/OV unchanged per 8051 spec for ANL/ORL/XRL A,src
+      PC++;
+      break;
+    }
+    case 'INC': {
+      if(ops.length!==1){ PC++; break; }
+      const dst = ops[0].toUpperCase();
+      if(dst==='A'){ A=u8(A+1); setParityFromA(); }
+      else if(isRn(dst)){ R[getRnIndex(dst)] = u8(R[getRnIndex(dst)]+1); }
+      else if(isAtR0R1(dst)){ const idx=(dst==='@R0'?R[0]:R[1])&0x7F; RAM[idx]=u8(RAM[idx]+1); }
+      else { const d=parseDirect(dst); if(d!=null) RAM[d]=u8(RAM[d]+1); }
+      PC++;
+      break;
+    }
+    case 'DEC': {
+      if(ops.length!==1){ PC++; break; }
+      const dst = ops[0].toUpperCase();
+      if(dst==='A'){ A=u8(A-1); setParityFromA(); }
+      else if(isRn(dst)){ R[getRnIndex(dst)] = u8(R[getRnIndex(dst)]-1); }
+      else if(isAtR0R1(dst)){ const idx=(dst==='@R0'?R[0]:R[1])&0x7F; RAM[idx]=u8(RAM[idx]-1); }
+      else { const d=parseDirect(dst); if(d!=null) RAM[d]=u8(RAM[d]-1); }
+      PC++;
+      break;
+    }
+    case 'CLR': {
+      if(ops.length!==1){ PC++; break; }
+      const t = ops[0].toUpperCase();
+      if(t==='A'){ A=0; setParityFromA(); }
+      else if(t==='C'){ CY=0; }
+      PC++;
+      break;
+    }
+    case 'CPL': {
+      if(ops.length!==1){ PC++; break; }
+      const t = ops[0].toUpperCase();
+      if(t==='A'){ A=u8(~A); setParityFromA(); }
+      else if(t==='C'){ CY = CY?0:1; }
+      PC++;
+      break;
+    }
+    case 'SETB': {
+      if(ops.length===1 && ops[0].toUpperCase()==='C'){ CY=1; }
+      PC++;
+      break;
+    }
+    case 'SJMP': {
+      if(ops.length!==1){ PC++; break; }
+      if(!gotoLabel(ops[0])) PC++; // if label missing, fallthrough
+      break;
+    }
+    case 'JZ': {
+      if(ops.length!==1){ PC++; break; }
+      if(A===0){ if(!gotoLabel(ops[0])) PC++; }
+      else PC++;
+      break;
+    }
+    case 'JNZ': {
+      if(ops.length!==1){ PC++; break; }
+      if(A!==0){ if(!gotoLabel(ops[0])) PC++; }
+      else PC++;
+      break;
+    }
+    case 'JC': {
+      if(ops.length!==1){ PC++; break; }
+      if(CY){ if(!gotoLabel(ops[0])) PC++; }
+      else PC++;
+      break;
+    }
+    case 'JNC': {
+      if(ops.length!==1){ PC++; break; }
+      if(!CY){ if(!gotoLabel(ops[0])) PC++; }
+      else PC++;
+      break;
+    }
+    case 'DJNZ': {
+      // DJNZ Rn,label
+      if(ops.length!==2 || !isRn(ops[0])){ PC++; break; }
+      const idx = getRnIndex(ops[0]);
+      R[idx] = u8(R[idx]-1);
+      if(R[idx] !== 0){ if(!gotoLabel(ops[1])) PC++; }
+      else PC++;
+      break;
+    }
+    default:
+      // Unknown mnemonic: just advance
+      PC++;
+      break;
+  }
+
+  renderAll();
+}
+
+function runAll(){
+  // simple safety to prevent infinite loops
+  let steps=0, cap = 20000;
+  while(PC>=0 && PC<lines.length && steps<cap){
+    let l = lines[PC].trim();
+    if(!l || /^[A-Za-z_]\w*:\s*$/.test(l)){ PC++; steps++; continue; }
+    step();
+    steps++;
+  }
+  renderAll();
+}
+
+// Initialize
+resetSim();
+</script>
+</body>
+</html>
