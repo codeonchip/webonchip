@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3D Function Plotter + I/Q + QAM</title>
+  <title>3D Function Plotter + I/Q + QAM + Animation</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
   <style>
@@ -27,7 +27,7 @@
   </style>
 </head>
 <body>
-  <h1>3D Function Plotter + Time/Frequency + I/Q + QAM</h1>
+  <h1>RF Function Visualizer: I/Q + QAM + Animation + Noise</h1>
 
   <div class="controls">
     <label for="presetSelect">Choose a preset:</label>
@@ -46,10 +46,14 @@
     <label for="freq">Frequency (freq): <span id="freqLabel">1</span></label>
     <input type="range" id="freq" min="0" max="10" step="0.1" value="1" oninput="updateLabel('freq')">
 
+    <label for="noise">Noise Strength (0–1): <span id="noiseLabel">0</span></label>
+    <input type="range" id="noise" min="0" max="1" step="0.05" value="0" oninput="updateLabel('noise')">
+
     <button onclick="drawPlot()">Draw 3D Surface</button>
     <button onclick="drawIQPlot()">Draw I/Q Constellation</button>
     <button onclick="drawPolarPlot()">Draw Polar I/Q</button>
     <button onclick="drawQAMSymbols()">Draw QAM Symbols</button>
+    <button onclick="toggleAnimation()">Toggle Animation</button>
   </div>
 
   <div id="plot"></div>
@@ -59,6 +63,9 @@
   <div id="polarIQ"></div>
 
   <script>
+    let animationActive = false;
+    let animationInterval;
+
     function setPresetFunction() {
       const select = document.getElementById("presetSelect");
       document.getElementById("functionInput").value = select.value;
@@ -92,24 +99,22 @@
         zData.push(zRow);
       }
 
-      Plotly.newPlot('plot', [{
-        z: zData,
-        x: xRange,
-        y: yRange,
-        type: 'surface'
-      }]);
+      Plotly.newPlot('plot', [{ z: zData, x: xRange, y: yRange, type: 'surface' }]);
     }
 
     function drawIQPlot() {
       const shiftT = parseFloat(document.getElementById("shiftT").value);
       const freq = parseFloat(document.getElementById("freq").value);
+      const noise = parseFloat(document.getElementById("noise").value);
       const t = numeric.linspace(-2 * Math.PI, 2 * Math.PI, 100);
       let I = [], Q = [];
 
       for (let i = 0; i < t.length; i++) {
         const tt = t[i];
-        I.push(Math.cos(freq * (tt - shiftT)));
-        Q.push(Math.sin(freq * (tt - shiftT)));
+        const nI = noise * (Math.random() - 0.5);
+        const nQ = noise * (Math.random() - 0.5);
+        I.push(Math.cos(freq * (tt - shiftT)) + nI);
+        Q.push(Math.sin(freq * (tt - shiftT)) + nQ);
       }
 
       const trace = {
@@ -123,7 +128,7 @@
       };
 
       Plotly.newPlot('iqPlot', [trace], {
-        title: 'I/Q Constellation',
+        title: 'I/Q Constellation with Noise',
         xaxis: { title: 'In-Phase (I)' },
         yaxis: { title: 'Quadrature (Q)' },
         width: 600,
@@ -134,31 +139,29 @@
     function drawPolarPlot() {
       const shiftT = parseFloat(document.getElementById("shiftT").value);
       const freq = parseFloat(document.getElementById("freq").value);
+      const noise = parseFloat(document.getElementById("noise").value);
       const t = numeric.linspace(0, 2 * Math.PI, 100);
       let r = [], theta = [];
 
       for (let i = 0; i < t.length; i++) {
         const tt = t[i];
-        const I = Math.cos(freq * (tt - shiftT));
-        const Q = Math.sin(freq * (tt - shiftT));
+        const I = Math.cos(freq * (tt - shiftT)) + noise * (Math.random() - 0.5);
+        const Q = Math.sin(freq * (tt - shiftT)) + noise * (Math.random() - 0.5);
         r.push(Math.sqrt(I * I + Q * Q));
         theta.push(Math.atan2(Q, I));
       }
 
-      const trace = {
+      Plotly.newPlot('polarIQ', [{
         type: 'scatterpolar',
         r: r,
         theta: theta.map(v => v * 180 / Math.PI),
-        mode: 'lines+markers',
-        name: 'I/Q Polar'
-      };
-
-      Plotly.newPlot('polarIQ', [trace], {
+        mode: 'lines+markers'
+      }], {
         polar: {
           radialaxis: { visible: true },
           angularaxis: { direction: 'clockwise' }
         },
-        title: 'Polar Plot of I/Q'
+        title: 'Polar I/Q with Noise'
       });
     }
 
@@ -169,6 +172,17 @@
         [1, -3], [1, -1], [1, 1], [1, 3],
         [3, -3], [3, -1], [3, 1], [3, 3]
       ];
+
+      const decisionRegions = symbols.map(([i, q]) => ({
+        type: 'circle',
+        xref: 'x',
+        yref: 'y',
+        x0: i - 0.5, x1: i + 0.5,
+        y0: q - 0.5, y1: q + 0.5,
+        line: { color: 'rgba(0,0,255,0.2)', width: 1 },
+        fillcolor: 'rgba(0,0,255,0.05)',
+        layer: 'below'
+      }));
 
       const trace = {
         x: symbols.map(s => s[0]),
@@ -182,12 +196,30 @@
       };
 
       Plotly.newPlot('iqPlot', [trace], {
-        title: '16-QAM Symbol Constellation',
+        title: '16-QAM with Decision Regions',
         xaxis: { title: 'I' },
         yaxis: { title: 'Q' },
         width: 600,
-        height: 600
+        height: 600,
+        shapes: decisionRegions
       });
+    }
+
+    function toggleAnimation() {
+      animationActive = !animationActive;
+      if (animationActive) {
+        animationInterval = setInterval(() => {
+          const slider = document.getElementById("shiftT");
+          let value = parseFloat(slider.value);
+          value = value >= 10 ? -10 : value + 0.1;
+          slider.value = value.toFixed(2);
+          updateLabel("shiftT");
+          drawIQPlot();
+          drawPolarPlot();
+        }, 100);
+      } else {
+        clearInterval(animationInterval);
+      }
     }
 
     drawPlot();
