@@ -1,394 +1,298 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>J1939 SDM CRC32 (0x6938392D) Calculator</title>
+  <title>SDM CRC32 (Polynomial 0x6938392D) – Web Calculator</title>
   <style>
-    :root {
-      --bg: #0b1220;
-      --panel: #121a2b;
-      --ink: #e6eefc;
-      --muted: #9eb0d1;
-      --accent: #5cc8ff;
-      --ok: #21c37a;
-      --bad: #ff5964;
-      --warn: #ffb020;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0; color: var(--ink); background: radial-gradient(1200px 800px at 10% -20%, #132347 0%, var(--bg) 55%) fixed;
-      font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    }
-    .wrap { max-width: 980px; margin: 28px auto; padding: 0 16px; }
-    header h1 { margin: 0 0 6px; font-weight: 800; letter-spacing: 0.2px; }
-    header p { margin: 4px 0; color: var(--muted); }
-
-    .card { background: linear-gradient(180deg, #0f1830 0%, var(--panel) 100%); border: 1px solid rgba(92,200,255,.2);
-      border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.25); padding: 18px; margin: 16px 0; }
-
-    .grid { display: grid; gap: 16px; }
-    @media (min-width: 860px) { .grid.cols-2 { grid-template-columns: 1fr 1fr; } }
-
-    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .muted { color: var(--muted); }
-    code, pre, .mono { font-family: var(--mono); }
-
-    textarea, input[type="text"] {
-      width: 100%;
-      background: #0b1220; color: var(--ink); border: 1px solid #243255; border-radius: 12px; padding: 12px; resize: vertical;
-      font-family: var(--mono);
-    }
-    textarea:focus, input[type="text"]:focus, input[type="file"]:focus-visible { outline: 2px solid var(--accent); }
-
-    .btn { appearance: none; border: 1px solid #294a6a; background: #0f2640; color: var(--ink); padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 600; }
-    .btn:hover { filter: brightness(1.1); }
-    .btn:active { transform: translateY(1px); }
-    .btn.primary { background: linear-gradient(180deg, #1d71a9 0%, #164e7a 100%); border-color: #2a78a7; }
-    .btn.ghost { background: transparent; border-color: #2a3b5f; }
-
-    .chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #2b3b63; color: var(--muted); padding: 8px 10px; border-radius: 999px; font-family: var(--mono); }
-    .chip strong { color: var(--ink); }
-
-    .kv { display: grid; grid-template-columns: 210px 1fr; gap: 8px 14px; align-items: center; }
-    .kv .val { font-family: var(--mono); background: #0b1220; padding: 8px 12px; border: 1px solid #233455; border-radius: 10px; }
-
-    .badge { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius: 999px; font-weight:700; }
-    .badge.ok { background: rgba(33,195,122,.15); color: #a3f5cd; border:1px solid rgba(33,195,122,.35); }
-    .badge.bad { background: rgba(255,89,100,.12); color: #ffc8cc; border:1px solid rgba(255,89,100,.35); }
-    .badge.warn { background: rgba(255,176,32,.12); color:#ffe0ae; border:1px solid rgba(255,176,32,.35); }
-
-    .foot { color: var(--muted); font-size: 14px; }
-    .sr { position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+    :root { --bg:#0b0d12; --panel:#121621; --ink:#e7ecf3; --muted:#a8b3c5; --accent:#7cc0ff; --ok:#19c37d; --bad:#ff6868; }
+    html,body{height:100%}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background:var(--bg); color:var(--ink);}
+    .wrap{max-width:1100px; margin:auto; padding:28px;}
+    h1{margin:0 0 12px; font-size:clamp(20px,3vw,28px)}
+    p.lede{margin:0 0 18px; color:var(--muted)}
+    .grid{display:grid; gap:16px}
+    @media(min-width:900px){ .grid{grid-template-columns:2fr 1fr} }
+    .card{background:var(--panel); border:1px solid #1f2533; border-radius:16px; padding:16px; box-shadow:0 1px 0 #1b2130, 0 8px 24px rgba(0,0,0,.35)}
+    .head{display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:10px}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    label{font-size:13px; color:var(--muted)}
+    textarea, input[type="text"]{width:100%; background:#0e1320; color:var(--ink); border:1px solid #27324a; border-radius:12px; padding:12px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px; resize:vertical; min-height:110px}
+    input[type="file"]{filter:invert(86%)}
+    .btn{background:#192038; border:1px solid #2a3656; color:var(--ink); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600}
+    .btn:hover{background:#20294a}
+    .btn.ghost{background:transparent}
+    .btn.ok{border-color:#215c45; background:#123527}
+    .btn.bad{border-color:#5c2121; background:#351212}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .muted{color:var(--muted)}
+    .kvs{display:grid; grid-template-columns:max-content 1fr; gap:8px 16px; font-size:14px}
+    .kvs code{font-weight:700}
+    .pill{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#0f1526; border:1px solid #27324a; font-size:12px; color:var(--muted)}
+    .footer{margin-top:18px; font-size:12px; color:var(--muted)}
+    details{background:#0e1320; border:1px dashed #27324a; border-radius:12px; padding:10px 12px}
+    summary{cursor:pointer; color:var(--accent); font-weight:700}
+    .codeblock{white-space:pre; overflow:auto; background:#0b0f1c; border:1px solid #202a44; padding:12px; border-radius:12px;}
+    .right .card{height:100%}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <h1>J1939 SDM CRC32 Calculator</h1>
-      <p class="muted">Implements <strong>SPN 9383</strong> for SDM data (PGN 3584) — Polynomial <code>0x6938392D</code>, Init <code>0xFFFFFFFF</code>, Final XOR <code>0x00000000</code>, <em>no reflection</em>.</p>
-      <div class="row" aria-hidden="true" style="margin-top:8px">
-        <span class="chip">Poly: <strong>0x6938392D</strong></span>
-        <span class="chip">Init: <strong>0xFFFFFFFF</strong></span>
-        <span class="chip">XOROut: <strong>0x00000000</strong></span>
-        <span class="chip">RefIn/RefOut: <strong>false/false</strong></span>
-        <span class="chip">Table size: <strong id="tblSize">256</strong></span>
-      </div>
-    </header>
+    <h1>SDM CRC32 Calculator (J1939 SPN 9383)</h1>
+    <p class="lede">Polynomial <b>0x6938392D</b>, Init <b>0xFFFFFFFF</b>, Final XOR <b>0x00000000</b>, <b>No reflection</b> (inputs & result). Uses your exact lookup table and the C algorithm you provided.</p>
 
-    <section class="card">
-      <h2 style="margin-top:0">1) Enter Data</h2>
-      <div class="row" role="radiogroup" aria-label="Input mode">
-        <label><input type="radio" name="mode" value="hex" checked> Hex bytes</label>
-        <label><input type="radio" name="mode" value="ascii"> ASCII / Text</label>
-        <label><input type="radio" name="mode" value="file"> Binary file</label>
-      </div>
-
-      <div id="hexBox">
-        <label class="muted" for="hexInput">Hex bytes (accepts spaces, commas, newlines, optional 0x). Examples: <code>00 01 02 03 04 05 06 07</code> or <code>0001020304050607</code></label>
-        <textarea id="hexInput" rows="6" placeholder="Paste hex bytes here..."></textarea>
-      </div>
-
-      <div id="asciiBox" style="display:none">
-        <label class="muted" for="asciiInput">ASCII text (UTF‑8 will be used to build bytes)</label>
-        <textarea id="asciiInput" rows="4" placeholder="Type or paste text...\n"></textarea>
-      </div>
-
-      <div id="fileBox" style="display:none">
-        <label class="muted" for="binFile">Choose a file (data will be read raw)</label><br>
-        <input id="binFile" type="file" />
-      </div>
-
-      <div class="row" style="margin-top:12px">
-        <button id="btnCalc" class="btn primary">Compute CRC</button>
-        <button id="btnClear" class="btn ghost">Clear</button>
-        <span class="muted" id="lenBadge" style="margin-left:auto">Length: 0 bytes</span>
-      </div>
-
-      <div class="row" style="margin-top:10px; gap:8px">
-        <button id="btnLoadA" class="btn">Load Test Vector A</button>
-        <button id="btnLoadB" class="btn">Load Test Vector B</button>
-        <button id="btnVerify" class="btn">Verify Examples</button>
-        <span id="verifyBadge" class="badge warn" style="display:none">Ready to verify…</span>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2 style="margin-top:0">2) Result</h2>
-      <div class="grid cols-2">
-        <div class="kv">
-          <div>CRC32 (hex)</div>
-          <div class="val" id="outHex">—</div>
-
-          <div>CRC32 (unsigned decimal)</div>
-          <div class="val" id="outDec">—</div>
-
-          <div>Big‑endian bytes</div>
-          <div class="val" id="outBE">—</div>
-
-          <div>Little‑endian bytes</div>
-          <div class="val" id="outLE">—</div>
-        </div>
-        <div>
+    <div class="grid">
+      <div class="left card">
+        <div class="head">
           <div class="row">
-            <button id="btnCopyHex" class="btn">Copy hex</button>
-            <button id="btnCopyLE" class="btn">Copy LE bytes</button>
-            <button id="btnCopyBE" class="btn">Copy BE bytes</button>
+            <span class="pill">Mode:
+              <label style="margin-left:8px"><input type="radio" name="mode" value="hex" checked> Hex</label>
+              <label><input type="radio" name="mode" value="ascii"> ASCII</label>
+            </span>
           </div>
-          <pre id="status" class="mono" style="margin-top:12px; background:#0b1220; border:1px solid #223355; border-radius:12px; padding:12px; min-height:86px; white-space:pre-wrap;">Status: waiting…</pre>
+          <div class="row">
+            <button class="btn" id="btnEx1" title="00..07 example">Load 00..07</button>
+            <button class="btn" id="btnEx2" title="FF×8 example">Load FF×8</button>
+            <button class="btn ghost" id="btnClear">Clear</button>
+          </div>
+        </div>
+
+        <label class="muted">Input bytes (<span id="byteCount">0</span> bytes)</label>
+        <textarea id="input" spellcheck="false" placeholder="Hex: e.g., 00 01 02 03 04 05 06 07   •   ASCII: switch to ASCII mode and type text. You can also paste 0x prefixes, commas, newlines, or colons."></textarea>
+
+        <div class="row" style="margin-top:8px">
+          <input type="file" id="file" />
+          <span class="muted">or drop a file here</span>
+          <button class="btn" id="btnCalc">Calculate</button>
+          <button class="btn" id="btnSelf">Self‑test</button>
+        </div>
+
+        <div id="fileNote" class="muted" style="margin-top:8px"></div>
+
+        <details style="margin-top:12px">
+          <summary>Show C reference (your function)</summary>
+<pre class="codeblock mono">/**
+ * @brief Calculate the J1939 SDM CRC32 checksum.
+ * Polynomial: 0x6938392D, Init: 0xFFFFFFFF, Final XOR: 0x00000000
+ * No reflection (inputs/results).
+ */
+uint32 sdm_crc32_calculate(const uint32 length, const uint8 *data)
+{
+    uint32 crc32 = 0xFFFFFFFF;
+    for (uint32 i = 0; i < length; i++)
+    {
+        uint8 pos = ((crc32 >> 24) ^ data[i]) & 0xFF;
+        crc32 = (crc32 << 8) ^ sdm_crc32_lookup_table[pos];
+    }
+    return crc32;
+}
+</pre>
+        </details>
+      </div>
+
+      <div class="right card">
+        <div class="head"><h3 style="margin:0">Result</h3>
+          <div class="row">
+            <button class="btn" id="btnCopy">Copy hex</button>
+          </div>
+        </div>
+        <div class="kvs mono" id="out">
+          <div>CRC32 (hex):</div> <div><code id="hex">—</code></div>
+          <div>CRC32 (dec):</div> <div><code id="dec">—</code></div>
+          <div>Bytes (big‑endian):</div> <div><code id="be">—</code></div>
+          <div>Bytes (little‑endian):</div> <div><code id="le">—</code></div>
+          <div>Status:</div> <div id="status" class="muted">Waiting…</div>
+        </div>
+
+        <hr style="border-color:#1f2533; opacity:.4; margin:16px 0" />
+        <div class="kvs">
+          <div class="muted">Settings</div>
+          <div class="muted">Poly <code>0x6938392D</code>; Init <code>0xFFFFFFFF</code>; Final XOR <code>0x00000000</code>; <b>no reflect</b>; table‑driven (256 entries).</div>
+        </div>
+
+        <div class="footer">
+          
+          <b>Test vectors</b>
+          <div class="mono" style="margin-top:6px">
+            • <code>00 01 02 03 04 05 06 07</code> → <code>0xC550537D</code><br/>
+            • <code>FF FF FF FF FF FF FF FF</code> → <code>0xBB1584F9</code>
+          </div>
         </div>
       </div>
-    </section>
-
-    <section class="card">
-      <h2 style="margin-top:0">Spec Examples (from firmware comment)</h2>
-      <ul>
-        <li class="mono">A) 00 01 02 03 04 05 06 07 → <strong>0xC550537D</strong></li>
-        <li class="mono">B) FF FF FF FF FF FF FF FF → <strong>0xBB1584F9</strong></li>
-      </ul>
-      <p class="foot">Algorithm matches your C implementation: <span class="mono">pos = ((crc >>> 24) ^ byte) & 0xFF;</span> then <span class="mono">crc = ((crc &lt;&lt; 8) ^ table[pos])</span>, with 32‑bit truncation each step; initial 0xFFFFFFFF and XOROut 0x00000000.</p>
-    </section>
-
-    <footer class="foot">© 2025 • SDM CRC32 (SPN 9383) helper. No external libraries. Paste into an offline environment if needed.</footer>
+    </div>
   </div>
 
-  <script>
-    // === SDM CRC32 TABLE (polynomial 0x6938392D, no-reflect) ===
-    const SDM_TABLE = new Uint32Array([
-      0x00000000,0x6938392D,0xD270725A,0xBB484B77,0xCDD8DD99,0xA4E0E4B4,0x1FA8AFC3,0x769096EE,
-      0xF289821F,0x9BB1BB32,0x20F9F045,0x49C1C968,0x3F515F86,0x566966AB,0xED212DDC,0x841914F1,
-      0x8C2B3D13,0xE513043E,0x5E5B4F49,0x37637664,0x41F3E08A,0x28CBD9A7,0x938392D0,0xFABBABFD,
-      0x7EA2BF0C,0x179A8621,0xACD2CD56,0xC5EAF47B,0xB37A6295,0xDA425BB8,0x610A10CF,0x083229E2,
-      0x716E430B,0x18567A26,0xA31E3151,0xCA26087C,0xBCB69E92,0xD58EA7BF,0x6EC6ECC8,0x07FED5E5,
-      0x83E7C114,0xEADFF839,0x5197B34E,0x38AF8A63,0x4E3F1C8D,0x270725A0,0x9C4F6ED7,0xF57757FA,
-      0xFD457E18,0x947D4735,0x2F350C42,0x460D356F,0x309DA381,0x59A59AAC,0xE2EDD1DB,0x8BD5E8F6,
-      0x0FCCFC07,0x66F4C52A,0xDDBC8E5D,0xB484B770,0xC214219E,0xAB2C18B3,0x106453C4,0x795C6AE9,
-      0xE2DC8616,0x8BE4BF3B,0x30ACF44C,0x5994CD61,0x2F045B8F,0x463C62A2,0xFD7429D5,0x944C10F8,
-      0x10550409,0x796D3D24,0xC2257653,0xAB1D4F7E,0xDD8DD990,0xB4B5E0BD,0x0FFDABCA,0x66C592E7,
-      0x6EF7BB05,0x07CF8228,0xBC87C95F,0xD5BFF072,0xA32F669C,0xCA175FB1,0x715F14C6,0x18672DEB,
-      0x9C7E391A,0xF5460037,0x4E0E4B40,0x2736726D,0x51A6E483,0x389EDDAE,0x83D696D9,0xEAEEAFF4,
-      0x93B2C51D,0xFA8AFC30,0x41C2B747,0x28FA8E6A,0x5E6A1884,0x375221A9,0x8C1A6ADE,0xE52253F3,
-      0x613B4702,0x08037E2F,0xB34B3558,0xDA730C75,0xACE39A9B,0xC5DBA3B6,0x7E93E8C1,0x17ABD1EC,
-      0x1F99F80E,0x76A1C123,0xCDE98A54,0xA4D1B379,0xD2412597,0xBB791CBA,0x003157CD,0x69096EE0,
-      0xED107A11,0x8428433C,0x3F60084B,0x56583166,0x20C8A788,0x49F09EA5,0xF2B8D5D2,0x9B80ECFF,
-      0xAC813501,0xC5B90C2C,0x7EF1475B,0x17C97E76,0x6159E898,0x0861D1B5,0xB3299AC2,0xDA11A3EF,
-      0x5E08B71E,0x37308E33,0x8C78C544,0xE540FC69,0x93D06A87,0xFAE853AA,0x41A018DD,0x289821F0,
-      0x20AA0812,0x4992313F,0xF2DA7A48,0x9BE24365,0xED72D58B,0x844AECA6,0x3F02A7D1,0x563A9EFC,
-      0xD2238A0D,0xBB1BB320,0x0053F857,0x696BC17A,0x1FFB5794,0x76C36EB9,0xCD8B25CE,0xA4B31CE3,
-      0xDDEF760A,0xB4D74F27,0x0F9F0450,0x66A73D7D,0x1037AB93,0x790F92BE,0xC247D9C9,0xAB7FE0E4,
-      0x2F66F415,0x465ECD38,0xFD16864F,0x942EBF62,0xE2BE298C,0x8B8610A1,0x30CE5BD6,0x59F662FB,
-      0x51C44B19,0x38FC7234,0x83B43943,0xEA8C006E,0x9C1C9680,0xF524AFAD,0x4E6CE4DA,0x2754DDF7,
-      0xA34DC906,0xCA75F02B,0x713DBB5C,0x18058271,0x6E95149F,0x07AD2DB2,0xBCE566C5,0xD5DD5FE8,
-      0x4E5DB317,0x27658A3A,0x9C2DC14D,0xF515F860,0x83856E8E,0xEABD57A3,0x51F51CD4,0x38CD25F9,
-      0xBCD43108,0xD5EC0825,0x6EA44352,0x079C7A7F,0x710CEC91,0x1834D5BC,0xA37C9ECB,0xCA44A7E6,
-      0xC2768E04,0xAB4EB729,0x1006FC5E,0x793EC573,0x0FAE539D,0x66966AB0,0xDDDE21C7,0xB4E618EA,
-      0x30FF0C1B,0x59C73536,0xE28F7E41,0x8BB7476C,0xFD27D182,0x941FE8AF,0x2F57A3D8,0x466F9AF5,
-      0x3F33F01C,0x560BC931,0xED438246,0x847BBB6B,0xF2EB2D85,0x9BD314A8,0x209B5FDF,0x49A366F2,
-      0xCDBA7203,0xA4824B2E,0x1FCA0059,0x76F23974,0x0062AF9A,0x695A96B7,0xD212DDC0,0xBB2AE4ED,
-      0xB318CD0F,0xDA20F422,0x6168BF55,0x08508678,0x7EC01096,0x17F829BB,0xACB062CC,0xC5885BE1,
-      0x41914F10,0x28A9763D,0x93E13D4A,0xFAD90467,0x8C499289,0xE571ABA4,0x5E39E0D3,0x3701D9FE,
-    ]);
+<script>
+  // ===== SDM CRC32 lookup table (exactly as provided) =====
+  const TBL = new Uint32Array([
+    0x00000000, 0x6938392D, 0xD270725A, 0xBB484B77, 0xCDD8DD99, 0xA4E0E4B4, 0x1FA8AFC3, 0x769096EE,
+    0xF289821F, 0x9BB1BB32, 0x20F9F045, 0x49C1C968, 0x3F515F86, 0x566966AB, 0xED212DDC, 0x841914F1,
+    0x8C2B3D13, 0xE513043E, 0x5E5B4F49, 0x37637664, 0x41F3E08A, 0x28CBD9A7, 0x938392D0, 0xFABBABFD,
+    0x7EA2BF0C, 0x179A8621, 0xACD2CD56, 0xC5EAF47B, 0xB37A6295, 0xDA425BB8, 0x610A10CF, 0x083229E2,
+    0x716E430B, 0x18567A26, 0xA31E3151, 0xCA26087C, 0xBCB69E92, 0xD58EA7BF, 0x6EC6ECC8, 0x07FED5E5,
+    0x83E7C114, 0xEADFF839, 0x5197B34E, 0x38AF8A63, 0x4E3F1C8D, 0x270725A0, 0x9C4F6ED7, 0xF57757FA,
+    0xFD457E18, 0x947D4735, 0x2F350C42, 0x460D356F, 0x309DA381, 0x59A59AAC, 0xE2EDD1DB, 0x8BD5E8F6,
+    0x0FCCFC07, 0x66F4C52A, 0xDDBC8E5D, 0xB484B770, 0xC214219E, 0xAB2C18B3, 0x106453C4, 0x795C6AE9,
+    0xE2DC8616, 0x8BE4BF3B, 0x30ACF44C, 0x5994CD61, 0x2F045B8F, 0x463C62A2, 0xFD7429D5, 0x944C10F8,
+    0x10550409, 0x796D3D24, 0xC2257653, 0xAB1D4F7E, 0xDD8DD990, 0xB4B5E0BD, 0x0FFDABCA, 0x66C592E7,
+    0x6EF7BB05, 0x07CF8228, 0xBC87C95F, 0xD5BFF072, 0xA32F669C, 0xCA175FB1, 0x715F14C6, 0x18672DEB,
+    0x9C7E391A, 0xF5460037, 0x4E0E4B40, 0x2736726D, 0x51A6E483, 0x389EDDAE, 0x83D696D9, 0xEAEEAFF4,
+    0x93B2C51D, 0xFA8AFC30, 0x41C2B747, 0x28FA8E6A, 0x5E6A1884, 0x375221A9, 0x8C1A6ADE, 0xE52253F3,
+    0x613B4702, 0x08037E2F, 0xB34B3558, 0xDA730C75, 0xACE39A9B, 0xC5DBA3B6, 0x7E93E8C1, 0x17ABD1EC,
+    0x1F99F80E, 0x76A1C123, 0xCDE98A54, 0xA4D1B379, 0xD2412597, 0xBB791CBA, 0x003157CD, 0x69096EE0,
+    0xED107A11, 0x8428433C, 0x3F60084B, 0x56583166, 0x20C8A788, 0x49F09EA5, 0xF2B8D5D2, 0x9B80ECFF,
+    0xAC813501, 0xC5B90C2C, 0x7EF1475B, 0x17C97E76, 0x6159E898, 0x0861D1B5, 0xB3299AC2, 0xDA11A3EF,
+    0x5E08B71E, 0x37308E33, 0x8C78C544, 0xE540FC69, 0x93D06A87, 0xFAE853AA, 0x41A018DD, 0x289821F0,
+    0x20AA0812, 0x4992313F, 0xF2DA7A48, 0x9BE24365, 0xED72D58B, 0x844AECA6, 0x3F02A7D1, 0x563A9EFC,
+    0xD2238A0D, 0xBB1BB320, 0x0053F857, 0x696BC17A, 0x1FFB5794, 0x76C36EB9, 0xCD8B25CE, 0xA4B31CE3,
+    0xDDEF760A, 0xB4D74F27, 0x0F9F0450, 0x66A73D7D, 0x1037AB93, 0x790F92BE, 0xC247D9C9, 0xAB7FE0E4,
+    0x2F66F415, 0x465ECD38, 0xFD16864F, 0x942EBF62, 0xE2BE298C, 0x8B8610A1, 0x30CE5BD6, 0x59F662FB,
+    0x51C44B19, 0x38FC7234, 0x83B43943, 0xEA8C006E, 0x9C1C9680, 0xF524AFAD, 0x4E6CE4DA, 0x2754DDF7,
+    0xA34DC906, 0xCA75F02B, 0x713DBB5C, 0x18058271, 0x6E95149F, 0x07AD2DB2, 0xBCE566C5, 0xD5DD5FE8,
+    0x4E5DB317, 0x27658A3A, 0x9C2DC14D, 0xF515F860, 0x83856E8E, 0xEABD57A3, 0x51F51CD4, 0x38CD25F9,
+    0xBCD43108, 0xD5EC0825, 0x6EA44352, 0x079C7A7F, 0x710CEC91, 0x1834D5BC, 0xA37C9ECB, 0xCA44A7E6,
+    0xC2768E04, 0xAB4EB729, 0x1006FC5E, 0x793EC573, 0x0FAE539D, 0x66966AB0, 0xDDDE21C7, 0xB4E618EA,
+    0x30FF0C1B, 0x59C73536, 0xE28F7E41, 0x8BB7476C, 0xFD27D182, 0x941FE8AF, 0x2F57A3D8, 0x466F9AF5,
+    0x3F33F01C, 0x560BC931, 0xED438246, 0x847BBB6B, 0xF2EB2D85, 0x9BD314A8, 0x209B5FDF, 0x49A366F2,
+    0xCDBA7203, 0xA4824B2E, 0x1FCA0059, 0x76F23974, 0x0062AF9A, 0x695A96B7, 0xD212DDC0, 0xBB2AE4ED,
+    0xB318CD0F, 0xDA20F422, 0x6168BF55, 0x08508678, 0x7EC01096, 0x17F829BB, 0xACB062CC, 0xC5885BE1,
+    0x41914F10, 0x28A9763D, 0x93E13D4A, 0xFAD90467, 0x8C499289, 0xE571ABA4, 0x5E39E0D3, 0x3701D9FE
+  ]);
 
-    const tblSize = document.getElementById('tblSize');
-    tblSize.textContent = SDM_TABLE.length;
-
-    // === DOM ===
-    const hexBox = document.getElementById('hexBox');
-    const asciiBox = document.getElementById('asciiBox');
-    const fileBox = document.getElementById('fileBox');
-    const hexInput = document.getElementById('hexInput');
-    const asciiInput = document.getElementById('asciiInput');
-    const binFile = document.getElementById('binFile');
-    const btnCalc = document.getElementById('btnCalc');
-    const btnClear = document.getElementById('btnClear');
-    const btnLoadA = document.getElementById('btnLoadA');
-    const btnLoadB = document.getElementById('btnLoadB');
-    const btnVerify = document.getElementById('btnVerify');
-    const verifyBadge = document.getElementById('verifyBadge');
-    const outHex = document.getElementById('outHex');
-    const outDec = document.getElementById('outDec');
-    const outBE  = document.getElementById('outBE');
-    const outLE  = document.getElementById('outLE');
-    const btnCopyHex = document.getElementById('btnCopyHex');
-    const btnCopyLE = document.getElementById('btnCopyLE');
-    const btnCopyBE = document.getElementById('btnCopyBE');
-    const status = document.getElementById('status');
-    const lenBadge = document.getElementById('lenBadge');
-
-    // === Helpers ===
-    function setMode(mode) {
-      hexBox.style.display = mode === 'hex' ? 'block' : 'none';
-      asciiBox.style.display = mode === 'ascii' ? 'block' : 'none';
-      fileBox.style.display = mode === 'file' ? 'block' : 'none';
-      verifyBadge.style.display = 'none';
-      setLength(0);
-      status.textContent = 'Status: waiting…';
-      clearOutputs();
+  // ===== Core CRC (no reflection) =====
+  function sdmCrc32(bytes){
+    let crc = 0xFFFFFFFF >>> 0;
+    for (let i = 0; i < bytes.length; i++){
+      const pos = ((crc >>> 24) ^ (bytes[i] & 0xFF)) & 0xFF;
+      crc = (((crc << 8) >>> 0) ^ TBL[pos]) >>> 0;
     }
+    // Final XOR is 0x00000000 (no change)
+    return crc >>> 0;
+  }
 
-    function clearOutputs() {
-      outHex.textContent = '—';
-      outDec.textContent = '—';
-      outBE.textContent = '—';
-      outLE.textContent = '—';
+  // ===== Helpers =====
+  const el = (id)=>document.getElementById(id);
+  const hex8 = (n)=> (n >>> 0).toString(16).toUpperCase().padStart(8,'0');
+  const toBytesBE = (n)=> [ (n>>>24)&0xFF, (n>>>16)&0xFF, (n>>>8)&0xFF, n&0xFF ];
+  const toBytesLE = (n)=> [ n&0xFF, (n>>>8)&0xFF, (n>>>16)&0xFF, (n>>>24)&0xFF ];
+  const fmtBytes = (arr)=> arr.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+
+  function parseHexLike(text){
+    // Accepts: spaces, commas, newlines, colons, 0x prefixes, underscores, trailing 'h'
+    const cleaned = text
+      .replace(/0x/gi,' ')
+      .replace(/[,_:\n\r\t\-]+/g,' ')
+      .replace(/\b([0-9A-Fa-f]{1,2})h\b/g,'$1')
+      .trim();
+    if(!cleaned) return new Uint8Array();
+    const parts = cleaned.split(/\s+/);
+    const out = new Uint8Array(parts.length);
+    for (let i=0;i<parts.length;i++){
+      const p = parts[i];
+      if(!/^[0-9A-Fa-f]{1,2}$/.test(p)) throw new Error(`Bad hex token: "${p}"`);
+      out[i] = parseInt(p,16) & 0xFF;
     }
+    return out;
+  }
 
-    function setLength(n) { lenBadge.textContent = `Length: ${n} byte${n===1?'':'s'}`; }
+  function parseAscii(text){
+    const out = new Uint8Array(text.length);
+    for (let i=0;i<text.length;i++) out[i] = text.charCodeAt(i) & 0xFF;
+    return out;
+  }
 
-    function pad8(x) { return x.toString(16).toUpperCase().padStart(8,'0'); }
-
-    function bytesToHex(arr) {
-      return Array.from(arr, b => b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
-    }
-
-    function hexToBytes(str) {
-      // Allow: "00 01 02", "0x00,0x01", or "000102"
-      if (!str.trim()) return new Uint8Array();
-      const cleaned = str.replace(/0x/gi,'').replace(/[^0-9a-fA-F]/g,'');
-      if (cleaned.length % 2 !== 0) throw new Error('Odd number of hex digits.');
-      const out = new Uint8Array(cleaned.length/2);
-      for (let i=0;i<cleaned.length;i+=2) {
-        out[i/2] = parseInt(cleaned.slice(i,i+2), 16);
-      }
-      return out;
-    }
-
-    function asciiToBytes(str) {
-      return new TextEncoder().encode(str);
-    }
-
-    // Core CRC implementation (mirrors the C function)
-    function sdm_crc32(bytes) {
-      let crc = 0xFFFFFFFF >>> 0; // init
-      for (let i = 0; i < bytes.length; i++) {
-        const pos = (((crc >>> 24) ^ bytes[i]) & 0xFF) >>> 0;
-        crc = (((crc << 8) >>> 0) ^ SDM_TABLE[pos]) >>> 0;
-      }
-      return crc >>> 0; // XOROut is 0x00000000 (no change)
-    }
-
-    function showResult(crc) {
-      const hex = pad8(crc);
-      outHex.textContent = '0x' + hex;
-      outDec.textContent = (crc >>> 0).toString(10);
-      // Big-endian (MSB→LSB)
-      const be = new Uint8Array([ (crc>>>24)&0xFF, (crc>>>16)&0xFF, (crc>>>8)&0xFF, crc&0xFF ]);
-      const le = new Uint8Array([ crc&0xFF, (crc>>>8)&0xFF, (crc>>>16)&0xFF, (crc>>>24)&0xFF ]);
-      outBE.textContent = bytesToHex(be);
-      outLE.textContent = bytesToHex(le);
-    }
-
-    function computeFromCurrent() {
+  function compute(){
+    try{
       const mode = document.querySelector('input[name="mode"]:checked').value;
-      try {
-        let bytes = new Uint8Array();
-        if (mode === 'hex') bytes = hexToBytes(hexInput.value);
-        if (mode === 'ascii') bytes = asciiToBytes(asciiInput.value);
-        if (mode === 'file') {
-          status.textContent = 'Status: Please choose a file first.';
-          return;
-        }
-        setLength(bytes.length);
-        const crc = sdm_crc32(bytes);
-        showResult(crc);
-        status.textContent = 'Status: Success. CRC computed.';
-      } catch (err) {
-        clearOutputs();
-        status.textContent = 'Error: ' + err.message;
-      }
+      const raw = el('input').value;
+      const bytes = (mode === 'hex') ? parseHexLike(raw) : parseAscii(raw);
+      el('byteCount').textContent = bytes.length.toString();
+      const crc = sdmCrc32(bytes);
+      el('hex').textContent = '0x'+hex8(crc);
+      el('dec').textContent = String(crc >>> 0);
+      el('be').textContent = fmtBytes(toBytesBE(crc));
+      el('le').textContent = fmtBytes(toBytesLE(crc));
+      el('status').textContent = 'OK';
+      el('status').style.color = 'var(--ok)';
+    }catch(err){
+      el('hex').textContent = '—';
+      el('dec').textContent = '—';
+      el('be').textContent = '—';
+      el('le').textContent = '—';
+      el('status').textContent = err.message || String(err);
+      el('status').style.color = 'var(--bad)';
     }
+  }
 
-    // === Events ===
-    document.querySelectorAll('input[name="mode"]').forEach(r => {
-      r.addEventListener('change', e => setMode(e.target.value));
-    });
-
-    btnCalc.addEventListener('click', computeFromCurrent);
-
-    btnClear.addEventListener('click', () => {
-      hexInput.value = '';
-      asciiInput.value = '';
-      binFile.value = '';
-      setLength(0);
-      clearOutputs();
-      status.textContent = 'Cleared.';
-      verifyBadge.style.display = 'none';
-    });
-
-    // File handling
-    binFile.addEventListener('change', () => {
-      const f = binFile.files && binFile.files[0];
-      if (!f) return;
-      const rd = new FileReader();
-      rd.onload = () => {
-        const buf = new Uint8Array(rd.result);
-        setLength(buf.length);
-        const crc = sdm_crc32(buf);
-        showResult(crc);
-        status.textContent = `Status: Read ${buf.length} bytes from file \"${f.name}\".`;
-      };
-      rd.onerror = () => { status.textContent = 'Error reading file.'; };
-      rd.readAsArrayBuffer(f);
-    });
-
-    // Test vectors
-    btnLoadA.addEventListener('click', () => {
-      document.querySelector('input[value="hex"]').checked = true; setMode('hex');
-      hexInput.value = '00 01 02 03 04 05 06 07';
-      computeFromCurrent();
-      verifyBadge.style.display = 'inline-flex';
-      verifyBadge.className = 'badge warn';
-      verifyBadge.textContent = 'Example A loaded';
-    });
-
-    btnLoadB.addEventListener('click', () => {
-      document.querySelector('input[value="hex"]').checked = true; setMode('hex');
-      hexInput.value = 'FF FF FF FF FF FF FF FF';
-      computeFromCurrent();
-      verifyBadge.style.display = 'inline-flex';
-      verifyBadge.className = 'badge warn';
-      verifyBadge.textContent = 'Example B loaded';
-    });
-
-    btnVerify.addEventListener('click', () => {
-      const a = sdm_crc32(new Uint8Array([0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07]));
-      const b = sdm_crc32(new Uint8Array([0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF]));
-      const okA = (a>>>0) === 0xC550537D;
-      const okB = (b>>>0) === 0xBB1584F9;
-      if (okA && okB) {
-        verifyBadge.style.display = 'inline-flex';
-        verifyBadge.className = 'badge ok';
-        verifyBadge.textContent = 'PASS: Matches both examples';
-        status.textContent = 'Verification OK. A=0x' + a.toString(16).toUpperCase().padStart(8,'0') + ', B=0x' + b.toString(16).toUpperCase().padStart(8,'0');
-      } else {
-        verifyBadge.style.display = 'inline-flex';
-        verifyBadge.className = 'badge bad';
-        verifyBadge.textContent = 'FAIL: Mismatch';
-        status.textContent = 'Verification failed: A=0x' + a.toString(16).toUpperCase().padStart(8,'0') + ', expect 0xC550537D; B=0x' + b.toString(16).toUpperCase().padStart(8,'0') + ', expect 0xBB1584F9';
-      }
-    });
-
-    // Copy helpers
-    function copy(text) {
-      navigator.clipboard.writeText(text).then(() => {
-        status.textContent = 'Copied to clipboard.';
-      }).catch(() => { status.textContent = 'Copy failed (permissions?).'; });
+  // ===== Self-test =====
+  function selfTest(){
+    const v1 = sdmCrc32(new Uint8Array([0,1,2,3,4,5,6,7]));
+    const v2 = sdmCrc32(new Uint8Array([0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF]));
+    const ok1 = (v1>>>0) === 0xC550537D;
+    const ok2 = (v2>>>0) === 0xBB1584F9;
+    let msg = `Test 1 (00..07): ${ok1? 'PASS ✅':'FAIL ❌ got 0x'+hex8(v1)}\n`+
+              `Test 2 (FF×8): ${ok2? 'PASS ✅':'FAIL ❌ got 0x'+hex8(v2)}`;
+    if (ok1 && ok2){
+      el('status').textContent = 'Self‑test passed';
+      el('status').style.color = 'var(--ok)';
+    } else {
+      el('status').textContent = 'Self‑test failed';
+      el('status').style.color = 'var(--bad)';
     }
+    alert(msg);
+  }
 
-    btnCopyHex.addEventListener('click', () => {
-      copy(outHex.textContent.replace(/^—$/, ''));
-    });
-    btnCopyLE.addEventListener('click', () => {
-      copy(outLE.textContent.replace(/^—$/, ''));
-    });
-    btnCopyBE.addEventListener('click', () => {
-      copy(outBE.textContent.replace(/^—$/, ''));
-    });
+  // ===== Wire up UI =====
+  el('btnCalc').addEventListener('click', compute);
+  el('btnSelf').addEventListener('click', selfTest);
+  el('btnCopy').addEventListener('click', ()=>{
+    const t = el('hex').textContent;
+    if(t && t !== '—') navigator.clipboard.writeText(t);
+  });
+  el('btnClear').addEventListener('click', ()=>{ el('input').value=''; el('byteCount').textContent='0'; compute(); });
+  el('btnEx1').addEventListener('click', ()=>{ el('input').value = '00 01 02 03 04 05 06 07'; compute(); });
+  el('btnEx2').addEventListener('click', ()=>{ el('input').value = 'FF FF FF FF FF FF FF FF'; compute(); });
+  document.querySelectorAll('input[name="mode"]').forEach(r=> r.addEventListener('change', compute));
+  el('input').addEventListener('input', compute);
 
-    // Default preload: show test A for quick confidence
-    btnLoadA.click();
-  </script>
+  // Drag & drop
+  const dropZone = document.body;
+  dropZone.addEventListener('dragover', e=>{ e.preventDefault(); });
+  dropZone.addEventListener('drop', e=>{
+    e.preventDefault();
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]){
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+  el('file').addEventListener('change', (e)=>{
+    if(e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const bytes = new Uint8Array(reader.result);
+      el('fileNote').textContent = `Loaded \"${file.name}\" (${bytes.length} bytes).`;
+      // Show a short preview in hex in the input box
+      const previewLen = Math.min(256, bytes.length);
+      let hexPreview = '';
+      for(let i=0;i<previewLen;i++) hexPreview += bytes[i].toString(16).toUpperCase().padStart(2,'0') + (i+1<previewLen?' ':'');
+      el('input').value = hexPreview + (bytes.length>previewLen ? ' …' : '');
+      document.querySelector('input[name="mode"][value="hex"]').checked = true;
+      el('byteCount').textContent = String(bytes.length);
+      const crc = sdmCrc32(bytes);
+      el('hex').textContent = '0x'+hex8(crc);
+      el('dec').textContent = String(crc>>>0);
+      el('be').textContent = fmtBytes(toBytesBE(crc));
+      el('le').textContent = fmtBytes(toBytesLE(crc));
+      el('status').textContent = 'OK (file)';
+      el('status').style.color = 'var(--ok)';
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // Initial paint
+  compute();
+</script>
 </body>
 </html>
