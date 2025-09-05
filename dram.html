@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Memory Timing Setup Calculator (DDR/SDR)</title>
+  <style>
+    :root{
+      --bg:#0b0f14;--panel:#101720;--panel2:#141c27;--ink:#e7eef7;--muted:#9fb1c7;--accent:#5ec0ff;--ok:#34c759;--warn:#ffcc00;--bad:#ff453a;--line:#1f2a38
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji";background:var(--bg);color:var(--ink)}
+    header{padding:20px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(94,192,255,.06),transparent)}
+    h1{margin:0;font-size:22px;letter-spacing:.2px}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px}
+    .grid{display:grid;gap:16px}
+    @media(min-width:960px){.grid{grid-template-columns:1.1fr .9fr}}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+    .card h2{margin:.2rem 0 1rem;font-size:16px;color:var(--accent);letter-spacing:.3px}
+    .sub{color:var(--muted);font-size:12px;margin-top:4px}
+    .row{display:grid;grid-template-columns:1fr 110px 120px;gap:10px;align-items:center;margin:6px 0}
+    .row label{font-size:13px;color:var(--ink)}
+    input,select,button,textarea{font:inherit}
+    input[type=number], input[type=text], select{width:100%;padding:10px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+    input::placeholder{color:#6f8197}
+    .muted{color:var(--muted)}
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--accent);color:#05131f;font-weight:700;cursor:pointer}
+    .btn.secondary{background:transparent;color:var(--ink)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .out{background:#0d131c;border:1px dashed #203043;border-radius:12px;padding:12px;margin-top:12px}
+    .out pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px}
+    .flex{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:var(--panel2);color:var(--muted);font-size:12px}
+    .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .kpi .box{background:#0f1722;border:1px solid var(--line);border-radius:10px;padding:10px}
+    .box h3{margin:.2rem 0;font-size:13px;color:var(--muted);font-weight:500}
+    .box b{font-size:20px}
+    .hint{font-size:12px;color:var(--muted)}
+    .status{font-size:12px;margin-top:8px}
+    .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+    hr{border:none;border-top:1px solid var(--line);margin:14px 0}
+    .section-title{display:flex;align-items:center;gap:8px}
+    .section-title span{font-size:12px;padding:4px 8px;border-radius:999px;background:#0d1620;border:1px solid var(--line);color:var(--muted)}
+    .code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0f1722;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Memory Timing Setup Calculator</h1>
+      <div class="sub">Convert datasheet timings (ns/µs) to controller cycles, check basic constraints, and export values for register programming. Supports DDR3/DDR4 style timing and classic SDR SDRAM (MPC8260‑era).</div>
+    </div>
+  </header>
+
+  <main class="wrap grid">
+    <section class="card" id="ddrCard">
+      <div class="section-title">
+        <h2>DDRx Timing (DDR2/DDR3/DDR4)</h2>
+        <span>ns → cycles</span>
+      </div>
+
+      <div class="kpi" id="kpiDDRx">
+        <div class="box"><h3>tCK (ns)</h3><b id="k_tck">—</b></div>
+        <div class="box"><h3>Rate (MT/s)</h3><b id="k_rate">—</b></div>
+        <div class="box"><h3>Freq (MHz)</h3><b id="k_mhz">—</b></div>
+        <div class="box"><h3>REFI cycles</h3><b id="k_refi">—</b></div>
+      </div>
+
+      <hr/>
+      <div class="row">
+        <label>Controller DRAM clock (MHz) <span class="muted">(not data rate)</span></label>
+        <input id="clkMHz" type="number" placeholder="e.g. 400 for DDR3‑800" value="400" step="1" min="1" />
+        <button class="btn secondary" id="btnPreset800">Preset: DDR3‑800</button>
+      </div>
+
+      <div class="row"><label>tRCD (ns)</label><input id="tRCD" type="number" placeholder="13.75" value="13.75" step="0.01"/><input id="cRCD" type="text" readonly /></div>
+      <div class="row"><label>tRP (ns)</label><input id="tRP" type="number" placeholder="13.75" value="13.75" step="0.01"/><input id="cRP" type="text" readonly /></div>
+      <div class="row"><label>tRAS (ns)</label><input id="tRAS" type="number" placeholder="35" value="35" step="0.01"/><input id="cRAS" type="text" readonly /></div>
+      <div class="row"><label>tRC (ns) <span class="muted">(≥ tRAS + tRP)</span></label><input id="tRC" type="number" placeholder="48.75" value="48.75" step="0.01"/><input id="cRC" type="text" readonly /></div>
+      <div class="row"><label>tRRD (ns)</label><input id="tRRD" type="number" placeholder="7.5" value="7.5" step="0.01"/><input id="cRRD" type="text" readonly /></div>
+      <div class="row"><label>tFAW (ns)</label><input id="tFAW" type="number" placeholder="30" value="30" step="0.01"/><input id="cFAW" type="text" readonly /></div>
+      <div class="row"><label>tWR (ns)</label><input id="tWR" type="number" placeholder="15" value="15" step="0.01"/><input id="cWR" type="text" readonly /></div>
+      <div class="row"><label>tRTP (ns)</label><input id="tRTP" type="number" placeholder="7.5" value="7.5" step="0.01"/><input id="cRTP" type="text" readonly /></div>
+      <div class="row"><label>tWTR (ns)</label><input id="tWTR" type="number" placeholder="7.5" value="7.5" step="0.01"/><input id="cWTR" type="text" readonly /></div>
+      <div class="row"><label>tRFC (ns)</label><input id="tRFC" type="number" placeholder="160" value="160" step="0.1"/><input id="cRFC" type="text" readonly /></div>
+      <div class="row"><label>tCKE (ns)</label><input id="tCKE" type="number" placeholder="7.5" value="7.5" step="0.01"/><input id="cCKE" type="text" readonly /></div>
+      <div class="row"><label>tCCD (ns)</label><input id="tCCD" type="number" placeholder="5" value="5" step="0.01"/><input id="cCCD" type="text" readonly /></div>
+
+      <div class="row"><label>tREFI (µs)</label><input id="tREFI" type="number" placeholder="7.8" value="7.8" step="0.1"/><input id="cREFI" type="text" readonly /></div>
+
+      <div class="flex" style="margin-top:10px">
+        <button class="btn" id="computeDDRx">Compute Cycles</button>
+        <button class="btn secondary" id="exportDDRx">Export JSON</button>
+        <button class="btn secondary" id="copyRegs">Copy as #defines</button>
+      </div>
+
+      <div class="status" id="statusDDRx"></div>
+
+      <div class="out" id="outDDRx" hidden>
+        <pre></pre>
+      </div>
+    </section>
+
+    <section class="card" id="sdrCard">
+      <div class="section-title">
+        <h2>SDR SDRAM Timing (60x bus / MPC8260‑era)</h2>
+        <span>ns → cycles</span>
+      </div>
+
+      <div class="kpi">
+        <div class="box"><h3>Bus tCK (ns)</h3><b id="s_tck">—</b></div>
+        <div class="box"><h3>Bus Freq (MHz)</h3><b id="s_mhz">—</b></div>
+        <div class="box"><h3>CAS</h3><b id="s_cas">—</b></div>
+        <div class="box"><h3>Refresh int.</h3><b id="s_refi">—</b></div>
+      </div>
+
+      <hr/>
+      <div class="row">
+        <label>60x / local bus clock (MHz)</label>
+        <input id="busMHz" type="number" placeholder="100" value="100" step="1" min="1" />
+        <button class="btn secondary" id="btnPresetSDR">Preset: 100 MHz / CAS 3</button>
+      </div>
+      <div class="row"><label>tRP (ns)</label><input id="s_tRP" type="number" placeholder="20" value="20" step="0.1"/><input id="s_cRP" type="text" readonly /></div>
+      <div class="row"><label>tRCD (ns)</label><input id="s_tRCD" type="number" placeholder="20" value="20" step="0.1"/><input id="s_cRCD" type="text" readonly /></div>
+      <div class="row"><label>tRAS (ns)</label><input id="s_tRAS" type="number" placeholder="45" value="45" step="0.1"/><input id="s_cRAS" type="text" readonly /></div>
+      <div class="row"><label>CAS latency (cycles)</label><input id="s_CAS" type="number" placeholder="2 or 3" value="3" step="1"/><input id="s_cCAS" type="text" readonly /></div>
+      <div class="row"><label>Refresh interval (µs)</label><input id="s_tREFI" type="number" placeholder="7.8" value="7.8" step="0.1"/><input id="s_cREFI" type="text" readonly /></div>
+
+      <div class="flex" style="margin-top:10px">
+        <button class="btn" id="computeSDR">Compute Cycles</button>
+        <button class="btn secondary" id="exportSDR">Export JSON</button>
+        <button class="btn secondary" id="copyRegsSDR">Copy as #defines</button>
+      </div>
+
+      <div class="status" id="statusSDR"></div>
+
+      <div class="out" id="outSDR" hidden>
+        <pre></pre>
+      </div>
+
+      <hr/>
+      <div class="hint">Typical SDR init: PRECHARGE ALL → 8× AUTO REFRESH → LOAD MODE (CAS, BL). Program your memory controller with the cycle counts shown here and enable periodic refresh.
+      </div>
+    </section>
+  </main>
+
+  <section class="wrap card" style="margin-bottom:24px">
+    <h2>Notes</h2>
+    <ul class="sub">
+      <li>Cycles are rounded up using <span class="code">ceil(ns / tCK)</span> (or µs → cycles for tREFI).</li>
+      <li>For DDRx, ensure <b>tRC ≥ tRAS + tRP</b>. The checker will flag violations.</li>
+      <li>Use controller datasheet names when mapping to registers; vendor names vary slightly.</li>
+    </ul>
+  </section>
+
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  const ceil = (x)=>Math.ceil(x);
+  const fmt = (x, d=2)=>Number.isFinite(x)?x.toFixed(d):'—';
+  const clampPos = (v,def=0)=>{v=parseFloat(v);return (Number.isFinite(v)&&v>=0)?v:def};
+
+  function tckFromMHz(mhz){ return 1000.0/Math.max(mhz,1e-9); } // ns
+
+  function computeDDRx(){
+    const mhz = clampPos($("clkMHz").value, 400);
+    const tCK = tckFromMHz(mhz); // ns
+    const rateMT = mhz*2; // DDR data rate
+
+    const ns = (id)=>clampPos($(id).value,0);
+    const vals = {
+      tRCD: ns('tRCD'), tRP: ns('tRP'), tRAS: ns('tRAS'), tRC: ns('tRC'),
+      tRRD: ns('tRRD'), tFAW: ns('tFAW'), tWR: ns('tWR'), tRTP: ns('tRTP'),
+      tWTR: ns('tWTR'), tRFC: ns('tRFC'), tCKE: ns('tCKE'), tCCD: ns('tCCD'),
+      tREFI_us: clampPos($("tREFI").value,7.8)
+    };
+
+    const cyc = {};
+    for (const k of ['tRCD','tRP','tRAS','tRC','tRRD','tFAW','tWR','tRTP','tWTR','tRFC','tCKE','tCCD']){
+      cyc[k] = ceil(vals[k]/tCK);
+      $("c"+k.substring(1)).value = cyc[k] + ' cyc';
+    }
+
+    const refi_cycles = ceil((vals.tREFI_us*1000.0)/tCK);
+    $("cREFI").value = refi_cycles + ' cyc';
+
+    $("k_tck").textContent = fmt(tCK,3);
+    $("k_mhz").textContent = fmt(mhz,0);
+    $("k_rate").textContent = fmt(rateMT,0);
+    $("k_refi").textContent = refi_cycles;
+
+    // Constraints
+    let status = [];
+    const min_tRC = vals.tRAS + vals.tRP;
+    if (vals.tRC + 1e-9 < min_tRC){
+      status.push(`tRC (${fmt(vals.tRC) } ns) < tRAS + tRP (${fmt(min_tRC)} ns)`);
+    }
+    const box = $("statusDDRx");
+    if (status.length){ box.innerHTML = '<span class="bad">Constraint violation:</span> '+status.join('; ');} else { box.innerHTML = '<span class="ok">All basic constraints satisfied.</span>'; }
+
+    const out = {
+      mhz, tCK_ns: tCK, data_rate_MTps: rateMT,
+      timings_ns: vals,
+      timings_cycles: {...cyc, tREFI_cycles: refi_cycles}
+    };
+    const pre = $("outDDRx").querySelector('pre');
+    pre.textContent = JSON.stringify(out, null, 2);
+    $("outDDRx").hidden = false;
+
+    // cache last
+    window.__lastDDRx = out;
+  }
+
+  function exportDDRx(){
+    const data = window.__lastDDRx || {};
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'ddrx_timings.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyRegsDDRx(){
+    const d = window.__lastDDRx; if(!d){return}
+    const c = d.timings_cycles;
+    const defs = [
+      `#define DDR_CLK_MHZ ${Math.round(d.mhz)}`,
+      `#define DDR_TCK_NS ${(d.tCK_ns).toFixed(3)}`,
+      `#define DDR_TRCD_CYC ${c.tRCD}`,
+      `#define DDR_TRP_CYC ${c.tRP}`,
+      `#define DDR_TRAS_CYC ${c.tRAS}`,
+      `#define DDR_TRC_CYC ${c.tRC}`,
+      `#define DDR_TRRD_CYC ${c.tRRD}`,
+      `#define DDR_TFAW_CYC ${c.tFAW}`,
+      `#define DDR_TWR_CYC ${c.tWR}`,
+      `#define DDR_TRTP_CYC ${c.tRTP}`,
+      `#define DDR_TWTR_CYC ${c.tWTR}`,
+      `#define DDR_TRFC_CYC ${c.tRFC}`,
+      `#define DDR_TCKE_CYC ${c.tCKE}`,
+      `#define DDR_TCCD_CYC ${c.tCCD}`,
+      `#define DDR_TREFI_CYC ${c.tREFI_cycles}`
+    ].join('\n');
+    navigator.clipboard.writeText(defs);
+    $("statusDDRx").innerHTML = '<span class="ok">Copied C #defines to clipboard.</span>';
+  }
+
+  function preset800(){
+    $("clkMHz").value = 400;
+    $("tRCD").value = 13.75; $("tRP").value = 13.75; $("tRAS").value = 35; $("tRC").value = 48.75;
+    $("tRRD").value = 7.5; $("tFAW").value = 30; $("tWR").value = 15; $("tRTP").value = 7.5; $("tWTR").value = 7.5; $("tRFC").value = 160; $("tCKE").value = 7.5; $("tCCD").value = 5; $("tREFI").value = 7.8;
+    computeDDRx();
+  }
+
+  // SDR section
+  function computeSDR(){
+    const mhz = clampPos($("busMHz").value,100);
+    const tCK = tckFromMHz(mhz);
+    const tRP = clampPos($("s_tRP").value,20);
+    const tRCD = clampPos($("s_tRCD").value,20);
+    const tRAS = clampPos($("s_tRAS").value,45);
+    const CAS = clampPos($("s_CAS").value,3);
+    const tREFI_us = clampPos($("s_tREFI").value,7.8);
+
+    const cRP = ceil(tRP/tCK), cRCD = ceil(tRCD/tCK), cRAS = ceil(tRAS/tCK), cCAS = ceil(CAS);
+    const cREFI = ceil((tREFI_us*1000.0)/tCK);
+
+    $("s_cRP").value = cRP + ' cyc';
+    $("s_cRCD").value = cRCD + ' cyc';
+    $("s_cRAS").value = cRAS + ' cyc';
+    $("s_cCAS").value = cCAS + ' cyc';
+    $("s_cREFI").value = cREFI + ' cyc';
+
+    $("s_tck").textContent = fmt(tCK,3);
+    $("s_mhz").textContent = fmt(mhz,0);
+    $("s_cas").textContent = cCAS;
+    $("s_refi").textContent = cREFI;
+
+    // Basic sanity: tRC >= tRAS + tRP (implicit)
+    const min_tRC = tRAS + tRP; const cRC = ceil(min_tRC/tCK);
+    let note = `Derived tRC(min) = ${fmt(min_tRC)} ns → ${cRC} cyc`;
+    $("statusSDR").innerHTML = '<span class="ok">'+note+'</span>';
+
+    const out = {
+      bus_mhz: mhz, tCK_ns: tCK,
+      timings_ns: { tRP, tRCD, tRAS, CAS_cycles: CAS, tREFI_us },
+      timings_cycles: { tRP: cRP, tRCD: cRCD, tRAS: cRAS, CAS: cCAS, tREFI_cycles: cREFI, tRC_min_cycles: cRC }
+    };
+    const pre = $("outSDR").querySelector('pre');
+    pre.textContent = JSON.stringify(out,null,2);
+    $("outSDR").hidden = false;
+    window.__lastSDR = out;
+  }
+
+  function exportSDR(){
+    const data = window.__lastSDR || {};
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'sdr_sdram_timings.json'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function copyRegsSDR(){
+    const d = window.__lastSDR; if(!d) return;
+    const c = d.timings_cycles;
+    const defs = [
+      `#define SDR_CLK_MHZ ${Math.round(d.bus_mhz)}`,
+      `#define SDR_TCK_NS ${(d.tCK_ns).toFixed(3)}`,
+      `#define SDR_TRP_CYC ${c.tRP}`,
+      `#define SDR_TRCD_CYC ${c.tRCD}`,
+      `#define SDR_TRAS_CYC ${c.tRAS}`,
+      `#define SDR_CAS_CYC ${c.CAS}`,
+      `#define SDR_TREFI_CYC ${c.tREFI_cycles}`,
+      `#define SDR_TRC_MIN_CYC ${c.tRC_min_cycles}`
+    ].join('\n');
+    navigator.clipboard.writeText(defs);
+    $("statusSDR").innerHTML = '<span class="ok">Copied C #defines to clipboard.</span>';
+  }
+
+  function presetSDR(){
+    $("busMHz").value = 100; $("s_CAS").value = 3; $("s_tRP").value = 20; $("s_tRCD").value = 20; $("s_tRAS").value = 45; $("s_tREFI").value = 7.8; computeSDR();
+  }
+
+  // Bindings
+  $("computeDDRx").addEventListener('click', computeDDRx);
+  $("exportDDRx").addEventListener('click', exportDDRx);
+  $("copyRegs").addEventListener('click', copyRegsDDRx);
+  $("btnPreset800").addEventListener('click', preset800);
+
+  $("computeSDR").addEventListener('click', computeSDR);
+  $("exportSDR").addEventListener('click', exportSDR);
+  $("copyRegsSDR").addEventListener('click', copyRegsSDR);
+  $("btnPresetSDR").addEventListener('click', presetSDR);
+
+  // Auto-compute once
+  preset800();
+  presetSDR();
+})();
+</script>
+</body>
+</html>
