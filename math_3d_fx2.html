@@ -45,6 +45,10 @@
     <option value="Math.exp(-Math.pow(x + y, 2)/20)">exp(-(x+y)²/20)</option>
     <option value="Math.sin(x) * Math.exp(-y*y/5)">sin(x) * exp(-y²/5)</option>
     <option value="Math.cos(y) * Math.exp(-x*x/5)">cos(y) * exp(-x²/5)</option>
+    <option value="Math.sin(x)/x * Math.sin(y)/y">sinc(x) * sinc(y)</option>
+    <option value="Math.exp(-(x*x + y*y)) * Math.cos(5 * (x + y))">Modulated Gaussian (RF style)</option>
+    <option value="Math.cos(2 * Math.PI * x) * Math.cos(2 * Math.PI * y)">Carrier Cosine (RF Grid)</option>
+    <option value="Math.exp(-x*x - y*y) * Math.sin(10 * x)">Gaussian Envelope with 10Hz RF Tone</option>
   </select><br>
 
   <label for="functionInput">Or enter custom function z = f(x, y):</label><br>
