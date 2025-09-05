@@ -49,6 +49,10 @@
     <option value="Math.exp(-(x*x + y*y)) * Math.cos(5 * (x + y))">Modulated Gaussian (RF style)</option>
     <option value="Math.cos(2 * Math.PI * x) * Math.cos(2 * Math.PI * y)">Carrier Cosine (RF Grid)</option>
     <option value="Math.exp(-x*x - y*y) * Math.sin(10 * x)">Gaussian Envelope with 10Hz RF Tone</option>
+    <option value="Math.sin(2 * Math.PI * x * (1 + 0.5 * Math.sin(2 * Math.PI * y / 10)))">FM Modulation</option>
+    <option value="(1 + 0.5 * Math.cos(2 * Math.PI * y / 10)) * Math.cos(2 * Math.PI * x)">AM Modulation</option>
+    <option value="Math.sqrt(Math.pow(Math.cos(x), 2) + Math.pow(Math.sin(y), 2))">I/Q Surface</option>
+    <option value="Math.exp(-x*x - y*y) * Math.cos(20 * x)">FFT-like spectrum (20 Hz burst)</option>
   </select><br>
 
   <label for="functionInput">Or enter custom function z = f(x, y):</label><br>
