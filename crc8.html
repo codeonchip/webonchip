@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CRC-8/H2F (Table-Based) – Web Calculator</title>
+  <style>
+    :root { --bg:#0b0d12; --panel:#121621; --ink:#e7ecf3; --muted:#a8b3c5; --accent:#7cc0ff; --ok:#19c37d; --bad:#ff6868; }
+    html,body{height:100%}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; background:var(--bg); color:var(--ink);}
+    .wrap{max-width:1000px; margin:auto; padding:28px;}
+    h1{margin:0 0 12px; font-size:clamp(20px,3vw,28px)}
+    p.lede{margin:0 0 18px; color:var(--muted)}
+    .grid{display:grid; gap:16px}
+    @media(min-width:900px){ .grid{grid-template-columns:2fr 1fr} }
+    .card{background:var(--panel); border:1px solid #1f2533; border-radius:16px; padding:16px; box-shadow:0 1px 0 #1b2130, 0 8px 24px rgba(0,0,0,.35)}
+    .head{display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:10px}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    label{font-size:13px; color:var(--muted)}
+    textarea{width:100%; background:#0e1320; color:var(--ink); border:1px solid #27324a; border-radius:12px; padding:12px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px; resize:vertical; min-height:120px}
+    input[type="file"]{filter:invert(86%)}
+    .btn{background:#192038; border:1px solid #2a3656; color:var(--ink); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600}
+    .btn:hover{background:#20294a}
+    .btn.ghost{background:transparent}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .muted{color:var(--muted)}
+    .kvs{display:grid; grid-template-columns:max-content 1fr; gap:8px 16px; font-size:14px}
+    .kvs code{font-weight:700}
+    .pill{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#0f1526; border:1px solid #27324a; font-size:12px; color:var(--muted)}
+    .footer{margin-top:18px; font-size:12px; color:var(--muted)}
+    .codeblock{white-space:pre; overflow:auto; background:#0b0f1c; border:1px solid #202a44; padding:12px; border-radius:12px;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>CRC‑8/H2F (Table‑Based) Calculator</h1>
+    <p class="lede">Uses your exact lookup table and routine (init <b>0xFF</b>, final XOR <b>0xFF</b>). Byte‑wise table index is <code>crc ^ data[i]</code>. Output is a single CRC byte.</p>
+
+    <div class="grid">
+      <div class="left card">
+        <div class="head">
+          <div class="row">
+            <span class="pill">Mode:
+              <label style="margin-left:8px"><input type="radio" name="mode" value="hex" checked> Hex</label>
+              <label><input type="radio" name="mode" value="ascii"> ASCII</label>
+            </span>
+          </div>
+          <div class="row">
+            <button class="btn" id="btnEx1">Load 00..07</button>
+            <button class="btn" id="btnEx2">Load FF×8</button>
+            <button class="btn ghost" id="btnClear">Clear</button>
+          </div>
+        </div>
+
+        <label class="muted">Input bytes (<span id="byteCount">0</span> bytes)</label>
+        <textarea id="input" spellcheck="false" placeholder="Hex: e.g., 01 02 03 …   •   ASCII: switch to ASCII and type text. Accepts 0x prefixes, commas, colons, newlines."></textarea>
+
+        <div class="row" style="margin-top:8px">
+          <input type="file" id="file" />
+          <span class="muted">or drop a file here</span>
+          <button class="btn" id="btnCalc">Calculate</button>
+          <button class="btn" id="btnSelf">Self‑test</button>
+        </div>
+
+        <details style="margin-top:12px">
+          <summary>Show C reference (your function)</summary>
+<pre class="codeblock mono">static const uint8 crc8h2f_table[256] = { /* … your table … */ };
+
+uint8 crc8h2f_table_based(const uint8 *data, uint8 len)
+{
+    uint8 crc = 0xFF;
+    for (uint8 i = 0; i < len; ++i)
+    {
+        crc = crc8h2f_table[crc ^ data[i]];
+    }
+    return crc ^ 0xFF;
+}
+</pre>
+        </details>
+      </div>
+
+      <div class="right card">
+        <div class="head"><h3 style="margin:0">Result</h3>
+          <div class="row">
+            <button class="btn" id="btnCopy">Copy hex</button>
+          </div>
+        </div>
+        <div class="kvs mono" id="out">
+          <div>CRC‑8/H2F (hex):</div> <div><code id="hex">—</code></div>
+          <div>CRC (dec):</div> <div><code id="dec">—</code></div>
+          <div>CRC byte:</div> <div><code id="byte">—</code></div>
+          <div>Status:</div> <div id="status" class="muted">Waiting…</div>
+        </div>
+
+        <hr style="border-color:#1f2533; opacity:.4; margin:16px 0" />
+        <div class="footer mono">
+          <b>Test vectors (from this table & routine)</b><br/>
+          • <code>00 01 02 03 04 05 06 07</code> → <code>0xFF</code><br/>
+          • <code>FF FF FF FF FF FF FF FF</code> → <code>0x35</code><br/>
+          • ASCII <code>"123456789"</code> → <code>0x54</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ===== CRC‑8/H2F lookup table (exactly as provided) =====
+  const T = new Uint8Array([
+    0x00,0x2F,0x5E,0x71,0xBC,0x93,0xE2,0xCD, 0x57,0x78,0x09,0x26,0xEB,0xC4,0xB5,0x9A,
+    0xAE,0x81,0xF0,0xDF,0x12,0x3D,0x4C,0x63, 0xF9,0xD6,0xA7,0x88,0x45,0x6A,0x1B,0x34,
+    0x73,0x5C,0x2D,0x02,0xCF,0xE0,0x91,0xBE, 0x24,0x0B,0x7A,0x55,0x98,0xB7,0xC6,0xE9,
+    0xDD,0xF2,0x83,0xAC,0x61,0x4E,0x3F,0x10, 0x8A,0xA5,0xD4,0xFB,0x36,0x19,0x68,0x47,
+    0xE6,0xC9,0xB8,0x97,0x5A,0x75,0x04,0x2B, 0xB1,0x9E,0xEF,0xC0,0x0D,0x22,0x53,0x7C,
+    0x48,0x67,0x16,0x39,0xF4,0xDB,0xAA,0x85, 0x1F,0x30,0x41,0x6E,0xA3,0x8C,0xFD,0xD2,
+    0x95,0xBA,0xCB,0xE4,0x29,0x06,0x77,0x58, 0xC2,0xED,0x9C,0xB3,0x7E,0x51,0x20,0x0F,
+    0x3B,0x14,0x65,0x4A,0x87,0xA8,0xD9,0xF6, 0x6C,0x43,0x32,0x1D,0xD0,0xFF,0x8E,0xA1,
+    0x3D,0x12,0x63,0x4C,0x81,0xAE,0xDF,0xF0, 0x62,0x4D,0x3C,0x13,0xDE,0xF1,0x80,0xAF,
+    0x9B,0xB4,0xC5,0xEA,0x27,0x08,0x79,0x56, 0xCC,0xE3,0x92,0xBD,0x70,0x5F,0x2E,0x01,
+    0x46,0x69,0x18,0x37,0xFA,0xD5,0xA4,0x8B, 0x11,0x3E,0x4F,0x60,0xAD,0x82,0xF3,0xDC,
+    0xE8,0xC7,0xB6,0x99,0x54,0x7B,0x0A,0x25, 0xBF,0x90,0xE1,0xCE,0x03,0x2C,0x5D,0x72,
+    0xD3,0xFC,0x8D,0xA2,0x6F,0x40,0x31,0x1E, 0x84,0xAB,0xDA,0xF5,0x38,0x17,0x66,0x49,
+    0x7D,0x52,0x23,0x0C,0xC1,0xEE,0x9F,0xB0, 0x2A,0x05,0x74,0x5B,0x96,0xB9,0xC8,0xE7,
+    0xA0,0x8F,0xFE,0xD1,0x1C,0x33,0x42,0x6D, 0xF7,0xD8,0xA9,0x86,0x4B,0x64,0x15,0x3A,
+    0x0E,0x21,0x50,0x7F,0xB2,0x9D,0xEC,0xC3, 0x59,0x76,0x07,0x28,0xE5,0xCA,0xBB,0x94
+  ]);
+
+  // ===== Core CRC‑8/H2F (per your table and routine) =====
+  function crc8h2f(bytes){
+    let crc = 0xFF;
+    for(let i=0;i<bytes.length;i++){
+      crc = T[(crc ^ (bytes[i] & 0xFF)) & 0xFF];
+    }
+    return (crc ^ 0xFF) & 0xFF;
+  }
+
+  // ===== Helpers =====
+  const el = (id)=>document.getElementById(id);
+  const hex2 = (n)=> (n & 0xFF).toString(16).toUpperCase().padStart(2,'0');
+  const fmtByte = (b)=> '0x'+hex2(b);
+  const fmtBytes = (arr)=> arr.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+
+  function parseHexLike(text){
+    const cleaned = text
+      .replace(/0x/gi,' ')
+      .replace(/[,_:\n\r\t\-]+/g,' ')
+      .replace(/\b([0-9A-Fa-f]{1,2})h\b/g,'$1')
+      .trim();
+    if(!cleaned) return new Uint8Array();
+    const parts = cleaned.split(/\s+/);
+    const out = new Uint8Array(parts.length);
+    for(let i=0;i<parts.length;i++){
+      const p = parts[i];
+      if(!/^[0-9A-Fa-f]{1,2}$/.test(p)) throw new Error(`Bad hex token: "${p}"`);
+      out[i] = parseInt(p,16) & 0xFF;
+    }
+    return out;
+  }
+
+  function parseAscii(text){
+    const out = new Uint8Array(text.length);
+    for(let i=0;i<text.length;i++) out[i] = text.charCodeAt(i) & 0xFF;
+    return out;
+  }
+
+  function compute(){
+    try{
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const raw = el('input').value;
+      const bytes = (mode === 'hex') ? parseHexLike(raw) : parseAscii(raw);
+      el('byteCount').textContent = String(bytes.length);
+      const crc = crc8h2f(bytes);
+      el('hex').textContent = '0x'+hex2(crc);
+      el('dec').textContent = String(crc);
+      el('byte').textContent = hex2(crc);
+      el('status').textContent = 'OK';
+      el('status').style.color = 'var(--ok)';
+    }catch(err){
+      el('hex').textContent = '—';
+      el('dec').textContent = '—';
+      el('byte').textContent = '—';
+      el('status').textContent = err.message || String(err);
+      el('status').style.color = 'var(--bad)';
+    }
+  }
+
+  // ===== Self-test based on the provided table/routine =====
+  function selfTest(){
+    const v1 = crc8h2f(new Uint8Array([0,1,2,3,4,5,6,7])); // expect 0xFF
+    const v2 = crc8h2f(new Uint8Array([0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF])); // expect 0x35
+    const v3 = crc8h2f(new TextEncoder().encode('123456789')); // expect 0x54 with this routine
+    const ok1 = v1===0xFF, ok2 = v2===0x35, ok3 = v3===0x54;
+    let msg = `00..07 => 0x${hex2(v1)} ${ok1?'PASS':'FAIL'}\nFF×8  => 0x${hex2(v2)} ${ok2?'PASS':'FAIL'}\n"123456789" => 0x${hex2(v3)} ${ok3?'PASS':'FAIL'}`;
+    if(ok1 && ok2 && ok3){ el('status').textContent='Self‑test passed'; el('status').style.color='var(--ok)'; }
+    else { el('status').textContent='Self‑test failed'; el('status').style.color='var(--bad)'; }
+    alert(msg);
+  }
+
+  // ===== Wire up UI =====
+  const $ = (id)=>document.getElementById(id);
+  $('btnCalc').addEventListener('click', compute);
+  $('btnSelf').addEventListener('click', selfTest);
+  $('btnCopy').addEventListener('click', ()=>{ const t = $('hex').textContent; if(t && t !== '—') navigator.clipboard.writeText(t); });
+  $('btnClear').addEventListener('click', ()=>{ $('input').value=''; $('byteCount').textContent='0'; compute(); });
+  $('btnEx1').addEventListener('click', ()=>{ $('input').value='00 01 02 03 04 05 06 07'; compute(); });
+  $('btnEx2').addEventListener('click', ()=>{ $('input').value='FF FF FF FF FF FF FF FF'; compute(); });
+  document.querySelectorAll('input[name="mode"]').forEach(r=> r.addEventListener('change', compute));
+  $('input').addEventListener('input', compute);
+
+  // Drag & drop whole files (CRC over the entire file)
+  document.body.addEventListener('dragover', e=>{ e.preventDefault(); });
+  document.body.addEventListener('drop', e=>{
+    e.preventDefault();
+    if(e.dataTransfer?.files?.[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  $('file').addEventListener('change', (e)=>{ if(e.target.files?.[0]) handleFile(e.target.files[0]); });
+
+  function handleFile(file){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const bytes = new Uint8Array(reader.result);
+      $('byteCount').textContent = String(bytes.length);
+      const crc = crc8h2f(bytes);
+      $('hex').textContent = '0x'+hex2(crc);
+      $('dec').textContent = String(crc);
+      $('byte').textContent = hex2(crc);
+      $('status').textContent = 'OK (file)';
+      $('status').style.color = 'var(--ok)';
+      // show a small preview of the file as hex
+      const previewLen = Math.min(256, bytes.length);
+      let hexPreview = '';
+      for(let i=0;i<previewLen;i++) hexPreview += bytes[i].toString(16).toUpperCase().padStart(2,'0') + (i+1<previewLen?' ':'');
+      $('input').value = hexPreview + (bytes.length>previewLen ? ' …' : '');
+      document.querySelector('input[name="mode"][value="hex"]').checked = true;
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // Initial paint
+  compute();
+</script>
+</body>
+</html>
