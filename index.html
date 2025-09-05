@@ -1,36 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Welcome to My GitHub Page</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Index of HTML files (local folder)</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 50px;
-    }
-    h1 {
-      font-size: 2.5rem;
-    }
-    a.button {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 12px 24px;
-      background-color: #007bff;
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
-      font-size: 1.2rem;
-    }
-    a.button:hover {
-      background-color: #0056b3;
-    }
+    :root { --bg:#0b0d12; --panel:#121621; --ink:#e7ecf3; --muted:#a8b3c5; --accent:#7cc0ff; --ok:#19c37d; --bad:#ff6868; }
+    html,body{height:100%}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; background:var(--bg); color:var(--ink)}
+    .wrap{max-width:1100px; margin:auto; padding:28px}
+    h1{margin:0 0 12px; font-size:clamp(20px,3vw,28px)}
+    p.lede{margin:0 0 18px; color:var(--muted)}
+    .card{background:var(--panel); border:1px solid #1f2533; border-radius:16px; padding:16px; box-shadow:0 1px 0 #1b2130, 0 8px 24px rgba(0,0,0,.35)}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .btn{background:#192038; border:1px solid #2a3656; color:var(--ink); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600}
+    .btn:hover{background:#20294a}
+    .btn.ghost{background:transparent}
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:#0f1526; border:1px solid #27324a; color:var(--muted); font-size:12px}
+    input[type="text"]{background:#0e1320; color:var(--ink); border:1px solid #27324a; border-radius:12px; padding:10px; min-width:260px}
+    table{width:100%; border-collapse:collapse; margin-top:12px}
+    th, td{padding:10px 8px; border-bottom:1px solid #1f2533; font-size:14px}
+    th{color:var(--muted); text-align:left; user-select:none}
+    th.sortable{cursor:pointer}
+    tr:hover{background:#0d1426}
+    code{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .muted{color:var(--muted)}
+    .right{margin-left:auto}
+    .tag{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #2a3656; color:var(--muted)}
+    .hidden{display:none}
+    .footer{margin-top:18px; font-size:12px; color:var(--muted)}
   </style>
 </head>
 <body>
-  <h1>🎮 Welcome to My Games Page</h1>
-  <p>Click below to play a fun Word Search game.</p>
-  <a class="button" href="word_search.html">Play Word Search</a>
+  <div class="wrap">
+    <h1>Index of HTML files</h1>
+    <p class="lede">Lists <code>.html</code>/<code>.htm</code> in a folder you choose. Works locally using the browser's File System Access API (Chrome/Edge/Opera/Arc). Nothing is uploaded.</p>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between; align-items:center; gap:12px">
+        <div class="row">
+          <button class="btn" id="pick">Select folder…</button>
+          <label class="pill"><input type="checkbox" id="recurse"> Include subfolders</label>
+          <label class="pill"><input type="checkbox" id="excludeIndex" checked> Exclude this <code>index.html</code></label>
+        </div>
+        <div class="row">
+          <input id="search" type="text" placeholder="Filter by name…" />
+          <button class="btn ghost" id="clear">Clear</button>
+          <span class="tag" id="count">0 files</span>
+        </div>
+      </div>
+
+      <table id="tbl" class="hidden">
+        <thead>
+          <tr>
+            <th class="sortable" data-sort="name">Name ▾</th>
+            <th class="sortable" data-sort="size">Size</th>
+            <th class="sortable" data-sort="date">Modified</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+
+      <div id="empty" class="muted">No files yet. Click <b>Select folder…</b> to grant access.</div>
+
+      <div class="footer">
+        Tips:
+        <ul>
+          <li>If hosting on a web server in the same directory, the <b>Open (relative)</b> link should work. For local files, <b>Open (blob)</b> works everywhere.</li>
+          <li>Supported browsers: Chromium‑based (Chrome 86+, Edge 86+, etc.). Firefox/Safari currently require different approaches.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id)=>document.getElementById(id);
+  const fmtSize = (n)=> {
+    if (n < 1024) return n + ' B';
+    if (n < 1024**2) return (n/1024).toFixed(1)+' KB';
+    if (n < 1024**3) return (n/1024**2).toFixed(1)+' MB';
+    return (n/1024**3).toFixed(1)+' GB';
+  };
+  const fmtDate = (ms)=> new Date(ms).toLocaleString();
+
+  let files = []; // {name, size, mtime, handle, relPath}
+  let sortKey = 'name';
+  let sortDir = 1; // 1 asc, -1 desc
+
+  function setCount(){
+    $('count').textContent = `${files.length} file${files.length===1?'':'s'}`;
+  }
+
+  function render(){
+    const q = $('search').value.trim().toLowerCase();
+    let view = files.filter(f => f.name.toLowerCase().includes(q));
+
+    view.sort((a,b)=>{
+      let av,bv;
+      if (sortKey==='name'){ av=a.relPath.toLowerCase(); bv=b.relPath.toLowerCase(); }
+      if (sortKey==='size'){ av=a.size; bv=b.size; }
+      if (sortKey==='date'){ av=a.mtime; bv=b.mtime; }
+      return (av>bv?1:av<bv?-1:0)*sortDir;
+    });
+
+    const tbody = $('tbody');
+    tbody.innerHTML = '';
+    for(const f of view){
+      const tr = document.createElement('tr');
+      const nameTd = document.createElement('td');
+      const aRel = document.createElement('a');
+      aRel.href = encodeURI(f.relPath); // relative link (works when hosted)
+      aRel.textContent = f.relPath;
+      aRel.target = '_blank';
+      aRel.rel = 'noopener noreferrer';
+      nameTd.appendChild(aRel);
+
+      const sizeTd = document.createElement('td');
+      sizeTd.textContent = fmtSize(f.size);
+
+      const dateTd = document.createElement('td');
+      dateTd.textContent = fmtDate(f.mtime);
+
+      const actTd = document.createElement('td');
+      const openBlobBtn = document.createElement('button');
+      openBlobBtn.className = 'btn';
+      openBlobBtn.textContent = 'Open (blob)';
+      openBlobBtn.addEventListener('click', async ()=>{
+        const file = await f.handle.getFile();
+        const url = URL.createObjectURL(file);
+        window.open(url, '_blank', 'noopener');
+        setTimeout(()=> URL.revokeObjectURL(url), 60_000);
+      });
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'btn ghost';
+      copyBtn.textContent = 'Copy name';
+      copyBtn.addEventListener('click', ()=> navigator.clipboard.writeText(f.relPath));
+
+      actTd.appendChild(openBlobBtn);
+      actTd.appendChild(document.createTextNode(' '));
+      actTd.appendChild(copyBtn);
+
+      tr.appendChild(nameTd);
+      tr.appendChild(sizeTd);
+      tr.appendChild(dateTd);
+      tr.appendChild(actTd);
+      tbody.appendChild(tr);
+    }
+
+    const has = view.length>0;
+    $('tbl').classList.toggle('hidden', !has);
+    $('empty').classList.toggle('hidden', has);
+    setCount();
+  }
+
+  async function* walkDir(dirHandle, prefix=''){
+    for await (const [name, handle] of dirHandle.entries()){
+      if (handle.kind === 'file'){
+        yield {name, handle, relPath: prefix ? `${prefix}/${name}` : name };
+      } else if (handle.kind === 'directory' && $('recurse').checked){
+        yield* walkDir(handle, prefix ? `${prefix}/${name}` : name);
+      }
+    }
+  }
+
+  $('pick').addEventListener('click', async ()=>{
+    try{
+      const dirHandle = await window.showDirectoryPicker();
+      files = [];
+      for await (const entry of walkDir(dirHandle)){
+        const lower = entry.name.toLowerCase();
+        if (!lower.endsWith('.html') && !lower.endsWith('.htm')) continue;
+        if ($('excludeIndex').checked && /(^|\/)index\.html$/i.test(entry.relPath)) continue;
+        const f = await entry.handle.getFile();
+        files.push({
+          name: entry.name,
+          relPath: entry.relPath,
+          size: f.size,
+          mtime: f.lastModified,
+          handle: entry.handle
+        });
+      }
+      render();
+    } catch (err){
+      console.error(err);
+      alert('Could not access folder. This feature needs a Chromium‑based browser.');
+    }
+  });
+
+  $('clear').addEventListener('click', ()=>{ $('search').value=''; render(); });
+  $('search').addEventListener('input', render);
+
+  // Sorting
+  for (const th of document.querySelectorAll('th.sortable')){
+    th.addEventListener('click', ()=>{
+      const key = th.getAttribute('data-sort');
+      if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+      for (const h of document.querySelectorAll('th.sortable')){
+        h.textContent = h.textContent.replace(/[▴▾]/g,'');
+      }
+      th.textContent = th.textContent + (sortDir>0?' ▾':' ▴');
+      render();
+    });
+  }
+
+  // Feature detection message
+  if (!('showDirectoryPicker' in window)){
+    $('empty').innerHTML = 'Your browser does not support folder access. Try Chrome/Edge, or place a manual list of links here.';
+  }
+</script>
 </body>
 </html>
