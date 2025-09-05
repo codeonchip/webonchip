@@ -12,6 +12,8 @@
     .table-scroll { max-height: 250px; overflow-y: auto; margin-top: 1em; border: 1px solid #ccc; }
     .buttons { margin-top: 0.5em; }
     button { font-size: 1em; padding: 6px 12px; margin-right: 10px; }
+    .highlight { background: yellow; font-weight: bold; }
+    .steps { margin-top: 1em; white-space: pre-wrap; background: #eee; padding: 1em; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -22,11 +24,13 @@
 <textarea id="input" placeholder="Enter hex values..."></textarea>
 
 <div class="buttons">
-  <button onclick="calculateCRC()">Compute CRC8-H2F</button>
   <button onclick="resetForm()">Reset</button>
 </div>
 
 <div class="crc-result" id="result">CRC: 0x--</div>
+
+<h3>Step-by-Step Calculation:</h3>
+<div class="steps" id="stepOutput">--</div>
 
 <div class="table-scroll">
   <table>
@@ -55,42 +59,71 @@
     0x0E,0x21,0x50,0x7F,0xB2,0x9D,0xEC,0xC3,0x59,0x76,0x07,0x28,0xE5,0xCA,0xBB,0x94
   ];
 
+  const inputBox = document.getElementById("input");
+  const resultEl = document.getElementById("result");
+  const stepOutput = document.getElementById("stepOutput");
+  const tableBody = document.getElementById("crcTableBody");
+
   function calculateCRC() {
-    const input = document.getElementById("input").value.trim();
-    if (!input) return;
+    clearHighlights();
+    const input = inputBox.value.trim();
+    if (!input) {
+      resultEl.textContent = 'CRC: 0x--';
+      stepOutput.textContent = '--';
+      return;
+    }
 
     const bytes = input.split(/\s+/).map(h => parseInt(h, 16));
     let crc = 0xFF;
-    for (let i = 0; i < bytes.length; ++i) {
-      crc = crc8h2f_table[crc ^ bytes[i]];
-    }
-    crc ^= 0xFF;
+    let steps = `Init CRC: 0xFF\n`;
 
-    document.getElementById("result").textContent = `CRC: 0x${crc.toString(16).padStart(2, '0').toUpperCase()}`;
+    for (let i = 0; i < bytes.length; ++i) {
+      const before = crc;
+      const index = crc ^ bytes[i];
+      crc = crc8h2f_table[index];
+      steps += `Byte[${i}] = 0x${bytes[i].toString(16).padStart(2, '0').toUpperCase()} => Index: 0x${index.toString(16).padStart(2, '0').toUpperCase()} => Table[${index}] = 0x${crc.toString(16).padStart(2, '0').toUpperCase()}\n`;
+      highlightTable(index);
+    }
+
+    crc ^= 0xFF;
+    steps += `\nFinal XOR with 0xFF: 0x${crc.toString(16).padStart(2, '0').toUpperCase()}`;
+    resultEl.textContent = `CRC: 0x${crc.toString(16).padStart(2, '0').toUpperCase()}`;
+    stepOutput.textContent = steps;
   }
 
   function resetForm() {
-    document.getElementById("input").value = '';
-    document.getElementById("result").textContent = 'CRC: 0x--';
-    document.getElementById("input").focus();
+    inputBox.value = '';
+    resultEl.textContent = 'CRC: 0x--';
+    stepOutput.textContent = '--';
+    inputBox.focus();
+    clearHighlights();
+  }
+
+  function highlightTable(index) {
+    const rows = tableBody.querySelectorAll("tr");
+    if (rows[index]) rows[index].classList.add("highlight");
+  }
+
+  function clearHighlights() {
+    tableBody.querySelectorAll("tr").forEach(tr => tr.classList.remove("highlight"));
   }
 
   function fillTable() {
-    const tableBody = document.getElementById("crcTableBody");
-    crc8h2f_table.forEach((val, idx) => {
+    for (let i = 0; i < crc8h2f_table.length; ++i) {
       const row = document.createElement("tr");
       const tdIndex = document.createElement("td");
-      tdIndex.textContent = idx.toString(16).padStart(2, '0').toUpperCase();
+      tdIndex.textContent = i.toString(16).padStart(2, '0').toUpperCase();
       const tdVal = document.createElement("td");
-      tdVal.textContent = val.toString(16).padStart(2, '0').toUpperCase();
+      tdVal.textContent = crc8h2f_table[i].toString(16).padStart(2, '0').toUpperCase();
       row.appendChild(tdIndex);
       row.appendChild(tdVal);
       tableBody.appendChild(row);
-    });
+    }
   }
+
+  inputBox.addEventListener("input", calculateCRC);
 
   fillTable();
 </script>
-
 </body>
 </html>
