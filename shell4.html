@@ -1,3 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Web Shell</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900">
+
+  <div id="root"></div>
+
+  <!-- React and ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Your WebShell code -->
+  <script type="text/babel">
+    /* paste the full WebShell component code here */
+    /* for example: */
+    function WebShell() {
+
+
 import React, {useEffect, useMemo, useRef, useState} from "react";
 
 // --- Small helpers ---------------------------------------------------------
@@ -463,3 +488,11 @@ export default function WebShell(){
     </div>
   );
 }
+
+
+ }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<WebShell />);
+  </script>
+</body>
+</html>
