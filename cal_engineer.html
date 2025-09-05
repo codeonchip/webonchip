@@ -2,905 +2,620 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>All‑in‑One Engineering Calculators</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All-in-One Engineering Calculators</title>
   <style>
     :root{
-      --bg: #0b1020; /* deep navy */
-      --bg-soft: #111735;
-      --panel: #151c3b;
-      --panel-2: #1b2450;
-      --text: #e7ecff;
-      --muted: #b6c1ff;
-      --accent: #6ea8fe;
-      --accent-2:#7df9c6;
-      --danger:#ff6b6b;
-      --ok:#6ef0a5;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --radius: 16px;
+      --bg:#0f172a; /* slate-900 */
+      --panel:#111827; /* gray-900 */
+      --card:#1f2937; /* gray-800 */
+      --muted:#94a3b8; /* slate-400 */
+      --text:#e5e7eb; /* gray-200 */
+      --accent:#38bdf8; /* sky-400 */
+      --accent-2:#a78bfa; /* violet-400 */
+      --good:#22c55e; /* green-500 */
+      --warn:#f59e0b; /* amber-500 */
+      --bad:#ef4444; /* red-500 */
+      --card-br:16px;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      color:var(--text); background: radial-gradient(1200px 800px at 15% 10%, #18214d 0%, var(--bg) 45%);
-    }
-    .app{display:grid; grid-template-columns: 280px 1fr; min-height:100vh}
-    aside{
-      position:sticky; top:0; align-self:start; height:100vh; overflow:auto;
-      background: linear-gradient(180deg, var(--panel) 0%, #0f1430 100%);
-      border-right:1px solid rgba(255,255,255,.06);
-      padding:20px; box-shadow: var(--shadow);
-    }
-    .brand{display:flex; gap:10px; align-items:center; margin-bottom:12px}
-    .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow:0 6px 16px rgba(110,168,254,.4)}
-    h1{font-size:18px;margin:0}
-    .muted{color:var(--muted); font-size:12px}
-    nav{margin-top:18px; display:flex; flex-direction:column; gap:8px}
-    nav a{
-      text-decoration:none; color:var(--text); padding:10px 12px; border-radius:12px; display:flex; align-items:center; gap:10px;
-      background:transparent; border:1px solid rgba(255,255,255,.06);
-    }
-    nav a:hover{background:rgba(255,255,255,.06)}
-    main{padding:28px;}
-    .section{margin-bottom:38px}
-    .section h2{margin:0 0 12px 0; font-size:22px}
-    .section p{margin:0 0 18px 0; color:var(--muted)}
-    .cards{display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px}
-    .card{
-      background:linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
-      border:1px solid rgba(255,255,255,.08); border-radius: var(--radius); padding:16px; box-shadow: var(--shadow);
-    }
-    .card h3{margin:0 0 8px 0; font-size:16px}
-    .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
-    label{font-size:12px; color:var(--muted)}
-    input, select, button, textarea{
-      width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#0d1330; color:var(--text);
-    }
-    input:focus, select:focus, textarea:focus{outline:2px solid rgba(110,168,254,.6); border-color:rgba(110,168,254,.4)}
-    .btn{background: linear-gradient(135deg, var(--accent), #88c7ff); border:none; color:#08112b; font-weight:700; cursor:pointer}
-    .btn.secondary{background: linear-gradient(135deg, #2cf2bd, #64ffd6)}
-    .btn.danger{background: linear-gradient(135deg, #ff8a8a, #ff6b6b)}
-    .btn:disabled{opacity:.55; cursor:not-allowed}
-    .result{margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(125,249,198,.08); border:1px dashed rgba(125,249,198,.35)}
-    .note{font-size:12px; color:var(--muted)}
-    .formula{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:12px; background:#0d1330; padding:2px 6px; border-radius:8px}
-    .grid-3{display:grid; grid-template-columns: repeat(3, 1fr); gap:10px}
-    .small{font-size:11px}
-    .hr{height:1px; background:rgba(255,255,255,.08); margin:12px 0}
-    footer{color:var(--muted); font-size:12px; margin-top:24px}
-    .kpi{display:flex; gap:8px; flex-wrap:wrap}
-    .pill{padding:6px 10px; border-radius:999px; background:rgba(110,168,254,.12); border:1px solid rgba(110,168,254,.35); font-size:12px}
-    .formula-block{background:#0d1330; border:1px solid rgba(255,255,255,.08); padding:8px 10px; border-radius:12px; overflow:auto}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#0b1026 35%, #0a0f22);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+    header{position:sticky;top:0;z-index:10;background:rgba(15,23,42,.8);backdrop-filter:blur(8px);border-bottom:1px solid #1e293b}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    h1{margin:0;font-size:24px;letter-spacing:.4px}
+    .subtitle{color:var(--muted);font-size:13px;margin-top:4px}
+    .layout{display:grid;grid-template-columns:260px 1fr;gap:18px;padding:16px}
+    @media (max-width: 920px){.layout{grid-template-columns:1fr}}
+
+    /* Sidebar */
+    .sidebar{background:var(--panel);border:1px solid #1f2a3a;border-radius:18px;padding:12px;position:sticky;top:80px;height:min(80vh,800px);overflow:auto}
+    .filter-title{font-size:13px;color:var(--muted);margin:8px 10px}
+    .pill{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:6px;border-radius:12px;cursor:pointer;border:1px solid #21314a;background:#0c1426;transition:.15s}
+    .pill:hover{border-color:#2a3e63;background:#0f1a33}
+    .pill.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.15) inset}
+    .pill span{font-weight:600}
+
+    /* Main grid */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+    .card{background:var(--card);border:1px solid #253147;border-radius:var(--card-br);padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .card h3{margin:0 0 10px 0;font-size:18px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #2b3347;color:#cbd5e1;background:#111827;font-size:12px;margin-bottom:10px}
+    .desc{color:var(--muted);font-size:12px;margin:6px 0 12px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    label{font-size:12px;color:#cbd5e1}
+    input,select{width:100%;padding:10px;border-radius:10px;border:1px solid #2b3347;background:#0b1222;color:#e5e7eb}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    button{padding:10px 12px;border-radius:12px;border:1px solid #284463;background:#0e1a2b;color:#e6f6ff;cursor:pointer;font-weight:600}
+    button:hover{background:#12243c;border-color:#2c6a94}
+    .primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));border:none;color:#0b1020}
+    .primary:hover{filter:brightness(1.05)}
+    .out{color:#d1fae5;border-color:#276a51;background:#0a1712}
+    .result{margin-top:10px;padding:10px;border-radius:12px;background:#0b1220;border:1px dashed #284463;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;white-space:pre-wrap}
+    .muted{color:var(--muted)}
+    .footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
+    .small{font-size:11px;color:#9ca3af}
+    .unit{opacity:.9}
+    .link{color:var(--accent)}
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside>
-      <div class="brand">
-        <div class="logo" aria-hidden="true"></div>
-        <div>
-          <h1>Engineering Calculators</h1>
-          <div class="muted">Single‑page toolkit</div>
-        </div>
-      </div>
-      <nav>
-        <a href="#electrical">⚡ Electrical</a>
-        <a href="#chemical">🧪 Chemical</a>
-        <a href="#civil">🏗️ Civil</a>
-        <a href="#mechanical">⚙️ Mechanical</a>
-        <a href="#software">💻 Software</a>
-      $1
-      <nav style="margin-top:8px">
-        <a href="#rf">📡 RF</a>
-      </nav>
-      <div class="hr"></div>
-      <div class="small muted">Tip: Values are SI by default. Hover labels for hints. Use the Reset buttons to clear forms.</div>
+  <header>
+    <div class="wrap">
+      <h1>All-in-One Engineering Calculators</h1>
+      <div class="subtitle">Chemical • Civil • Electrical • RF • Mechanical • Software — single page, fast, and offline.</div>
+    </div>
+  </header>
+
+  <div class="layout wrap">
+    <!-- Sidebar Filters -->
+    <aside class="sidebar" id="sidebar">
+      <div class="filter-title">Show calculators for</div>
+      <div class="pill active" data-tag="all"><span>All</span></div>
+      <div class="pill" data-tag="chemical"><span>Chemical Eng</span></div>
+      <div class="pill" data-tag="civil"><span>Civil Eng</span></div>
+      <div class="pill" data-tag="electrical"><span>Electrical Eng</span></div>
+      <div class="pill" data-tag="rf"><span>RF Engineer</span></div>
+      <div class="pill" data-tag="mechanical"><span>Mechanical Eng</span></div>
+      <div class="pill" data-tag="software"><span>Software Eng</span></div>
     </aside>
 
-    <main>
-      <!-- ELECTRICAL -->
-      <section id="electrical" class="section">
-        <h2>⚡ Electrical Engineering</h2>
-        <p>Quick tools for Ohm's law, reactance, and dividers.</p>
-        <div class="cards">
-          <div class="card">
-            <h3>Ohm's Law Solver</h3>
-            <div class="row">
-              <div>
-                <label title="Voltage in volts">Voltage V (V)</label>
-                <input id="ee_v" type="number" step="any" placeholder="e.g., 12" />
-              </div>
-              <div>
-                <label title="Current in amperes">Current I (A)</label>
-                <input id="ee_i" type="number" step="any" placeholder="e.g., 0.5" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label title="Resistance in ohms">Resistance R (Ω)</label>
-                <input id="ee_r" type="number" step="any" placeholder="e.g., 24" />
-              </div>
-              <div>
-                <label title="Power in watts (calculated)">Power P (W)</label>
-                <input id="ee_p" type="number" step="any" placeholder="auto" disabled />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" onclick="ohmsLawSolve()">Solve Missing</button>
-              <button class="btn secondary" onclick="clearOhms()">Reset</button>
-            </div>
-            <div id="ee_ohm_out" class="result" hidden></div>
-            <div class="note">Provide any <b>two</b> of V, I, R. The rest will be calculated. P is always V×I.</div>
+    <!-- Main Cards -->
+    <main class="grid" id="cards">
+      <!-- ================= CHEMICAL ================= -->
+      <section class="card" data-tags="chemical">
+        <div class="badge">Chemical</div>
+        <h3>Ideal Gas Law (PV = nRT)</h3>
+        <div class="desc">Solve for one unknown. Units: P[kPa], V[L], n[mol], T[K], R = 8.314462618 J/mol·K.</div>
+        <div class="row">
+          <div>
+            <label>Known P (kPa)</label>
+            <input id="chem_p" type="number" step="any" placeholder="e.g., 101.325" />
           </div>
-
-          <div class="card">
-            <h3>Reactance @ Frequency</h3>
-            <div class="row">
-              <div>
-                <label>f (Hz)</label>
-                <input id="rx_f" type="number" step="any" placeholder="1000" />
-              </div>
-              <div>
-                <label>C (µF)</label>
-                <input id="rx_c" type="number" step="any" placeholder="1" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>L (mH)</label>
-                <input id="rx_l" type="number" step="any" placeholder="10" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="reactanceCalc()">Calculate</button>
-              </div>
-            </div>
-            <div id="rx_out" class="result" hidden></div>
-            <div class="note">X<sub>C</sub>=1/(2π f C), X<sub>L</sub>=2π f L. Inputs in µF and mH are converted internally.</div>
-          </div>
-
-          <div class="card">
-            <h3>Voltage Divider</h3>
-            <div class="row">
-              <div>
-                <label>V<sub>in</sub> (V)</label>
-                <input id="vd_vin" type="number" step="any" placeholder="5" />
-              </div>
-              <div>
-                <label>R1 (Ω)</label>
-                <input id="vd_r1" type="number" step="any" placeholder="1000" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>R2 (Ω)</label>
-                <input id="vd_r2" type="number" step="any" placeholder="2000" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="voltageDivider()">Compute Vout</button>
-              </div>
-            </div>
-            <div id="vd_out" class="result" hidden></div>
-            <div class="note">Ideal divider: V<sub>out</sub> = V<sub>in</sub> · R2 / (R1 + R2).</div>
+          <div>
+            <label>Known V (L)</label>
+            <input id="chem_v" type="number" step="any" placeholder="e.g., 22.414" />
           </div>
         </div>
+        <div class="row">
+          <div>
+            <label>Known n (mol)</label>
+            <input id="chem_n" type="number" step="any" placeholder="e.g., 1" />
+          </div>
+          <div>
+            <label>Known T (K)</label>
+            <input id="chem_t" type="number" step="any" placeholder="e.g., 273.15" />
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="idealGasSolve()">Solve Unknown</button>
+          <button onclick="clearFields(['chem_p','chem_v','chem_n','chem_t'],'chem_out')">Clear</button>
+        </div>
+        <div id="chem_out" class="result"></div>
       </section>
 
-      <!-- CHEMICAL -->
-      <section id="chemical" class="section">
-        <h2>🧪 Chemical Engineering</h2>
-        <p>Fluid/thermo helpers: Ideal Gas, Reynolds &amp; Pressure Drop, and CSTR residence time.</p>
-        <div class="cards">
-          <div class="card">
-            <h3>Ideal Gas Law (P·V = n·R·T)</h3>
-            <div class="row">
-              <div>
-                <label>P (kPa)</label>
-                <input id="ig_p" type="number" step="any" placeholder="101.325" />
-              </div>
-              <div>
-                <label>V (L)</label>
-                <input id="ig_v" type="number" step="any" placeholder="22.414" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>n (mol)</label>
-                <input id="ig_n" type="number" step="any" placeholder="1" />
-              </div>
-              <div>
-                <label>T (K)</label>
-                <input id="ig_t" type="number" step="any" placeholder="273.15" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" onclick="idealGasSolve()">Solve Missing</button>
-              <button class="btn secondary" onclick="clearIG()">Reset</button>
-            </div>
-            <div id="ig_out" class="result" hidden></div>
-            <div class="note">Uses R = 8.314462618 kPa·L·mol⁻¹·K⁻¹. Supply any three variables.</div>
+      <section class="card" data-tags="chemical">
+        <div class="badge">Chemical</div>
+        <h3>Pipe Reynolds Number</h3>
+        <div class="desc">Re = ρ v D / μ. Choose fluid density ρ [kg/m³], velocity v [m/s], diameter D [m], dynamic viscosity μ [Pa·s].</div>
+        <div class="row3">
+          <div>
+            <label>ρ (kg/m³)</label>
+            <input id="re_rho" type="number" step="any" placeholder="997 (water)" />
           </div>
-
-          <div class="card">
-            <h3>Pipe Flow: Reynolds, f, ΔP (Darcy–Weisbach)</h3>
-            <div class="row">
-              <div>
-                <label>Diameter D (m)</label>
-                <input id="pf_d" type="number" step="any" placeholder="0.05" />
-              </div>
-              <div>
-                <label>Length L (m)</label>
-                <input id="pf_l" type="number" step="any" placeholder="10" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Volumetric Flow Q (m³/s)</label>
-                <input id="pf_q" type="number" step="any" placeholder="0.002" />
-              </div>
-              <div>
-                <label>Roughness ε (m)</label>
-                <input id="pf_eps" type="number" step="any" placeholder="0.000045" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Density ρ (kg/m³)</label>
-                <input id="pf_rho" type="number" step="any" placeholder="998" />
-              </div>
-              <div>
-                <label>Viscosity μ (Pa·s)</label>
-                <input id="pf_mu" type="number" step="any" placeholder="0.001" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" onclick="pipeFlowCalc()">Calculate</button>
-              <button class="btn secondary" onclick="clearPF()">Reset</button>
-            </div>
-            <div id="pf_out" class="result" hidden></div>
-            <div class="note">Swamee–Jain for turbulent: f = 0.25 / [log10(ε/(3.7D) + 5.74/Re^0.9)]². Laminar (Re&lt;2300): f=64/Re.</div>
+          <div>
+            <label>v (m/s)</label>
+            <input id="re_v" type="number" step="any" placeholder="1.0" />
           </div>
-
-          <div class="card">
-            <h3>CSTR Residence Time</h3>
-            <div class="row">
-              <div>
-                <label>Tank Volume V (m³)</label>
-                <input id="cstr_v" type="number" step="any" placeholder="5" />
-              </div>
-              <div>
-                <label>Flow Rate Q (m³/s)</label>
-                <input id="cstr_q" type="number" step="any" placeholder="0.02" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" onclick="cstrCalc()">Compute τ</button>
-              <button class="btn secondary" onclick="clearCSTR()">Reset</button>
-            </div>
-            <div id="cstr_out" class="result" hidden></div>
-            <div class="note">τ = V / Q (seconds). Multiply by 60 for minutes if desired.</div>
+          <div>
+            <label>D (m)</label>
+            <input id="re_d" type="number" step="any" placeholder="0.05" />
           </div>
         </div>
+        <div class="row">
+          <div>
+            <label>μ (Pa·s)</label>
+            <input id="re_mu" type="number" step="any" placeholder="0.001 (water @20°C)" />
+          </div>
+          <div>
+            <label class="muted">Tip</label>
+            <input disabled value="Laminar &lt; 2300 • Transitional 2300–4000 • Turbulent &gt; 4000" />
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="reynoldsCalc()">Compute Re</button>
+          <button onclick="clearFields(['re_rho','re_v','re_d','re_mu'],'re_out')">Clear</button>
+        </div>
+        <div id="re_out" class="result"></div>
       </section>
 
-      <!-- CIVIL -->
-      <section id="civil" class="section">
-        <h2>🏗️ Civil Engineering</h2>
-        <p>Beam deflection &amp; stress, concrete volume, and slope/grade.</p>
-        <div class="cards">
-          <div class="card">
-            <h3>Beam (Simply Supported, Center Load)</h3>
-            <div class="row">
-              <div>
-                <label>Load P (N)</label>
-                <input id="beam_p" type="number" step="any" placeholder="1000" />
-              </div>
-              <div>
-                <label>Length L (m)</label>
-                <input id="beam_l" type="number" step="any" placeholder="2" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Elastic Modulus E (Pa)</label>
-                <input id="beam_e" type="number" step="any" placeholder="2e11" />
-              </div>
-              <div>
-                <label>Rect. Section b×h (m)</label>
-                <div class="row">
-                  <input id="beam_b" type="number" step="any" placeholder="0.05" />
-                  <input id="beam_h" type="number" step="any" placeholder="0.10" />
-                </div>
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" onclick="beamCalc()">Calculate</button>
-              <button class="btn secondary" onclick="clearBeam()">Reset</button>
-            </div>
-            <div id="beam_out" class="result" hidden></div>
-            <div class="note">δ<sub>max</sub>=P L³/(48 E I), I=b h³/12, σ<sub>max</sub>=M<sub>max</sub>·(h/2)/I with M<sub>max</sub>=P L/4.</div>
-          </div>
-
-          <div class="card">
-            <h3>Concrete Volume (Slab)</h3>
-            <div class="row">
-              <div>
-                <label>Length (m)</label>
-                <input id="conc_l" type="number" step="any" placeholder="4" />
-              </div>
-              <div>
-                <label>Width (m)</label>
-                <input id="conc_w" type="number" step="any" placeholder="3" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Thickness (m)</label>
-                <input id="conc_t" type="number" step="any" placeholder="0.12" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="concCalc()">Compute Volume</button>
-              </div>
-            </div>
-            <div id="conc_out" class="result" hidden></div>
-            <div class="note">Outputs m³ and yd³ (1 m³ = 1.30795 yd³). Add 5–10% waste as needed.</div>
-          </div>
-
-          <div class="card">
-            <h3>Slope / Grade</h3>
-            <div class="row">
-              <div>
-                <label>Rise</label>
-                <input id="slope_rise" type="number" step="any" placeholder="1" />
-              </div>
-              <div>
-                <label>Run</label>
-                <input id="slope_run" type="number" step="any" placeholder="10" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" onclick="slopeCalc()">Calculate</button>
-              <button class="btn secondary" onclick="clearSlope()">Reset</button>
-            </div>
-            <div id="slope_out" class="result" hidden></div>
-            <div class="note">Grade % = 100 × rise/run. Angle θ = arctan(rise/run).</div>
-          </div>
+      <!-- ================= CIVIL ================= -->
+      <section class="card" data-tags="civil">
+        <div class="badge">Civil</div>
+        <h3>Beam (Simply Supported, Midspan Point Load)</h3>
+        <div class="desc">Deflection δ = (P L³)/(48 E I). Moment at midspan M = P L/4. Rectangular section: I = b h³/12.</div>
+        <div class="row3">
+          <div><label>Load P (N)</label><input id="beam_P" type="number" step="any" placeholder="1000" /></div>
+          <div><label>Length L (m)</label><input id="beam_L" type="number" step="any" placeholder="2" /></div>
+          <div><label>Modulus E (GPa)</label><input id="beam_E" type="number" step="any" placeholder="200" /></div>
         </div>
+        <div class="row3">
+          <div><label>Width b (m)</label><input id="beam_b" type="number" step="any" placeholder="0.05" /></div>
+          <div><label>Height h (m)</label><input id="beam_h" type="number" step="any" placeholder="0.2" /></div>
+          <div><label>Allowable σ (MPa) <span class="small">(optional)</span></label><input id="beam_allow" type="number" step="any" placeholder="" /></div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="beamCalc()">Compute δ and σ</button>
+          <button onclick="clearFields(['beam_P','beam_L','beam_E','beam_b','beam_h','beam_allow'],'beam_out')">Clear</button>
+        </div>
+        <div id="beam_out" class="result"></div>
       </section>
 
-      <!-- MECHANICAL -->
-      <section id="mechanical" class="section">
-        <h2>⚙️ Mechanical Engineering</h2>
-        <p>Gearing, thermal expansion, and power from torque &amp; RPM.</p>
-        <div class="cards">
-          <div class="card">
-            <h3>Gear Ratio: Speed &amp; Torque</h3>
-            <div class="row">
-              <div>
-                <label>Driver Teeth (N<sub>1</sub>)</label>
-                <input id="gear_n1" type="number" step="any" placeholder="20" />
-              </div>
-              <div>
-                <label>Driven Teeth (N<sub>2</sub>)</label>
-                <input id="gear_n2" type="number" step="any" placeholder="40" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Input RPM</label>
-                <input id="gear_rpm_in" type="number" step="any" placeholder="1500" />
-              </div>
-              <div>
-                <label>Input Torque (N·m)</label>
-                <input id="gear_t_in" type="number" step="any" placeholder="10" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Efficiency η (0–1)</label>
-                <input id="gear_eta" type="number" step="any" value="0.98" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="gearCalc()">Calculate</button>
-              </div>
-            </div>
-            <div id="gear_out" class="result" hidden></div>
-            <div class="note">Ratio i = N₂/N₁. RPM<sub>out</sub>=RPM<sub>in</sub>/i. Torque<sub>out</sub>=Torque<sub>in</sub>·i·η.</div>
-          </div>
-
-          <div class="card">
-            <h3>Thermal Expansion</h3>
-            <div class="row">
-              <div>
-                <label>α (1/K)</label>
-                <input id="te_alpha" type="number" step="any" placeholder="1.2e-5" />
-              </div>
-              <div>
-                <label>Length L (m)</label>
-                <input id="te_l" type="number" step="any" placeholder="2" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>ΔT (K)</label>
-                <input id="te_dt" type="number" step="any" placeholder="50" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="thermalExp()">Compute ΔL</button>
-              </div>
-            </div>
-            <div id="te_out" class="result" hidden></div>
-            <div class="note">ΔL = α · L · ΔT. Approximate linear expansion.</div>
-          </div>
-
-          <div class="card">
-            <h3>Power from Torque &amp; RPM</h3>
-            <div class="row">
-              <div>
-                <label>Torque τ (N·m)</label>
-                <input id="p_torque" type="number" step="any" placeholder="50" />
-              </div>
-              <div>
-                <label>Speed n (RPM)</label>
-                <input id="p_rpm" type="number" step="any" placeholder="3000" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" onclick="powerFromTR()">Calculate</button>
-              <button class="btn secondary" onclick="clearPower()">Reset</button>
-            </div>
-            <div id="p_out" class="result" hidden></div>
-            <div class="note">P(W)=τ·2π·n/60. Horsepower = P/746.</div>
-          </div>
+      <!-- ================= ELECTRICAL ================= -->
+      <section class="card" data-tags="electrical">
+        <div class="badge">Electrical</div>
+        <h3>Ohm's Law</h3>
+        <div class="desc">Enter any two to solve the rest.</div>
+        <div class="row3">
+          <div><label>V (V)</label><input id="ohm_V" type="number" step="any" /></div>
+          <div><label>I (A)</label><input id="ohm_I" type="number" step="any" /></div>
+          <div><label>R (Ω)</label><input id="ohm_R" type="number" step="any" /></div>
         </div>
-      </section>
-      <!-- RF -->
-      <section id="rf" class="section">
-        <h2>📡 RF Engineering</h2>
-        <p>Quick radio helpers: dBm↔mW, wavelength, free‑space path loss, link budget, VSWR/return loss, and noise floor.</p>
-        <div class="cards">
-          <div class="card">
-            <h3>dBm ↔ mW & Wavelength</h3>
-            <div class="row">
-              <div>
-                <label>Power (dBm)</label>
-                <input id="rf_dbm" type="number" step="any" placeholder="30" />
-              </div>
-              <div>
-                <label>Power (mW)</label>
-                <input id="rf_mw" type="number" step="any" placeholder="1000" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Frequency f (MHz)</label>
-                <input id="rf_f_mhz" type="number" step="any" placeholder="2400" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="rfPowerConvert()">Convert</button>
-              </div>
-            </div>
-            <div id="rf_basic_out" class="result" hidden></div>
-            <div class="note">mW = 10<sup>dBm/10</sup>; dBm = 10·log₁₀(mW). Wavelength λ = c / f. Quarter‑wave = λ/4.</div>
-          </div>
-
-          <div class="card">
-            <h3>FSPL & Link Budget (Friis)</h3>
-            <div class="row">
-              <div>
-                <label>Frequency f (MHz)</label>
-                <input id="fspl_f" type="number" step="any" placeholder="2400" />
-              </div>
-              <div>
-                <label>Distance d (km)</label>
-                <input id="fspl_d" type="number" step="any" placeholder="1" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>P<sub>t</sub> (dBm)</label>
-                <input id="fspl_pt" type="number" step="any" placeholder="20" />
-              </div>
-              <div>
-                <label>G<sub>t</sub>/G<sub>r</sub> (dBi)</label>
-                <div class="row">
-                  <input id="fspl_gt" type="number" step="any" placeholder="2" />
-                  <input id="fspl_gr" type="number" step="any" placeholder="2" />
-                </div>
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Misc Loss L (dB)</label>
-                <input id="fspl_l" type="number" step="any" value="0" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="fsplLinkBudget()">Compute</button>
-              </div>
-            </div>
-            <div id="fspl_out" class="result" hidden></div>
-            <div class="note">FSPL(dB)=32.44+20log₁₀(f<sub>MHz</sub>)+20log₁₀(d<sub>km</sub>). Friis: P<sub>r</sub>=P<sub>t</sub>+G<sub>t</sub>+G<sub>r</sub>−FSPL−L.</div>
-          </div>
-
-          <div class="card">
-            <h3>VSWR / Return Loss & Noise</h3>
-            <div class="row">
-              <div>
-                <label>VSWR</label>
-                <input id="vswr_v" type="number" step="any" placeholder="1.5" />
-              </div>
-              <div>
-                <label>Bandwidth (Hz)</label>
-                <input id="noise_bw" type="number" step="any" placeholder="20000000" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Noise Figure NF (dB)</label>
-                <input id="noise_nf" type="number" step="any" placeholder="5" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="vswrAndNoise()">Calculate</button>
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Antenna size D (m)</label>
-                <input id="ff_d" type="number" step="any" placeholder="0.1" />
-              </div>
-              <div>
-                <label>Use f (MHz) above</label>
-                <input id="ff_f_mhz" type="number" step="any" placeholder="2400" />
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn secondary" onclick="farFieldBoundary()">Far‑Field Boundary</button>
-            </div>
-            <div id="vswr_noise_out" class="result" hidden></div>
-            <div class="note">Γ=(VSWR−1)/(VSWR+1); RL=−20log₁₀|Γ|; mismatch loss = −10log₁₀(1−|Γ|²). Noise floor ≈ −174 dBm/Hz + 10log₁₀(BW) + NF.</div>
-          </div>
+        <div class="actions">
+          <button class="primary" onclick="ohmsLaw()">Solve</button>
+          <button onclick="clearFields(['ohm_V','ohm_I','ohm_R'],'ohm_out')">Clear</button>
         </div>
+        <div id="ohm_out" class="result"></div>
       </section>
 
-      $1
-      <section id="software" class="section">
-        <h2>💻 Software Engineering</h2>
-        <p>Bandwidth/download time, SLA uptime ⇒ downtime, and bits required.</p>
-        <div class="cards">
-          <div class="card">
-            <h3>Download Time</h3>
-            <div class="row">
-              <div>
-                <label>File Size</label>
-                <div class="row">
-                  <input id="dl_size" type="number" step="any" placeholder="1024" />
-                  <select id="dl_size_unit">
-                    <option value="MB">MB</option>
-                    <option value="GB">GB</option>
-                    <option value="KB">KB</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label>Bandwidth</label>
-                <div class="row">
-                  <input id="dl_bw" type="number" step="any" placeholder="100" />
-                  <select id="dl_bw_unit">
-                    <option value="Mbps">Mbps</option>
-                    <option value="MBps">MB/s</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <div>
-                <label>Overhead (0–1)</label>
-                <input id="dl_oh" type="number" step="any" value="0.1" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="downloadTime()">Estimate</button>
-              </div>
-            </div>
-            <div id="dl_out" class="result" hidden></div>
-            <div class="note">Time ≈ size / effective_rate, where effective_rate = bandwidth × (1 − overhead).</div>
-          </div>
-
-          <div class="card">
-            <h3>SLA Uptime → Downtime</h3>
-            <div class="row">
-              <div>
-                <label>Availability (%)</label>
-                <input id="sla_pct" type="number" step="any" placeholder="99.9" />
-              </div>
-              <div>
-                <label>Period</label>
-                <select id="sla_period">
-                  <option value="year">Per Year</option>
-                  <option value="month">Per Month</option>
-                  <option value="week">Per Week</option>
-                  <option value="day">Per Day</option>
-                </select>
-              </div>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" onclick="slaCalc()">Calculate</button>
-              <button class="btn secondary" onclick="clearSLA()">Reset</button>
-            </div>
-            <div id="sla_out" class="result" hidden></div>
-            <div class="note">Downtime = (1 − availability) × period_duration. For a year, uses 365 days.</div>
-          </div>
-
-          <div class="card">
-            <h3>Bits Required</h3>
-            <div class="row">
-              <div>
-                <label>Number of states/items N</label>
-                <input id="bits_n" type="number" step="any" placeholder="1000" />
-              </div>
-              <div style="align-self:end">
-                <button class="btn" onclick="bitsNeeded()">Compute</button>
-              </div>
-            </div>
-            <div id="bits_out" class="result" hidden></div>
-            <div class="note">Bits = ⌈log₂(N)⌉ to represent up to N unique values (0 … N−1).</div>
-          </div>
+      <section class="card" data-tags="electrical">
+        <div class="badge">Electrical</div>
+        <h3>Voltage Divider</h3>
+        <div class="row3">
+          <div><label>Vin (V)</label><input id="vd_vin" type="number" step="any" placeholder="5" /></div>
+          <div><label>R1 (Ω)</label><input id="vd_r1" type="number" step="any" placeholder="10000" /></div>
+          <div><label>R2 (Ω)</label><input id="vd_r2" type="number" step="any" placeholder="10000" /></div>
         </div>
+        <div class="actions">
+          <button class="primary" onclick="voltageDivider()">Compute Vout</button>
+          <button onclick="clearFields(['vd_vin','vd_r1','vd_r2'],'vd_out')">Clear</button>
+        </div>
+        <div id="vd_out" class="result"></div>
       </section>
 
-      <footer>
-        <div class="kpi">
-          <div class="pill">No external libraries</div>
-          <div class="pill">Unit‑aware where relevant</div>
-          <div class="pill">Edge‑case guarded</div>
+      <section class="card" data-tags="electrical">
+        <div class="badge">Electrical</div>
+        <h3>Reactance (XC &amp; XL)</h3>
+        <div class="row3">
+          <div><label>f (Hz)</label><input id="rx_f" type="number" step="any" placeholder="1000" /></div>
+          <div><label>C (F)</label><input id="rx_c" type="number" step="any" placeholder="1e-6" /></div>
+          <div><label>L (H)</label><input id="rx_l" type="number" step="any" placeholder="1e-3" /></div>
         </div>
-        <div style="margin-top:12px">Made for quick engineering estimates — verify with detailed design calcs when required.</div>
-      </footer>
+        <div class="actions">
+          <button class="primary" onclick="reactanceCalc()">Compute</button>
+          <button onclick="clearFields(['rx_f','rx_c','rx_l'],'rx_out')">Clear</button>
+        </div>
+        <div id="rx_out" class="result"></div>
+      </section>
+
+      <!-- ================= RF ================= -->
+      <section class="card" data-tags="rf">
+        <div class="badge">RF</div>
+        <h3>Wavelength</h3>
+        <div class="row">
+          <div><label>Frequency (MHz)</label><input id="rf_freq_mhz" type="number" step="any" placeholder="915" /></div>
+          <div><label class="muted">c ≈ 299,792,458 m/s</label><input disabled value="λ = c / f" /></div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="wavelengthCalc()">Compute λ</button>
+          <button onclick="clearFields(['rf_freq_mhz'],'rf_out')">Clear</button>
+        </div>
+        <div id="rf_out" class="result"></div>
+      </section>
+
+      <section class="card" data-tags="rf">
+        <div class="badge">RF</div>
+        <h3>Link Budget (Friis Free-Space)</h3>
+        <div class="desc">FSPL(dB) = 20 log10(d_km) + 20 log10(f_MHz) + 32.44 • Pr = Pt + Gt + Gr − FSPL</div>
+        <div class="row3">
+          <div><label>Pt (dBm)</label><input id="friis_pt" type="number" step="any" placeholder="14" /></div>
+          <div><label>Gt (dBi)</label><input id="friis_gt" type="number" step="any" placeholder="2" /></div>
+          <div><label>Gr (dBi)</label><input id="friis_gr" type="number" step="any" placeholder="2" /></div>
+        </div>
+        <div class="row3">
+          <div><label>f (MHz)</label><input id="friis_f" type="number" step="any" placeholder="915" /></div>
+          <div><label>d (km)</label><input id="friis_d" type="number" step="any" placeholder="1" /></div>
+          <div>
+            <label>Noise Floor (dBm) <span class="small">opt</span></label>
+            <input id="friis_nf" type="number" step="any" placeholder="-100" />
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="friisCalc()">Compute Pr &amp; FSPL</button>
+          <button onclick="clearFields(['friis_pt','friis_gt','friis_gr','friis_f','friis_d','friis_nf'],'friis_out')">Clear</button>
+        </div>
+        <div id="friis_out" class="result"></div>
+      </section>
+
+      <section class="card" data-tags="rf">
+        <div class="badge">RF</div>
+        <h3>VSWR ⇄ Return Loss</h3>
+        <div class="row">
+          <div><label>VSWR</label><input id="vswr_val" type="number" step="any" placeholder="1.5" /></div>
+          <div><label>Return Loss (dB)</label><input id="rl_val" type="number" step="any" placeholder="" /></div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="vswrToRL()">VSWR → RL</button>
+          <button onclick="rlToVSWR()">RL → VSWR</button>
+          <button onclick="clearFields(['vswr_val','rl_val'],'vswr_out')">Clear</button>
+        </div>
+        <div id="vswr_out" class="result"></div>
+      </section>
+
+      <!-- ================= MECHANICAL ================= -->
+      <section class="card" data-tags="mechanical">
+        <div class="badge">Mechanical</div>
+        <h3>Torque ↔ Power ↔ RPM</h3>
+        <div class="desc">P = τ ω, with ω = 2π·RPM/60. Outputs in kW and HP.</div>
+        <div class="row3">
+          <div><label>Torque τ (N·m)</label><input id="mech_tau" type="number" step="any" placeholder="10" /></div>
+          <div><label>RPM</label><input id="mech_rpm" type="number" step="any" placeholder="1500" /></div>
+          <div><label>Power P (kW) <span class="small">(optional)</span></label><input id="mech_kw" type="number" step="any" placeholder="" /></div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="mechTorquePower()">Compute</button>
+          <button onclick="clearFields(['mech_tau','mech_rpm','mech_kw'],'mech_out')">Clear</button>
+        </div>
+        <div id="mech_out" class="result"></div>
+      </section>
+
+      <section class="card" data-tags="mechanical">
+        <div class="badge">Mechanical</div>
+        <h3>Constant Acceleration</h3>
+        <div class="desc">s = v₀ t + ½ a t² • v = v₀ + a t</div>
+        <div class="row3">
+          <div><label>v₀ (m/s)</label><input id="kin_v0" type="number" step="any" placeholder="0" /></div>
+          <div><label>a (m/s²)</label><input id="kin_a" type="number" step="any" placeholder="2" /></div>
+          <div><label>t (s)</label><input id="kin_t" type="number" step="any" placeholder="5" /></div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="kinematicsCalc()">Compute s &amp; v</button>
+          <button onclick="clearFields(['kin_v0','kin_a','kin_t'],'kin_out')">Clear</button>
+        </div>
+        <div id="kin_out" class="result"></div>
+      </section>
+
+      <!-- ================= SOFTWARE ================= -->
+      <section class="card" data-tags="software">
+        <div class="badge">Software</div>
+        <h3>Transfer Time Estimator</h3>
+        <div class="row3">
+          <div>
+            <label>File Size</label>
+            <input id="tt_size" type="number" step="any" placeholder="100" />
+          </div>
+          <div>
+            <label>Unit</label>
+            <select id="tt_unit">
+              <option>MB</option>
+              <option>GB</option>
+              <option>KiB</option>
+              <option>MiB</option>
+              <option>GiB</option>
+            </select>
+          </div>
+          <div>
+            <label>Throughput</label>
+            <input id="tt_bw" type="number" step="any" placeholder="100" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Throughput Unit</label>
+            <select id="tt_bwunit">
+              <option>Mbps</option>
+              <option>Gbps</option>
+              <option>MiB/s</option>
+              <option>MB/s</option>
+            </select>
+          </div>
+          <div>
+            <label class="muted">Note</label>
+            <input disabled value="Includes 10% protocol overhead estimate for bit-based rates" />
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="transferTimeCalc()">Estimate Time</button>
+          <button onclick="clearFields(['tt_size','tt_bw'],'tt_out')">Clear</button>
+        </div>
+        <div id="tt_out" class="result"></div>
+      </section>
+
+      <section class="card" data-tags="software">
+        <div class="badge">Software</div>
+        <h3>Big‑O Runtime Roughness</h3>
+        <div class="desc">Given input size n, assumed complexity, and operations/sec, estimate wall time.</div>
+        <div class="row3">
+          <div><label>n</label><input id="bo_n" type="number" step="any" placeholder="1e7" /></div>
+          <div>
+            <label>Complexity</label>
+            <select id="bo_c">
+              <option value="n">O(n)</option>
+              <option value="nlogn">O(n log₂ n)</option>
+              <option value="n2">O(n²)</option>
+              <option value="logn">O(log₂ n)</option>
+            </select>
+          </div>
+          <div><label>Ops/sec</label><input id="bo_ops" type="number" step="any" placeholder="5e8" /></div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="bigOCalc()">Estimate</button>
+          <button onclick="clearFields(['bo_n','bo_ops'],'bo_out')">Clear</button>
+        </div>
+        <div id="bo_out" class="result"></div>
+      </section>
+
     </main>
   </div>
 
-  <script>
-    // ---------- Helpers ----------
-    const show = (el, on=true)=>{ el.hidden = !on }
-    const num = (id)=>{ const v = parseFloat(document.getElementById(id).value); return isFinite(v) ? v : null }
-    const set = (id, v)=>{ document.getElementById(id).value = (v===null||v===undefined||Number.isNaN(v))?"": String(v) }
+  <div class="wrap footer">Made with vanilla HTML/CSS/JS. No tracking. <span class="small">Tip: Click a sidebar pill to filter calculators.</span></div>
 
-    // ---------- Electrical ----------
-    function clearOhms(){ ['ee_v','ee_i','ee_r','ee_p'].forEach(id=>set(id, '')); show(document.getElementById('ee_ohm_out'), false) }
-    function ohmsLawSolve(){
-      const V = num('ee_v');
-      const I = num('ee_i');
-      const R = num('ee_r');
-      const out = document.getElementById('ee_ohm_out');
-      const known = [V,I,R].filter(v=>v!==null).length;
-      if(known < 2){ out.innerHTML = '<span style="color:var(--danger)">Enter any two of V, I, R.</span>'; show(out,true); return }
-      let v=V, i=I, r=R;
-      if(v===null) v = I*R;
-      if(i===null) i = V/R;
-      if(r===null) r = V/I;
-      const p = v*i;
-      set('ee_v', +v.toFixed(6)); set('ee_i', +i.toFixed(6)); set('ee_r', +r.toFixed(6)); set('ee_p', +p.toFixed(6));
-      out.innerHTML = `V=${v.toFixed(6)} V, I=${i.toFixed(6)} A, R=${r.toFixed(6)} Ω, P=${p.toFixed(6)} W`;
-      show(out,true);
+  <script>
+    // Sidebar filtering
+    const pills = document.querySelectorAll('.pill');
+    const cards = document.querySelectorAll('.card');
+    pills.forEach(p=>{
+      p.addEventListener('click',()=>{
+        pills.forEach(x=>x.classList.remove('active'));
+        p.classList.add('active');
+        const tag = p.dataset.tag;
+        cards.forEach(c=>{
+          const tags = c.dataset.tags.split(',');
+          c.style.display = (tag==='all' || tags.includes(tag)) ? 'block':'none';
+        })
+      })
+    })
+
+    function clearFields(ids, outId){ ids.forEach(id=>{ const el = document.getElementById(id); if(el) el.value='';}); if(outId) document.getElementById(outId).textContent=''; }
+    const fmt = (v,unit='')=> Number.isFinite(v)? `${v.toLocaleString(undefined,{maximumFractionDigits:6})} ${unit}`.trim(): '—';
+    const ln = (s='')=> s+"\n";
+
+    // ========== Chemical: Ideal Gas ==========
+    function idealGasSolve(){
+      const PkPa = parseFloat(document.getElementById('chem_p').value);
+      const VL = parseFloat(document.getElementById('chem_v').value);
+      const n = parseFloat(document.getElementById('chem_n').value);
+      const T = parseFloat(document.getElementById('chem_t').value);
+      const R = 8.314462618; // J/mol-K
+      const P = Number.isFinite(PkPa) ? PkPa*1000 : NaN; // Pa
+      const V = Number.isFinite(VL) ? VL/1000 : NaN;     // m^3
+      const given = [Number.isFinite(P), Number.isFinite(V), Number.isFinite(n), Number.isFinite(T)].filter(Boolean).length;
+      let out='';
+      if(given < 3){ document.getElementById('chem_out').textContent='Please enter any three of P, V, n, T.'; return; }
+      if(!Number.isFinite(P)){
+        const Psol = (n*R*T)/V; out += ln(`P = ${fmt(Psol/1000,'kPa')}`);
+      }
+      if(!Number.isFinite(V)){
+        const Vsol = (n*R*T)/P; out += ln(`V = ${fmt(Vsol*1000,'L')}`);
+      }
+      if(!Number.isFinite(n)){
+        const nsol = (P*V)/(R*T); out += ln(`n = ${fmt(nsol,'mol')}`);
+      }
+      if(!Number.isFinite(T)){
+        const Tsol = (P*V)/(n*R); out += ln(`T = ${fmt(Tsol,'K')}`);
+      }
+      document.getElementById('chem_out').textContent=out.trim();
     }
 
-    function reactanceCalc(){
-      const f = num('rx_f'); const c_uF = num('rx_c'); const l_mH = num('rx_l');
-      const out = document.getElementById('rx_out');
-      if(!f || (!c_uF && !l_mH)){ out.innerHTML = '<span style="color:var(--danger)">Provide f and at least one of C or L.</span>'; show(out,true); return }
-      const twoPiF = 2*Math.PI*f;
-      let msg=[];
-      if(c_uF){ const C = c_uF*1e-6; const Xc = 1/(twoPiF*C); msg.push(`X<sub>C</sub>=${Xc.toFixed(6)} Ω`) }
-      if(l_mH){ const L = l_mH*1e-3; const Xl = twoPiF*L; msg.push(`X<sub>L</sub>=${Xl.toFixed(6)} Ω`) }
-      out.innerHTML = msg.join(' · '); show(out,true);
+    // ========== Chemical: Reynolds ==========
+    function reynoldsCalc(){
+      const rho = parseFloat(document.getElementById('re_rho').value);
+      const v = parseFloat(document.getElementById('re_v').value);
+      const d = parseFloat(document.getElementById('re_d').value);
+      const mu = parseFloat(document.getElementById('re_mu').value);
+      if(![rho,v,d,mu].every(Number.isFinite)){ document.getElementById('re_out').textContent='Please fill ρ, v, D, μ.'; return; }
+      const Re = rho*v*d/mu;
+      let regime = 'Transitional';
+      if(Re < 2300) regime='Laminar'; else if(Re>4000) regime='Turbulent';
+      document.getElementById('re_out').textContent=`Re = ${fmt(Re)}\nRegime: ${regime}`;
+    }
+
+    // ========== Civil: Beam ==========
+    function beamCalc(){
+      const P = parseFloat(document.getElementById('beam_P').value);
+      const L = parseFloat(document.getElementById('beam_L').value);
+      const E_GPa = parseFloat(document.getElementById('beam_E').value);
+      const b = parseFloat(document.getElementById('beam_b').value);
+      const h = parseFloat(document.getElementById('beam_h').value);
+      const allow = parseFloat(document.getElementById('beam_allow').value);
+      if(![P,L,E_GPa,b,h].every(Number.isFinite)){ document.getElementById('beam_out').textContent='Fill P, L, E, b, h.'; return; }
+      const E = E_GPa*1e9;
+      const I = b*Math.pow(h,3)/12;
+      const delta = (P*Math.pow(L,3))/(48*E*I);
+      const M = P*L/4;
+      const c = h/2;
+      const sigma = M*c/I; // Pa
+      let out = `I = ${fmt(I,'m^4')}\nδ(mid) = ${fmt(delta,'m')}\nσ(max) = ${fmt(sigma/1e6,'MPa')}`;
+      if(Number.isFinite(allow)){
+        out += `\nAllowable check: ${sigma/1e6 <= allow ? 'OK ✅' : 'Exceeds ❌'}`;
+      }
+      document.getElementById('beam_out').textContent = out;
+    }
+
+    // ========== Electrical: Ohm's Law ==========
+    function ohmsLaw(){
+      let V = parseFloat(document.getElementById('ohm_V').value);
+      let I = parseFloat(document.getElementById('ohm_I').value);
+      let R = parseFloat(document.getElementById('ohm_R').value);
+      const given = [V,I,R].filter(Number.isFinite).length;
+      if(given < 2){ document.getElementById('ohm_out').textContent='Enter any two of V, I, R.'; return; }
+      if(!Number.isFinite(V)) V = I*R;
+      if(!Number.isFinite(I)) I = V/R;
+      if(!Number.isFinite(R)) R = V/I;
+      document.getElementById('ohm_out').textContent = `V=${fmt(V,'V')}  I=${fmt(I,'A')}  R=${fmt(R,'Ω')}`;
     }
 
     function voltageDivider(){
-      const vin = num('vd_vin'), r1 = num('vd_r1'), r2 = num('vd_r2');
-      const out = document.getElementById('vd_out');
-      if(vin===null||r1===null||r2===null||r1+r2===0){ out.innerHTML = '<span style="color:var(--danger)">Enter Vin, R1, R2 (R1+R2≠0).</span>'; show(out,true); return }
-      const vout = vin * (r2/(r1+r2));
-      out.innerHTML = `V<sub>out</sub> = ${vout.toFixed(6)} V`;
-      show(out,true);
+      const Vin = parseFloat(document.getElementById('vd_vin').value);
+      const R1 = parseFloat(document.getElementById('vd_r1').value);
+      const R2 = parseFloat(document.getElementById('vd_r2').value);
+      if(![Vin,R1,R2].every(Number.isFinite) || (R1+R2)<=0){ document.getElementById('vd_out').textContent='Enter Vin, R1, R2.'; return; }
+      const Vout = Vin * (R2/(R1+R2));
+      document.getElementById('vd_out').textContent = `Vout = ${fmt(Vout,'V')}`;
     }
 
-    // ---------- Chemical ----------
-    function clearIG(){ ['ig_p','ig_v','ig_n','ig_t'].forEach(id=>set(id,'')); show(document.getElementById('ig_out'), false) }
-    function idealGasSolve(){
-      const R = 8.314462618; // kPa·L/(mol·K)
-      let P = num('ig_p'); let V = num('ig_v'); let n = num('ig_n'); let T = num('ig_t');
-      const out = document.getElementById('ig_out');
-      const filled = [P,V,n,T].filter(x=>x!==null).length;
-      if(filled < 3){ out.innerHTML = '<span style="color:var(--danger)">Provide any three of P,V,n,T.</span>'; show(out,true); return }
-      if(P===null) P = (n*R*T)/V;
-      else if(V===null) V = (n*R*T)/P;
-      else if(n===null) n = (P*V)/(R*T);
-      else if(T===null) T = (P*V)/(n*R);
-      out.innerHTML = `P=${P.toFixed(6)} kPa, V=${V.toFixed(6)} L, n=${n.toFixed(6)} mol, T=${T.toFixed(6)} K`;
-      set('ig_p',+P.toFixed(6)); set('ig_v',+V.toFixed(6)); set('ig_n',+n.toFixed(6)); set('ig_t',+T.toFixed(6));
-      show(out,true);
+    function reactanceCalc(){
+      const f = parseFloat(document.getElementById('rx_f').value);
+      const C = parseFloat(document.getElementById('rx_c').value);
+      const L = parseFloat(document.getElementById('rx_l').value);
+      let out='';
+      if(Number.isFinite(C) && Number.isFinite(f) && f>0) out += ln(`Xc = ${fmt(1/(2*Math.PI*f*C),'Ω')}`);
+      if(Number.isFinite(L) && Number.isFinite(f)) out += ln(`Xl = ${fmt(2*Math.PI*f*L,'Ω')}`);
+      if(!out) out='Provide f and C/L.';
+      document.getElementById('rx_out').textContent=out.trim();
     }
 
-    function areaCircle(d){ return Math.PI*(d*d)/4 }
-    function pipeFlowCalc(){
-      const D = num('pf_d'); const L = num('pf_l'); const Q = num('pf_q');
-      const eps = num('pf_eps'); const rho = num('pf_rho'); const mu = num('pf_mu');
-      const out = document.getElementById('pf_out');
-      if([D,L,Q,eps,rho,mu].some(v=>v===null||v<=0)){ out.innerHTML = '<span style="color:var(--danger)">Fill all fields with positive values.</span>'; show(out,true); return }
-      const A = areaCircle(D);
-      const v = Q / A;
-      const Re = rho*v*D / mu;
-      let f;
-      if(Re < 2300){ f = 64/Re; }
-      else {
-        f = 0.25 / Math.pow(Math.log10( (eps/(3.7*D)) + (5.74/Math.pow(Re,0.9)) ), 2);
+    // ========== RF ==========
+    function wavelengthCalc(){
+      const fMHz = parseFloat(document.getElementById('rf_freq_mhz').value);
+      if(!Number.isFinite(fMHz) || fMHz<=0){ document.getElementById('rf_out').textContent='Enter frequency in MHz.'; return; }
+      const c = 299792458; // m/s
+      const f = fMHz*1e6;
+      const lambda = c/f;
+      document.getElementById('rf_out').textContent=`λ = ${fmt(lambda,'m')}  •  ${fmt(lambda*100,'cm')}  •  ${fmt(lambda*39.3701,'in')}`;
+    }
+
+    function friisCalc(){
+      const Pt = parseFloat(document.getElementById('friis_pt').value);
+      const Gt = parseFloat(document.getElementById('friis_gt').value);
+      const Gr = parseFloat(document.getElementById('friis_gr').value);
+      const f = parseFloat(document.getElementById('friis_f').value);
+      const d = parseFloat(document.getElementById('friis_d').value);
+      const nf = parseFloat(document.getElementById('friis_nf').value);
+      if(![Pt,Gt,Gr,f,d].every(Number.isFinite) || f<=0 || d<=0){ document.getElementById('friis_out').textContent='Fill Pt, Gt, Gr, f, d.'; return; }
+      const FSPL = 20*Math.log10(d) + 20*Math.log10(f) + 32.44; // dB (km,MHz)
+      const Pr = Pt + Gt + Gr - FSPL; // dBm
+      let out = `FSPL = ${fmt(FSPL,'dB')}\nPr = ${fmt(Pr,'dBm')}`;
+      if(Number.isFinite(nf)){
+        const linkMargin = Pr - nf;
+        out += `\nLink margin ≈ ${fmt(linkMargin,'dB')}`;
       }
-      const dP = f * (L/D) * (rho * v*v / 2);
-      const g = 9.80665;
-      const hL = dP/(rho*g);
-      out.innerHTML = `v=${v.toFixed(6)} m/s, Re=${Re.toFixed(0)}, f=${f.toFixed(5)}, ΔP=${dP.toFixed(2)} Pa, head loss=${hL.toFixed(4)} m`;
-      show(out,true);
-    }
-    function clearPF(){ ['pf_d','pf_l','pf_q','pf_eps','pf_rho','pf_mu'].forEach(id=>set(id,'')); show(document.getElementById('pf_out'), false) }
-
-    function cstrCalc(){
-      const V = num('cstr_v'); const Q = num('cstr_q'); const out = document.getElementById('cstr_out');
-      if(V===null||Q===null||Q<=0){ out.innerHTML = '<span style="color:var(--danger)">Enter V and Q (Q>0).</span>'; show(out,true); return }
-      const tau = V/Q;
-      out.innerHTML = `τ = ${tau.toFixed(6)} s (${(tau/60).toFixed(3)} min)`;
-      show(out,true);
-    }
-    function clearCSTR(){ ['cstr_v','cstr_q'].forEach(id=>set(id,'')); show(document.getElementById('cstr_out'), false) }
-
-    // ---------- Civil ----------
-    function beamCalc(){
-      const P = num('beam_p'); const L = num('beam_l'); const E = num('beam_e'); const b = num('beam_b'); const h = num('beam_h');
-      const out = document.getElementById('beam_out');
-      if([P,L,E,b,h].some(v=>v===null||v<=0)){ out.innerHTML = '<span style="color:var(--danger)">Fill P, L, E, b, h (all > 0).</span>'; show(out,true); return }
-      const I = b*Math.pow(h,3)/12;
-      const delta = P*Math.pow(L,3)/(48*E*I);
-      const Mmax = P*L/4;
-      const c = h/2;
-      const sigma = Mmax*c/I;
-      out.innerHTML = `I=${I.toExponential(6)} m⁴, δ<sub>max</sub>=${delta.toExponential(6)} m, σ<sub>max</sub>=${sigma.toFixed(2)} Pa (≈ ${(sigma/1e6).toFixed(3)} MPa)`;
-      show(out,true);
-    }
-    function clearBeam(){ ['beam_p','beam_l','beam_e','beam_b','beam_h'].forEach(id=>set(id,'')); show(document.getElementById('beam_out'), false) }
-
-    function concCalc(){
-      const L = num('conc_l'); const W = num('conc_w'); const T = num('conc_t');
-      const out = document.getElementById('conc_out');
-      if([L,W,T].some(v=>v===null||v<=0)){ out.innerHTML = '<span style="color:var(--danger)">Enter L, W, T (all > 0).</span>'; show(out,true); return }
-      const m3 = L*W*T; const yd3 = m3*1.30795062;
-      out.innerHTML = `${m3.toFixed(4)} m³  ( ${yd3.toFixed(4)} yd³ )`;
-      show(out,true);
+      document.getElementById('friis_out').textContent=out;
     }
 
-    function slopeCalc(){
-      const rise = num('slope_rise'); const run = num('slope_run'); const out = document.getElementById('slope_out');
-      if(rise===null||run===null||run===0){ out.innerHTML = '<span style="color:var(--danger)">Enter rise and run (run≠0).</span>'; show(out,true); return }
-      const pct = 100*rise/run; const angle = Math.atan(rise/run)*(180/Math.PI);
-      out.innerHTML = `Grade = ${pct.toFixed(3)} %, Angle = ${angle.toFixed(3)} °`;
-      show(out,true);
+    function vswrToRL(){
+      const S = parseFloat(document.getElementById('vswr_val').value);
+      if(!Number.isFinite(S) || S<=1){ document.getElementById('vswr_out').textContent='VSWR must be ≥ 1.'; return; }
+      const gamma = (S-1)/(S+1);
+      const RL = -20*Math.log10(gamma);
+      document.getElementById('rl_val').value = RL.toFixed(4);
+      document.getElementById('vswr_out').textContent = `|Γ|=${fmt(gamma)}  •  RL=${fmt(RL,'dB')}`;
     }
-    function clearSlope(){ ['slope_rise','slope_run'].forEach(id=>set(id,'')); show(document.getElementById('slope_out'), false) }
-
-    // ---------- Mechanical ----------
-    function gearCalc(){
-      const N1 = num('gear_n1'); const N2 = num('gear_n2'); const rpmIn = num('gear_rpm_in'); const tIn = num('gear_t_in'); const eta = num('gear_eta');
-      const out = document.getElementById('gear_out');
-      if([N1,N2,rpmIn,tIn,eta].some(v=>v===null||v<=0)){ out.innerHTML = '<span style="color:var(--danger)">Enter N1, N2, RPM, Torque, η (all > 0).</span>'; show(out,true); return }
-      const i = N2/N1; const rpmOut = rpmIn / i; const tOut = tIn * i * eta;
-      out.innerHTML = `i=${i.toFixed(4)}, RPM<sub>out</sub>=${rpmOut.toFixed(2)}, Torque<sub>out</sub>=${tOut.toFixed(3)} N·m`;
-      show(out,true);
+    function rlToVSWR(){
+      const RL = parseFloat(document.getElementById('rl_val').value);
+      if(!Number.isFinite(RL)){ document.getElementById('vswr_out').textContent='Enter return loss (dB).'; return; }
+      const gamma = Math.pow(10, -RL/20);
+      const S = (1+gamma)/(1-gamma);
+      document.getElementById('vswr_val').value = S.toFixed(4);
+      document.getElementById('vswr_out').textContent = `|Γ|=${fmt(gamma)}  •  VSWR=${fmt(S)}`;
     }
 
-    function thermalExp(){
-      const a = num('te_alpha'); const L = num('te_l'); const dT = num('te_dt'); const out = document.getElementById('te_out');
-      if([a,L,dT].some(v=>v===null)){ out.innerHTML = '<span style="color:var(--danger)">Enter α, L, ΔT.</span>'; show(out,true); return }
-      const dL = a*L*dT; out.innerHTML = `ΔL = ${dL.toExponential(6)} m`;
-      show(out,true);
-    }
-
-    function powerFromTR(){
-      const tau = num('p_torque'); const rpm = num('p_rpm'); const out = document.getElementById('p_out');
-      if([tau,rpm].some(v=>v===null)){ out.innerHTML = '<span style="color:var(--danger)">Enter torque and RPM.</span>'; show(out,true); return }
-      const P = tau * 2*Math.PI * rpm / 60; const hp = P/746;
-      out.innerHTML = `P = ${P.toFixed(2)} W ( ${hp.toFixed(3)} hp )`;
-      show(out,true);
-    }
-    function clearPower(){ ['p_torque','p_rpm'].forEach(id=>set(id,'')); show(document.getElementById('p_out'), false) }
-
-    // ---------- Software ----------
-    function toBytes(size, unit){
-      if(unit==='KB') return size*1024; if(unit==='MB') return size*1024*1024; if(unit==='GB') return size*1024*1024*1024; return size;
-    }
-    function toBps(bw, unit){
-      if(unit==='MBps') return bw*1024*1024; // bytes per second
-      if(unit==='Mbps') return (bw*1e6)/8;  // convert to bytes/s
-      return bw;
-    }
-    function downloadTime(){
-      const size = num('dl_size'); const sizeU = document.getElementById('dl_size_unit').value;
-      const bw = num('dl_bw'); const bwU = document.getElementById('dl_bw_unit').value; const oh = num('dl_oh');
-      const out = document.getElementById('dl_out');
-      if([size,bw,oh].some(v=>v===null)||oh<0||oh>=1){ out.innerHTML = '<span style="color:var(--danger)">Enter size, bandwidth, and overhead (0–1).</span>'; show(out,true); return }
-      const bytes = toBytes(size, sizeU); const rate = toBps(bw, bwU)*(1-oh);
-      const secs = bytes / rate;
-      const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = secs%60;
-      out.innerHTML = `≈ ${h}h ${m}m ${s.toFixed(1)}s  ( ${rate.toFixed(0)} B/s effective )`;
-      show(out,true);
-    }
-
-    function slaCalc(){
-      const pct = num('sla_pct'); const period = document.getElementById('sla_period').value; const out=document.getElementById('sla_out');
-      if(pct===null||pct<=0||pct>100){ out.innerHTML = '<span style="color:var(--danger)">Enter availability between 0–100.</span>'; show(out,true); return }
-      const avail = pct/100; let seconds;
-      if(period==='year') seconds = 365*24*3600; else if(period==='month') seconds = 30*24*3600; else if(period==='week') seconds = 7*24*3600; else seconds = 24*3600;
-      const down = (1- avail)*seconds; const h=Math.floor(down/3600), m=Math.floor((down%3600)/60), s=(down%60);
-      out.innerHTML = `Allowed downtime ≈ ${h}h ${m}m ${s.toFixed(0)}s per ${period}`;
-      show(out,true);
-    }
-    function clearSLA(){ set('sla_pct',''); document.getElementById('sla_period').value='year'; show(document.getElementById('sla_out'), false) }
-
-    function bitsNeeded(){
-      const N = num('bits_n'); const out=document.getElementById('bits_out');
-      if(N===null||N<=0){ out.innerHTML = '<span style="color:var(--danger)">Enter N &gt; 0.</span>'; show(out,true); return }
-      const bits = Math.ceil(Math.log2(N));
-      out.innerHTML = `Bits required = ${bits}`;
-      show(out,true);
-    }
-  
-    // ---------- RF ----------
-    function rfPowerConvert(){
-      const dbm = num('rf_dbm'); const mw = num('rf_mw'); const fMHz = num('rf_f_mhz');
-      const out = document.getElementById('rf_basic_out');
-      let d = dbm, m = mw;
-      if(d===null && m===null){ out.innerHTML = '<span style="color:var(--danger)">Enter dBm or mW.</span>'; show(out,true); return }
-      if(d===null) d = 10*Math.log10(m);
-      if(m===null) m = Math.pow(10, d/10);
-      set('rf_dbm', +d.toFixed(6)); set('rf_mw', +m.toFixed(6));
-      let msg = [`${d.toFixed(3)} dBm ↔ ${m.toFixed(3)} mW`];
-      if(fMHz!==null && fMHz>0){
-        const c = 299792458; const fHz = fMHz*1e6; const lambda = c/fHz; const q = lambda/4;
-        msg.push(`λ=${lambda.toFixed(4)} m (λ/4=${q.toFixed(4)} m)`);
+    // ========== Mechanical ==========
+    function mechTorquePower(){
+      let tau = parseFloat(document.getElementById('mech_tau').value);
+      let rpm = parseFloat(document.getElementById('mech_rpm').value);
+      let kw = parseFloat(document.getElementById('mech_kw').value);
+      if(Number.isFinite(tau) && Number.isFinite(rpm)){
+        const omega = 2*Math.PI*rpm/60;
+        const P = tau*omega; // W
+        const kW = P/1000;
+        const HP = P/745.699872;
+        document.getElementById('mech_out').textContent = `P = ${fmt(kW,'kW')}  (${fmt(HP,'HP')})`;
+        document.getElementById('mech_kw').value = kW.toFixed(6);
+        return;
       }
-      out.innerHTML = msg.join(' · '); show(out,true);
-    }
-
-    function fsplLinkBudget(){
-      const f = num('fspl_f'); const d = num('fspl_d'); const pt = num('fspl_pt'); const gt = num('fspl_gt'); const gr = num('fspl_gr'); const L = num('fspl_l');
-      const out = document.getElementById('fspl_out');
-      if([f,d,pt,gt,gr].some(v=>v===null||v<=0) || L===null){ out.innerHTML = '<span style="color:var(--danger)">Fill f, d, Pt, Gt, Gr, and L.</span>'; show(out,true); return }
-      const FSPL = 32.44 + 20*Math.log10(f) + 20*Math.log10(d);
-      const pr = pt + gt + gr - FSPL - L;
-      out.innerHTML = `FSPL=${FSPL.toFixed(2)} dB · P<sub>r</sub>=${pr.toFixed(2)} dBm`;
-      show(out,true);
-    }
-
-    function vswrAndNoise(){
-      const vswr = num('vswr_v'); const bw = num('noise_bw'); const nf = num('noise_nf');
-      const out = document.getElementById('vswr_noise_out');
-      if(vswr===null || vswr<1){ out.innerHTML = '<span style="color:var(--danger)">VSWR must be ≥ 1.</span>'; show(out,true); return }
-      const gamma = (vswr-1)/(vswr+1);
-      const RL = -20*Math.log10(Math.abs(gamma));
-      const ML = -10*Math.log10(1-Math.pow(gamma,2));
-      let msg = [`Γ=${gamma.toFixed(4)} · RL=${RL.toFixed(2)} dB · mismatch=${ML.toFixed(2)} dB`];
-      if(bw!==null && bw>0 && nf!==null){
-        const noise = -174 + 10*Math.log10(bw) + nf; // dBm
-        msg.push(`Noise floor ≈ ${noise.toFixed(2)} dBm`);
+      if(Number.isFinite(kw) && Number.isFinite(rpm)){
+        const P = kw*1000;
+        const omega = 2*Math.PI*rpm/60;
+        const tauSol = P/omega;
+        document.getElementById('mech_out').textContent = `τ = ${fmt(tauSol,'N·m')}`;
+        document.getElementById('mech_tau').value = tauSol.toFixed(6);
+        return;
       }
-      out.innerHTML = msg.join(' · '); show(out,true);
+      document.getElementById('mech_out').textContent = 'Provide (τ and RPM) or (kW and RPM).';
     }
 
-    function farFieldBoundary(){
-      const D = num('ff_d'); let fMHz = num('ff_f_mhz');
-      const out = document.getElementById('vswr_noise_out');
-      if(D===null || D<=0 || fMHz===null || fMHz<=0){ out.innerHTML = '<span style="color:var(--danger)">Enter antenna size D and frequency f.</span>'; show(out,true); return }
-      const c = 299792458; const lambda = c/(fMHz*1e6);
-      const Rff = 2*Math.pow(D,2)/lambda;
-      out.innerHTML = `Far‑field boundary R<sub>ff</sub> ≈ ${Rff.toFixed(3)} m (λ=${lambda.toFixed(4)} m)`;
-      show(out,true);
+    function kinematicsCalc(){
+      const v0 = parseFloat(document.getElementById('kin_v0').value);
+      const a = parseFloat(document.getElementById('kin_a').value);
+      const t = parseFloat(document.getElementById('kin_t').value);
+      if(![v0,a,t].every(Number.isFinite)){ document.getElementById('kin_out').textContent='Enter v₀, a, t.'; return; }
+      const s = v0*t + 0.5*a*t*t;
+      const v = v0 + a*t;
+      document.getElementById('kin_out').textContent = `s = ${fmt(s,'m')}\nv = ${fmt(v,'m/s')}`;
     }
-  $1
+
+    // ========== Software ==========
+    function transferTimeCalc(){
+      const size = parseFloat(document.getElementById('tt_size').value);
+      const unit = document.getElementById('tt_unit').value;
+      const bw = parseFloat(document.getElementById('tt_bw').value);
+      const bwUnit = document.getElementById('tt_bwunit').value;
+      if(![size,bw].every(Number.isFinite)){ document.getElementById('tt_out').textContent='Enter size and throughput.'; return; }
+      const bin = {KiB:1024, MiB:1024**2, GiB:1024**3};
+      const dec = {MB:1e6, GB:1e9};
+      let bytes = 0;
+      if(unit in bin) bytes = size*bin[unit]; else bytes = size*dec[unit];
+      let Bps = 0;
+      if(bwUnit==='MiB/s') Bps = bw*bin['MiB'];
+      else if(bwUnit==='MB/s') Bps = bw*1e6;
+      else if(bwUnit==='Gbps') Bps = (bw*1e9)/8 * 0.9; // 10% overhead
+      else if(bwUnit==='Mbps') Bps = (bw*1e6)/8 * 0.9;
+      const seconds = bytes / Bps;
+      const h = Math.floor(seconds/3600), m = Math.floor((seconds%3600)/60), s = seconds%60;
+      const pretty = `${h}h ${m}m ${s.toFixed(1)}s`;
+      document.getElementById('tt_out').textContent = `≈ ${pretty}  (${fmt(seconds,'s')})`;
+    }
+
+    function bigOCalc(){
+      const n = parseFloat(document.getElementById('bo_n').value);
+      const c = document.getElementById('bo_c').value;
+      const ops = parseFloat(document.getElementById('bo_ops').value);
+      if(![n,ops].every(Number.isFinite) || n<=0 || ops<=0){ document.getElementById('bo_out').textContent='Enter n and ops/sec.'; return; }
+      let steps = 0;
+      if(c==='n') steps = n;
+      else if(c==='nlogn') steps = n*(Math.log2(n));
+      else if(c==='n2') steps = n*n;
+      else if(c==='logn') steps = Math.log2(n);
+      const seconds = steps/ops;
+      const days = seconds/86400;
+      let scale = seconds;
+      let unit = 's';
+      if(seconds>120){ scale = seconds/60; unit='min'; }
+      if(seconds>7200){ scale = seconds/3600; unit='h'; }
+      const out = `Estimated steps ≈ ${fmt(steps)}\nTime ≈ ${fmt(scale,unit)}  (${fmt(days,'days')})`;
+      document.getElementById('bo_out').textContent = out;
+    }
+  </script>
 </body>
 </html>
