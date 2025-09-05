@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3D Function Plotter + Time/Freq + I/Q</title>
+  <title>3D Function Plotter + I/Q + QAM</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
   <style>
@@ -11,7 +11,7 @@
       margin: 2rem;
       background-color: #f0f0f0;
     }
-    #plot, #iqPlot {
+    #plot, #iqPlot, #polarIQ {
       width: 100%;
       height: 600px;
     }
@@ -22,12 +22,12 @@
     .controls {
       display: flex;
       flex-direction: column;
-      max-width: 600px;
+      max-width: 700px;
     }
   </style>
 </head>
 <body>
-  <h1>3D Function Plotter + Time/Frequency + I/Q</h1>
+  <h1>3D Function Plotter + Time/Frequency + I/Q + QAM</h1>
 
   <div class="controls">
     <label for="presetSelect">Choose a preset:</label>
@@ -46,13 +46,17 @@
     <label for="freq">Frequency (freq): <span id="freqLabel">1</span></label>
     <input type="range" id="freq" min="0" max="10" step="0.1" value="1" oninput="updateLabel('freq')">
 
-    <button onclick="drawPlot()">Draw</button>
-    <button onclick="drawIQPlot()">Plot I/Q Constellation</button>
+    <button onclick="drawPlot()">Draw 3D Surface</button>
+    <button onclick="drawIQPlot()">Draw I/Q Constellation</button>
+    <button onclick="drawPolarPlot()">Draw Polar I/Q</button>
+    <button onclick="drawQAMSymbols()">Draw QAM Symbols</button>
   </div>
 
   <div id="plot"></div>
-  <h2>I/Q Constellation Plot</h2>
+  <h2>I/Q Constellation</h2>
   <div id="iqPlot"></div>
+  <h2>Polar I/Q Plot</h2>
+  <div id="polarIQ"></div>
 
   <script>
     function setPresetFunction() {
@@ -71,7 +75,6 @@
       const freq = parseFloat(document.getElementById("freq").value);
       const xRange = numeric.linspace(-10, 10, 50);
       const yRange = numeric.linspace(-10, 10, 50);
-
       let zData = [];
 
       for (let i = 0; i < xRange.length; i++) {
@@ -89,14 +92,12 @@
         zData.push(zRow);
       }
 
-      const data = [{
+      Plotly.newPlot('plot', [{
         z: zData,
         x: xRange,
         y: yRange,
         type: 'surface'
-      }];
-
-      Plotly.newPlot('plot', data);
+      }]);
     }
 
     function drawIQPlot() {
@@ -121,19 +122,77 @@
         line: { shape: 'spline' }
       };
 
-      const layout = {
-        title: 'I/Q Constellation (Circular Orbit at Frequency)',
+      Plotly.newPlot('iqPlot', [trace], {
+        title: 'I/Q Constellation',
         xaxis: { title: 'In-Phase (I)' },
         yaxis: { title: 'Quadrature (Q)' },
         width: 600,
         height: 600
+      });
+    }
+
+    function drawPolarPlot() {
+      const shiftT = parseFloat(document.getElementById("shiftT").value);
+      const freq = parseFloat(document.getElementById("freq").value);
+      const t = numeric.linspace(0, 2 * Math.PI, 100);
+      let r = [], theta = [];
+
+      for (let i = 0; i < t.length; i++) {
+        const tt = t[i];
+        const I = Math.cos(freq * (tt - shiftT));
+        const Q = Math.sin(freq * (tt - shiftT));
+        r.push(Math.sqrt(I * I + Q * Q));
+        theta.push(Math.atan2(Q, I));
+      }
+
+      const trace = {
+        type: 'scatterpolar',
+        r: r,
+        theta: theta.map(v => v * 180 / Math.PI),
+        mode: 'lines+markers',
+        name: 'I/Q Polar'
       };
 
-      Plotly.newPlot('iqPlot', [trace], layout);
+      Plotly.newPlot('polarIQ', [trace], {
+        polar: {
+          radialaxis: { visible: true },
+          angularaxis: { direction: 'clockwise' }
+        },
+        title: 'Polar Plot of I/Q'
+      });
+    }
+
+    function drawQAMSymbols() {
+      const symbols = [
+        [-3, -3], [-3, -1], [-3, 1], [-3, 3],
+        [-1, -3], [-1, -1], [-1, 1], [-1, 3],
+        [1, -3], [1, -1], [1, 1], [1, 3],
+        [3, -3], [3, -1], [3, 1], [3, 3]
+      ];
+
+      const trace = {
+        x: symbols.map(s => s[0]),
+        y: symbols.map(s => s[1]),
+        mode: 'markers+text',
+        text: symbols.map((s, i) => `S${i}`),
+        textposition: 'top center',
+        type: 'scatter',
+        marker: { size: 10, color: 'red' },
+        name: '16-QAM'
+      };
+
+      Plotly.newPlot('iqPlot', [trace], {
+        title: '16-QAM Symbol Constellation',
+        xaxis: { title: 'I' },
+        yaxis: { title: 'Q' },
+        width: 600,
+        height: 600
+      });
     }
 
     drawPlot();
     drawIQPlot();
+    drawPolarPlot();
   </script>
 </body>
 </html>
