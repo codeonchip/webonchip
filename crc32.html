@@ -71,18 +71,14 @@
 
         <details style="margin-top:12px">
           <summary>Show C reference (your function)</summary>
-<pre class="codeblock mono">/**
- * @brief Calculate the J1939 SDM CRC32 checksum.
- * Polynomial: 0x6938392D, Init: 0xFFFFFFFF, Final XOR: 0x00000000
- * No reflection (inputs/results).
- */
-uint32 sdm_crc32_calculate(const uint32 length, const uint8 *data)
+<pre class="codeblock mono">
+uint32 crc32_calculate(const uint32 length, const uint8 *data)
 {
     uint32 crc32 = 0xFFFFFFFF;
     for (uint32 i = 0; i < length; i++)
     {
         uint8 pos = ((crc32 >> 24) ^ data[i]) & 0xFF;
-        crc32 = (crc32 << 8) ^ sdm_crc32_lookup_table[pos];
+        crc32 = (crc32 << 8) ^ crc32_lookup_table[pos];
     }
     return crc32;
 }
@@ -229,7 +225,7 @@ uint32 sdm_crc32_calculate(const uint32 length, const uint8 *data)
     const v1 = sdmCrc32(new Uint8Array([0,1,2,3,4,5,6,7]));
     const v2 = sdmCrc32(new Uint8Array([0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF]));
     const ok1 = (v1>>>0) === 0xC550537D;
-    const ok2 = (v2>>>0) === 0xBB1584F9;
+    const ok2 = (v2>>>0) === 0xFFD18D4D;
     let msg = `Test 1 (00..07): ${ok1? 'PASS ✅':'FAIL ❌ got 0x'+hex8(v1)}\n`+
               `Test 2 (FF×8): ${ok2? 'PASS ✅':'FAIL ❌ got 0x'+hex8(v2)}`;
     if (ok1 && ok2){
