@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Huge Symmetric Ax = y — Conjugate Gradient Demo</title>
+  <style>
+    :root{
+      --bg:#0b1020;        /* deep navy */
+      --panel:#111733;     /* slate */
+      --muted:#7c8aa5;
+      --text:#e8ecf4;
+      --accent:#9fd1ff;   /* ice blue */
+      --ok:#9fffb1;
+      --warn:#ffd59f;
+      --err:#ff9fa8;
+      --card:#0e1530;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial;
+      color:var(--text); background: radial-gradient(1200px 700px at 100% -10%, #14204f 0%, #0b1020 60%);
+    }
+    header{ padding:18px 22px; display:flex; align-items:center; gap:16px; border-bottom:1px solid #1b2449; position:sticky; top:0; backdrop-filter: blur(8px); background:linear-gradient( to bottom, rgba(15,22,48,.8), rgba(15,22,48,.6) ); z-index:5; }
+    header h1{margin:0; font-size:18px; letter-spacing:.3px}
+    header .tag{font-size:12px; color:var(--panel); background:var(--accent); padding:2px 8px; border-radius:999px; font-weight:600}
+
+    .grid{ display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:16px; }
+    @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+
+    .card{ background:rgba(20,28,64,.55); border:1px solid #1b2449; border-radius:16px; box-shadow: 0 10px 30px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.03); }
+    .panel{ padding:16px; }
+    .panel h2{ margin:4px 0 14px; font-size:14px; color:var(--accent); letter-spacing:.4px }
+    .row{ display:grid; grid-template-columns: 1fr 110px; align-items:center; gap:12px; margin:8px 0; }
+    .row label{color:var(--muted)}
+    input[type="number"], select{ width:100%; padding:8px 10px; border-radius:10px; background:#0f1534; color:var(--text); border:1px solid #233168; }
+    input[type="checkbox"]{ transform: translateY(1px); }
+
+    .btnbar{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+    button{ appearance:none; border:none; padding:10px 12px; border-radius:12px; background:linear-gradient(180deg, #3a63ff, #274bdb); color:white; font-weight:600; letter-spacing:.2px; cursor:pointer; box-shadow: 0 6px 18px rgba(52, 94, 255,.35); }
+    button.sec{ background:linear-gradient(180deg, #22305f, #1a254a); color:#d6ddf3; box-shadow:none; border:1px solid #2a3a79 }
+    button.warn{ background:linear-gradient(180deg, #8a2f2f, #6d2121); border:1px solid #9b4040 }
+    button:disabled{ opacity:.6; cursor:not-allowed }
+
+    .status{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; padding:14px; border-top:1px dashed #26305d; }
+    .kv{ background:rgba(0,0,0,.18); padding:10px 12px; border-radius:12px; border:1px solid #1b2449; }
+    .kv .k{ color:var(--muted); font-size:12px }
+    .kv .v{ font-weight:700; margin-top:2px; font-size:14px }
+    .kv.ok .v{ color:var(--ok) }
+    .kv.warn .v{ color:var(--warn) }
+
+    .plots{ display:grid; grid-template-columns: minmax(0,1fr); gap:16px; padding:16px; }
+    canvas{ width:100%; height:320px; background:linear-gradient(180deg, rgba(12,18,42,.9), rgba(10,15,33,.9)); border-radius:16px; border:1px solid #1b2449; }
+
+    .log{ max-height:200px; overflow:auto; padding:12px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; background: #0a0f24; border-top:1px dashed #26305d; border-radius:0 0 16px 16px; }
+    .log p{ margin:0 0 6px; color:#b6c2e1 }
+
+    footer{ color:#9fb0d6; padding:14px 18px; text-align:center; opacity:.9 }
+    a{ color:var(--accent) }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="tag">Symmetric SPD</span>
+    <h1>Ax = y — Conjugate Gradient (Large & Sparse) In‑Browser Demo</h1>
+  </header>
+
+  <main class="grid">
+    <!-- Controls -->
+    <section class="card panel">
+      <h2>Problem setup</h2>
+      <div class="row">
+        <label>Structure</label>
+        <select id="structure">
+          <option value="1d">1D Laplacian (tridiagonal)</option>
+          <option value="2d">2D Laplacian (5‑point stencil)</option>
+        </select>
+      </div>
+      <div class="row" id="row-n">
+        <label>Size N</label>
+        <input id="n" type="number" value="20000" min="10" step="10" />
+      </div>
+      <div class="row" id="row-nx" style="display:none">
+        <label>Nx (columns)</label>
+        <input id="nx" type="number" value="160" min="8" step="8" />
+      </div>
+      <div class="row" id="row-ny" style="display:none">
+        <label>Ny (rows)</label>
+        <input id="ny" type="number" value="160" min="8" step="8" />
+      </div>
+      <div class="row">
+        <label>Shift σ (SPD boost)</label>
+        <input id="shift" type="number" value="1" step="0.1" />
+      </div>
+      <div class="row">
+        <label>Tolerance</label>
+        <input id="tol" type="number" value="1e-8" step="any" />
+      </div>
+      <div class="row">
+        <label>Max iterations</label>
+        <input id="maxit" type="number" value="2000" min="1" step="50" />
+      </div>
+      <div class="row">
+        <label>Iters / frame</label>
+        <input id="chunk" type="number" value="10" min="1" />
+      </div>
+      <div class="row">
+        <label>Warm start x₀≈0</label>
+        <select id="x0">
+          <option value="zero">Zero</option>
+          <option value="random">Random</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Right‑hand side y</label>
+        <select id="rhs">
+          <option value="random">Random</option>
+          <option value="from-xtrue">Make y = A·xₜᵣᵤₑ</option>
+        </select>
+      </div>
+
+      <div class="btnbar">
+        <button id="btn-generate" class="sec">Generate data</button>
+        <button id="btn-start">Start CG</button>
+        <button id="btn-pause" class="sec" disabled>Pause</button>
+        <button id="btn-reset" class="warn">Reset</button>
+      </div>
+
+      <div class="status">
+        <div class="kv"><div class="k">Unknowns (n)</div><div class="v" id="kv-n">–</div></div>
+        <div class="kv"><div class="k">Approx. nnz</div><div class="v" id="kv-nnz">–</div></div>
+        <div class="kv"><div class="k">Iterations</div><div class="v" id="kv-it">0</div></div>
+        <div class="kv"><div class="k">Residual ‖r‖/‖y‖</div><div class="v" id="kv-res">–</div></div>
+        <div class="kv"><div class="k">Elapsed</div><div class="v" id="kv-time">0.00 s</div></div>
+        <div class="kv"><div class="k">‖x−xₜᵣᵤₑ‖/‖xₜᵣᵤₑ‖</div><div class="v" id="kv-xerr">–</div></div>
+      </div>
+
+      <div class="log" id="log"></div>
+    </section>
+
+    <!-- Plots / Output -->
+    <section class="card">
+      <div class="plots panel">
+        <h2>Convergence (log scale residual)</h2>
+        <canvas id="plot"></canvas>
+        <p style="color:var(--muted); margin:0">This demo solves a <strong>symmetric, positive‑definite</strong> system using <strong>Preconditioned Conjugate Gradient</strong> with a Jacobi (diagonal) preconditioner. The matrix A is never formed explicitly for Laplacian operators — the matrix‑vector product is computed on the fly for scalability.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Built for large, sparse, symmetric SPD systems · Methods: CG + Jacobi · Structures: 1D/2D Laplacian with shift σ
+  </footer>
+
+<script>
+(function(){
+  // --- Utility helpers ---
+  const $ = (id)=>document.getElementById(id);
+  const fmt = (x, d=3)=> (isFinite(x) ? (Math.abs(x) < 1e-3 || Math.abs(x) > 1e4 ? x.toExponential(d) : x.toFixed(d)) : '–');
+  function log(msg){ const el=$('log'); const p=document.createElement('p'); p.textContent = msg; el.prepend(p); }
+  function setKV(id, val){ $(id).textContent = val; }
+
+  // --- Problem state ---
+  let n=0, nx=0, ny=0, structure='1d';
+  let shift=1.0;
+  let y=null, x=null, xtrue=null; // Float64Array
+  let diag=null; // Jacobi preconditioner
+  let Aop=null;  // function: (dst, src) => dst = A*src
+  let matKind='1d';
+
+  // CG work vectors
+  let r=null, z=null, p=null, Ap=null;
+  let rz=0, bnorm=1, iter=0, maxit=2000, tol=1e-8, running=false, chunk=10, t0=0, rhsMode='random';
+  let animHandle=null;
+
+  // Plot state
+  const canvas = $('plot');
+  const ctx = canvas.getContext('2d');
+  const residuals=[]; // store log10 rel residuals
+  function resizeCanvas(){ const dpr=window.devicePixelRatio||1; canvas.width = canvas.clientWidth*dpr; canvas.height = canvas.clientHeight*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); drawPlot(); }
+  window.addEventListener('resize', resizeCanvas, {passive:true});
+
+  function drawPlot(){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx.clearRect(0,0,w,h);
+    // axes
+    ctx.strokeStyle = 'rgba(159,209,255,.35)';
+    ctx.lineWidth = 1; ctx.beginPath();
+    ctx.moveTo(40, 12); ctx.lineTo(40, h-28); ctx.lineTo(w-12, h-28); ctx.stroke();
+    // labels
+    ctx.fillStyle = 'rgba(200,220,255,.9)'; ctx.font = '12px system-ui';
+    ctx.fillText('log10(‖r‖/‖y‖)', 8, 12);
+    ctx.fillText('iter', w-36, h-10);
+    // plot line
+    if(residuals.length===0) return;
+    const xmin=0, xmax=Math.max(1,residuals.length-1);
+    const ymin = Math.min(...residuals)-0.3, ymax = Math.max(...residuals)+0.1;
+    const xmap = i=> 40 + (w-52)*(i-xmin)/(xmax-xmin);
+    const ymap = v=> 12 + (h-40)*(1-(v - ymin)/(ymax-ymin));
+    ctx.lineWidth = 2; ctx.strokeStyle = '#9fd1ff'; ctx.beginPath();
+    for(let i=0;i<residuals.length;i++){
+      const x=xmap(i), y=ymap(residuals[i]);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // --- Matrix-vector operators (Laplacians) ---
+  function make1DLaplacian(N, sigma){
+    const D = 2 + sigma; // diagonal
+    const apply = (dst, v)=>{
+      const n=v.length; dst[0] = D*v[0] - v[1];
+      for(let i=1;i<n-1;i++) dst[i] = -v[i-1] + D*v[i] - v[i+1];
+      dst[n-1] = -v[n-2] + D*v[n-1];
+    };
+    const diag = new Float64Array(N); diag.fill(D);
+    return { apply, diag };
+  }
+  function make2DLaplacian(Nx, Ny, sigma){
+    const D = 4 + sigma; const N = Nx*Ny;
+    const apply = (dst, v)=>{
+      // 5-point stencil with Dirichlet boundaries
+      for(let j=0;j<Ny;j++){
+        const row = j*Nx;
+        for(let i=0;i<Nx;i++){
+          const idx = row+i;
+          let s = D*v[idx];
+          if(i>0) s -= v[idx-1];
+          if(i<Nx-1) s -= v[idx+1];
+          if(j>0) s -= v[idx-Nx];
+          if(j<Ny-1) s -= v[idx+Nx];
+          dst[idx] = s;
+        }
+      }
+    };
+    const diag = new Float64Array(N); diag.fill(D);
+    return { apply, diag };
+  }
+
+  // --- Linear algebra helpers ---
+  function dot(a,b){ let s=0; for(let i=0;i<a.length;i++) s += a[i]*b[i]; return s; }
+  function axpy(y,a,x){ for(let i=0;i<y.length;i++) y[i] += a*x[i]; }
+  function scal(y,a){ for(let i=0;i<y.length;i++) y[i] *= a; }
+  function copy(dst,src){ dst.set(src); }
+  function norm2(x){ return Math.sqrt(dot(x,x)); }
+
+  // Apply preconditioner M^{-1} ~ Jacobi (1/diag)
+  function precondition(z, r, diag){ for(let i=0;i<r.length;i++) z[i] = r[i] / diag[i]; }
+
+  // Initialize problem according to UI
+  function configureProblem(){
+    structure = $('structure').value;
+    shift = parseFloat($('shift').value);
+    if(structure==='1d'){
+      n = parseInt($('n').value,10);
+      const {apply, diag:dg} = make1DLaplacian(n, shift);
+      Aop = apply; diag = dg; matKind='1d';
+      $('row-n').style.display='grid'; $('row-nx').style.display='none'; $('row-ny').style.display='none';
+      $('kv-n').textContent = n.toLocaleString();
+      $('kv-nnz').textContent = (3*n - 2).toLocaleString();
+    } else {
+      nx = parseInt($('nx').value,10); ny = parseInt($('ny').value,10);
+      n = nx*ny;
+      const {apply, diag:dg} = make2DLaplacian(nx, ny, shift);
+      Aop = apply; diag = dg; matKind='2d';
+      $('row-n').style.display='none'; $('row-nx').style.display='grid'; $('row-ny').style.display='grid';
+      $('kv-n').textContent = n.toLocaleString();
+      $('kv-nnz').textContent = (5*n - 2*nx - 2*ny).toLocaleString(); // interior 5, edges less; approx
+    }
+    // allocate vectors
+    x = new Float64Array(n);
+    y = new Float64Array(n);
+    r = new Float64Array(n);
+    z = new Float64Array(n);
+    p = new Float64Array(n);
+    Ap= new Float64Array(n);
+    xtrue = null;
+    residuals.length = 0; iter=0; setKV('kv-it', '0'); setKV('kv-res','–'); setKV('kv-xerr','–'); setKV('kv-time','0.00 s');
+    drawPlot(); log(`[setup] structure=${structure}, n=${n.toLocaleString()}, shift=${shift}`);
+  }
+
+  // Generate RHS and optional x_true
+  function generateData(){
+    const mode = $('rhs').value; rhsMode = mode;
+    const x0mode = $('x0').value;
+    // x0
+    if(x0mode==='random'){ for(let i=0;i<n;i++) x[i] = (Math.random()*2-1)*0.01; } else x.fill(0);
+    // y
+    if(mode==='random'){
+      for(let i=0;i<n;i++) y[i] = Math.random()*2-1;
+    } else {
+      xtrue = new Float64Array(n); for(let i=0;i<n;i++) xtrue[i] = Math.random()*2-1;
+      Aop(y, xtrue);
+    }
+    // residual init r = y - A x0
+    Aop(r, x); for(let i=0;i<n;i++) r[i] = y[i] - r[i];
+    precondition(z, r, diag); p.set(z);
+    rz = dot(r,z);
+    bnorm = Math.max(1e-30, norm2(y));
+    tol = parseFloat($('tol').value)||1e-8;
+    maxit = parseInt($('maxit').value,10)||2000;
+    chunk = parseInt($('chunk').value,10)||10;
+    residuals.length=0; residuals.push(Math.log10(norm2(r)/bnorm));
+    setKV('kv-it', '0'); setKV('kv-res', fmt(norm2(r)/bnorm)); setKV('kv-time','0.00 s');
+    if(xtrue){ const err = norm2(diffCopy(x, xtrue))/Math.max(1e-30, norm2(xtrue)); setKV('kv-xerr', fmt(err)); }
+    drawPlot();
+    log(`[data] rhs=${mode}, x0=${x0mode}, \u2016r0\u2016/\u2016y\u2016=${fmt(norm2(r)/bnorm)}`);
+  }
+
+  function diffCopy(a,b){ const d=new Float64Array(a.length); for(let i=0;i<a.length;i++) d[i]=a[i]-b[i]; return d; }
+
+  // One CG iteration chunk
+  function cgStep(){
+    let k=0;
+    while(k<chunk && iter<maxit && running){
+      // Ap = A p
+      Aop(Ap, p);
+      const pAp = dot(p,Ap);
+      const alpha = rz / pAp;
+      axpy(x, alpha, p);           // x = x + alpha p
+      axpy(r, -alpha, Ap);         // r = r - alpha Ap
+      const rel = norm2(r)/bnorm;
+      residuals.push(Math.log10(rel));
+      iter++;
+      setKV('kv-it', String(iter));
+      setKV('kv-res', fmt(rel));
+      if(iter===1) t0 = performance.now();
+      if(rel <= tol){ running=false; finalize(); return; }
+      precondition(z, r, diag);    // z = M^{-1} r
+      const rz_new = dot(r,z);
+      const beta = rz_new / rz;
+      // p = z + beta p
+      for(let i=0;i<p.length;i++) p[i] = z[i] + beta*p[i];
+      rz = rz_new;
+      k++;
+    }
+    drawPlot();
+    if(running) animHandle = requestAnimationFrame(cgStep);
+  }
+
+  function finalize(){
+    const t = (performance.now() - t0)/1000;
+    setKV('kv-time', fmt(t,2)+ ' s');
+    if(xtrue){ const err = norm2(diffCopy(x, xtrue))/Math.max(1e-30, norm2(xtrue)); setKV('kv-xerr', fmt(err)); }
+    log(`[done] iter=${iter}, relres=${fmt(Math.pow(10,residuals[residuals.length-1]))}, time=${fmt(t,2)} s`);
+    drawPlot();
+    $('btn-start').disabled=false; $('btn-pause').disabled=true;
+  }
+
+  // --- Event wiring ---
+  $('structure').addEventListener('change', configureProblem);
+  ['n','nx','ny','shift'].forEach(id=> $(id).addEventListener('change', configureProblem));
+  $('rhs').addEventListener('change', ()=>{/* no-op until generate */});
+  $('x0').addEventListener('change', ()=>{/* no-op until generate */});
+  $('btn-generate').addEventListener('click', ()=>{ generateData(); });
+  $('btn-start').addEventListener('click', ()=>{
+    if(!y){ generateData(); }
+    tol = parseFloat($('tol').value)||1e-8;
+    maxit = parseInt($('maxit').value,10)||2000;
+    chunk = parseInt($('chunk').value,10)||10;
+    running=true; $('btn-start').disabled=true; $('btn-pause').disabled=false; cgStep();
+  });
+  $('btn-pause').addEventListener('click', ()=>{ running=false; $('btn-start').disabled=false; $('btn-pause').disabled=true; cancelAnimationFrame(animHandle); });
+  $('btn-reset').addEventListener('click', ()=>{ running=false; cancelAnimationFrame(animHandle); configureProblem(); });
+
+  // Initial setup
+  configureProblem();
+  resizeCanvas();
+  generateData();
+})();
+</script>
+</body>
+</html>
