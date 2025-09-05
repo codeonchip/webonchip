@@ -10,6 +10,8 @@
     td, th { border: 1px solid #999; padding: 4px 8px; text-align: center; }
     .crc-result { font-size: 1.5em; color: green; margin-top: 1em; }
     .table-scroll { max-height: 250px; overflow-y: auto; margin-top: 1em; border: 1px solid #ccc; }
+    .buttons { margin-top: 0.5em; }
+    button { font-size: 1em; padding: 6px 12px; margin-right: 10px; }
   </style>
 </head>
 <body>
@@ -18,7 +20,11 @@
 
 <label for="input">Enter hex bytes (e.g. <code>01 02 03</code>):</label>
 <textarea id="input" placeholder="Enter hex values..."></textarea>
-<button onclick="calculateCRC()">Compute CRC8-H2F</button>
+
+<div class="buttons">
+  <button onclick="calculateCRC()">Compute CRC8-H2F</button>
+  <button onclick="resetForm()">Reset</button>
+</div>
 
 <div class="crc-result" id="result">CRC: 0x--</div>
 
@@ -61,6 +67,12 @@
     crc ^= 0xFF;
 
     document.getElementById("result").textContent = `CRC: 0x${crc.toString(16).padStart(2, '0').toUpperCase()}`;
+  }
+
+  function resetForm() {
+    document.getElementById("input").value = '';
+    document.getElementById("result").textContent = 'CRC: 0x--';
+    document.getElementById("input").focus();
   }
 
   function fillTable() {
