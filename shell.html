@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WebShell — In‑Browser UNIX‑y Shell</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #0f141a;
+    --fg: #e8eef2;
+    --muted: #8aa0ad;
+    --accent: #6bd968;
+    --accent-2: #7aa2f7;
+    --error: #ff6b6b;
+    --warn: #ffb86c;
+    --ok: #50fa7b;
+  }
+  [data-theme="light"] {
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --fg: #0f172a;
+    --muted: #475569;
+    --accent: #059669;
+    --accent-2: #2563eb;
+    --error: #dc2626;
+    --warn: #d97706;
+    --ok: #16a34a;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    display: grid; grid-template-rows: auto 1fr auto;
+  }
+  header {
+    padding: .75rem 1rem; background: var(--panel);
+    display: flex; gap: .75rem; align-items: center; border-bottom: 1px solid rgba(255,255,255,.06);
+    position: sticky; top: 0; z-index: 3;
+  }
+  header .brand { font-weight: 700; letter-spacing: .3px; }
+  header .sep { opacity: .25; }
+  header .btn {
+    border: 1px solid rgba(255,255,255,.12); background: transparent; color: var(--fg);
+    padding: .25rem .55rem; border-radius: .5rem; cursor: pointer; font: inherit;
+  }
+  header .btn:hover { border-color: var(--accent-2); }
+
+  #terminal {
+    padding: 1rem; overflow-y: auto; height: calc(100vh - 150px);
+  }
+  .line { white-space: pre-wrap; word-break: break-word; }
+  .out { color: var(--fg); }
+  .err { color: var(--error); }
+  .muted { color: var(--muted); }
+  .ok { color: var(--ok); }
+  .warn { color: var(--warn); }
+  .prompt { color: var(--accent); }
+  .path { color: var(--accent-2); }
+  .hint { color: var(--muted); font-style: italic; }
+
+  #inputBar {
+    padding: .5rem 1rem; background: var(--panel); display: grid; grid-template-columns: auto 1fr auto; gap: .5rem;
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+  #ps1 { align-self: center; }
+  #cmd {
+    background: transparent; color: var(--fg); border: none; outline: none;
+    width: 100%; font: inherit; caret-color: var(--accent-2);
+  }
+  #tip { color: var(--muted); }
+  .badge { border:1px solid rgba(255,255,255,.15); padding:.05rem .35rem; border-radius:.35rem; font-size:.8em; }
+  .k { color:#f2d; }
+  .v { color:#6bd968; }
+  .keycaps { background: rgba(255,255,255,.08); padding:.1rem .3rem; border-radius:.25rem; }
+
+  /* Tiny modal editor */
+  dialog {
+    border: 1px solid rgba(255,255,255,.12); border-radius: .75rem; background: var(--panel); color: var(--fg);
+    width: min(900px, 92vw);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  .dlg-head { display:flex; justify-content:space-between; align-items:center; padding:.6rem .8rem; border-bottom:1px solid rgba(255,255,255,.08); }
+  .dlg-body { padding:.6rem; }
+  .dlg-body textarea { width:100%; min-height: 45vh; background: #0b0f14; color: #e8eef2; border-radius: .5rem; border:1px solid rgba(255,255,255,.12); padding:.6rem; font: inherit; }
+  .dlg-actions { display:flex; gap:.5rem; justify-content:flex-end; padding:.6rem; border-top:1px solid rgba(255,255,255,.08); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 10px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="brand">WebShell</span>
+    <span class="sep">•</span>
+    <span class="muted">Type <span class="keycaps">help</span> or <span class="keycaps">help &lt;cmd&gt;</span>. Press <span class="keycaps">Tab</span> for completion, <span class="keycaps">Ctrl</span>+<span class="keycaps">L</span> to clear.</span>
+    <span style="flex:1"></span>
+    <button class="btn" id="btnTheme" title="Toggle theme">Theme</button>
+    <button class="btn" id="btnExport" title="Export FS to file">Backup</button>
+    <button class="btn" id="btnImport" title="Import FS from file">Restore</button>
+  </header>
+
+  <main id="terminal" aria-live="polite" aria-atomic="false"></main>
+
+  <div id="inputBar">
+    <div id="ps1" aria-hidden="true"></div>
+    <input id="cmd" type="text" autocomplete="off" spellcheck="false" aria-label="Command line" />
+    <div id="tip"></div>
+  </div>
+
+  <dialog id="editor">
+    <div class="dlg-head">
+      <strong id="edTitle">Edit</strong>
+      <span class="muted" id="edPath"></span>
+    </div>
+    <div class="dlg-body">
+      <textarea id="edArea"></textarea>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn" id="edCancel">Cancel</button>
+      <button class="btn" id="edSave">Save</button>
+    </div>
+  </dialog>
+
+<script>
+(() => {
+  // ------------------------------
+  // Utils
+  // ------------------------------
+  const $ = sel => document.querySelector(sel);
+  const term = $('#terminal');
+  const input = $('#cmd');
+  const tip = $('#tip');
+  const ps1 = $('#ps1');
+
+  const STORAGE_KEY = 'webshell.fs.v1';
+  const ENV_KEY = 'webshell.env.v1';
+  const HIST_KEY = 'webshell.hist.v1';
+
+  const nowISO = () => new Date().toISOString();
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  function pad(n, w=2) { return String(n).padStart(w, '0'); }
+  function fmtDate(d = new Date()) {
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function print(html, cls='out') {
+    const div = document.createElement('div');
+    div.className = `line ${cls}`;
+    div.innerHTML = html;
+    term.appendChild(div);
+    term.scrollTop = term.scrollHeight;
+  }
+  function printPrompt(s) { print(`<span class="prompt">${escapeHtml(s.user)}@webshell</span>:<span class="path">${escapeHtml(s.path)}</span>$`, 'line'); }
+
+  function escapeHtml(str="") {
+    return str.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  function sha256Hex(bytes) {
+    return crypto.subtle.digest('SHA-256', bytes).then(buf => Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join(''));
+  }
+
+  function toBytes(str) {
+    return new TextEncoder().encode(str);
+  }
+
+  function fromBytes(bytes) {
+    return new TextDecoder().decode(bytes);
+  }
+
+  // ------------------------------
+  // Virtual Filesystem
+  // ------------------------------
+  function makeDir(name) { return { type:'dir', name, ctime: nowISO(), mtime: nowISO(), children:{} }; }
+  function makeFile(name, content='') { return { type:'file', name, ctime: nowISO(), mtime: nowISO(), size: content.length, content }; }
+
+  let fs = null;
+  let env = null;
+  let history = [];
+
+  function loadState() {
+    try {
+      fs = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      env = JSON.parse(localStorage.getItem(ENV_KEY));
+      history = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+    } catch (e) {}
+
+    if (!fs) {
+      fs = makeDir(''); // root
+      fs.children['home'] = makeDir('home');
+      fs.children['tmp'] = makeDir('tmp');
+      const userDir = makeDir('guest');
+      fs.children['home'].children['guest'] = userDir;
+      userDir.children['readme.txt'] = makeFile('readme.txt', `Welcome to WebShell!\n\nTry: help, ls, pwd, cat readme.txt, echo hello, calc 1+2*3, tree, grep, wc, head, tail, base64, sha256, uuid, date, which, alias, theme, history, sleep 500.\nUse pipelines and redirection: ls -l | grep txt > result.txt\nPersisted in localStorage. Use backup/restore buttons to export/import.\n`);
+    }
+
+    if (!env) {
+      env = {
+        USER: 'guest', HOME: '/home/guest', PWD: '/home/guest', OLDPWD: '/home/guest',
+        THEME: localStorage.getItem('webshell.theme') || 'dark',
+        PATH: '/bin:/usr/bin',
+        EDITOR: 'nano',
+        PS1: '${USER}@webshell:${PWD}$ ',
+        ALIAS: { ll: 'ls -l', la: 'ls -la' }
+      };
+    }
+
+    applyTheme(env.THEME);
+  }
+
+  function saveFS() { localStorage.setItem(STORAGE_KEY, JSON.stringify(fs)); }
+  function saveEnv() { localStorage.setItem(ENV_KEY, JSON.stringify(env)); localStorage.setItem('webshell.theme', env.THEME); }
+  function saveHistory() { localStorage.setItem(HIST_KEY, JSON.stringify(history.slice(-400))); }
+
+  function splitPath(path) {
+    if (!path) return [];
+    return path.split('/').filter(Boolean);
+  }
+
+  function resolvePath(path, cwd = env.PWD) {
+    if (!path || path === '.') return cwd;
+    if (path === '~') return env.HOME;
+    if (path.startsWith('~/')) path = env.HOME + '/' + path.slice(2);
+    if (path.startsWith('/')) return simplify(path);
+    return simplify(cwd + '/' + path);
+  }
+  function simplify(path) {
+    const parts = [];
+    for (const seg of path.split('/')) {
+      if (!seg || seg === '.') continue;
+      if (seg === '..') parts.pop(); else parts.push(seg);
+    }
+    return '/' + parts.join('/');
+  }
+
+  function getNode(path) {
+    const parts = splitPath(path);
+    let node = fs;
+    for (const p of parts) {
+      if (!node.children || !node.children[p]) return null;
+      node = node.children[p];
+    }
+    return node;
+  }
+
+  function ensureParent(path) {
+    const parts = splitPath(path);
+    const base = parts.pop();
+    let node = fs;
+    for (const p of parts) {
+      if (!node.children[p]) node.children[p] = makeDir(p);
+      node = node.children[p];
+      if (node.type !== 'dir') throw new Error('Not a directory: ' + p);
+    }
+    return { dir: node, base };
+  }
+
+  function listDir(node) {
+    if (!node || node.type !== 'dir') throw new Error('Not a directory');
+    return Object.values(node.children).sort((a,b)=>a.name.localeCompare(b.name));
+  }
+
+  function writeFile(path, content) {
+    const { dir, base } = ensureParent(path);
+    dir.children[base] = makeFile(base, content);
+    dir.mtime = nowISO();
+    saveFS();
+  }
+
+  function appendFile(path, content) {
+    const node = getNode(path);
+    if (node && node.type === 'file') {
+      node.content += content; node.mtime = nowISO();
+    } else {
+      writeFile(path, content);
+    }
+    saveFS();
+  }
+
+  function removePath(path) {
+    const parts = splitPath(path);
+    const base = parts.pop();
+    let node = fs;
+    for (const p of parts) {
+      if (!node.children[p]) return false;
+      node = node.children[p];
+    }
+    if (!node.children[base]) return false;
+    delete node.children[base];
+    node.mtime = nowISO();
+    saveFS();
+    return true;
+  }
+
+  // ------------------------------
+  // Parsing & Execution
+  // ------------------------------
+  const builtins = new Map();
+
+  function register(name, fn, help="") {
+    builtins.set(name, { run: fn, help });
+  }
+
+  function expandAliases(cmdline) {
+    const { tokens } = tokenize(cmdline, false);
+    if (tokens.length === 0) return cmdline;
+    const first = tokens[0];
+    const alias = env.ALIAS?.[first];
+    if (!alias) return cmdline;
+    return alias + (tokens.length > 1 ? ' ' + cmdline.slice(cmdline.indexOf(first) + first.length + 1) : '');
+  }
+
+  function expandVars(str) {
+    return str.replace(/\\\$|\$\{([^}]+)\}|\$(\w+)/g, (m, a, b) => {
+      if (m === '\\$') return '$';
+      const key = a || b;
+      return env[key] ?? '';
+    });
+  }
+
+  function tokenize(s, expand=true) {
+    // Very small shell-like tokenizer: supports quotes, escapes, pipes, redirects
+    let i=0, cur='', tokens=[], ops=['|','>','>>','<'];
+    const push = () => { if (cur!=='' ) { tokens.push(expand ? expandVars(cur) : cur); cur=''; } };
+    while (i < s.length) {
+      const ch = s[i];
+      if (ch === ' ') { push(); i++; continue; }
+      if (ch === '\\') { cur += s[i+1] ?? ''; i+=2; continue; }
+      if (ch === '"' || ch === '\'') {
+        const quote = ch; i++; let tmp='';
+        while (i < s.length && s[i] !== quote) { if (s[i] === '\\') { tmp += s[i+1] ?? ''; i+=2; } else { tmp += s[i++]; } }
+        i++; cur += (quote === '"' ? expandVars(tmp) : tmp); continue;
+      }
+      if (s.startsWith('>>', i)) { push(); tokens.push('>>'); i+=2; continue; }
+      if (ops.includes(ch)) { push(); tokens.push(ch); i++; continue; }
+      cur += ch; i++;
+    }
+    push();
+    // Split pipeline by '|', capture redirection on last command only
+    const pipeline = [];
+    let segment = [];
+    for (let t of tokens) {
+      if (t === '|') { pipeline.push(segment); segment = []; }
+      else segment.push(t);
+    }
+    pipeline.push(segment);
+    return { tokens, pipeline };
+  }
+
+  async function execute(cmdline) {
+    // Alias + var expansion
+    const expanded = expandAliases(cmdline);
+    const { pipeline } = tokenize(expanded);
+
+    // Handle redirection tokens in last segment
+    let redirOut=null, redirMode='w';
+    const last = pipeline[pipeline.length-1];
+    for (let i=0; i<last.length; i++) {
+      if (last[i] === '>' || last[i] === '>>') {
+        redirMode = (last[i] === '>>') ? 'a' : 'w';
+        redirOut = last[i+1];
+        last.splice(i, 2); break;
+      }
+    }
+
+    let stdin = '';
+    let stdout = '';
+    for (const seg of pipeline) {
+      const [name, ...args] = seg;
+      if (!name) continue;
+      const cmd = builtins.get(name);
+      if (!cmd) throw new Error(`command not found: ${name}`);
+      stdout = await cmd.run(args, stdin);
+      stdin = stdout; // pipe forward
+    }
+
+    if (redirOut) {
+      const path = resolvePath(redirOut);
+      if (redirMode === 'a') appendFile(path, stdout + (stdout.endsWith('\n')?'':'\n'));
+      else writeFile(path, stdout + (stdout.endsWith('\n')?'':'\n'));
+      return '';
+    }
+    return stdout;
+  }
+
+  // ------------------------------
+  // Built‑ins (many!)
+  // ------------------------------
+  function ensureArgc(args, n, msg) { if (args.length < n) throw new Error(msg); }
+  function formatLs(node, long=false) {
+    if (!long) return node.name;
+    const type = node.type === 'dir' ? 'd' : '-';
+    const size = node.type === 'file' ? (node.content?.length||0) : 0;
+    return `${type}rw-r--r-- 1 user users ${size.toString().padStart(8)} ${fmtDate(new Date(node.mtime))} ${node.name}`;
+  }
+
+  register('help', async (args) => {
+    if (args[0]) {
+      const c = builtins.get(args[0]);
+      if (!c) throw new Error(`no help for ${args[0]}`);
+      return (c.help||'no help available') + '\n';
+    }
+    const names = Array.from(builtins.keys()).sort();
+    const cols = names.join('  ');
+    return `WebShell built-ins (type \"help &lt;cmd&gt;\"):\n${cols}\n`;
+  }, `help [cmd]\n  Show general or command-specific help.`);
+
+  register('man', async (args) => builtins.get(args[0])?.help + '\n' || `No manual entry for ${args[0]}\n`, 'man <cmd>\n  Show manual for a command.');
+
+  register('clear', async ()=>{ term.innerHTML=''; return ''; }, 'clear\n  Clear the screen. (Ctrl+L also works)');
+
+  register('echo', async (args, stdin)=> (args.length? args.join(' ') : stdin) + '\n', 'echo [args...]\n  Echo arguments or stdin. Supports $VAR in double quotes.');
+
+  register('pwd', async ()=> env.PWD + '\n', 'pwd\n  Print working directory.');
+
+  register('cd', async (args)=>{
+    const to = resolvePath(args[0] || env.HOME);
+    const node = getNode(to);
+    if (!node) throw new Error(`no such file or directory: ${args[0]||to}`);
+    if (node.type !== 'dir') throw new Error('not a directory: ' + args[0]);
+    env.OLDPWD = env.PWD; env.PWD = to; saveEnv(); refreshPS1(); return '';
+  }, 'cd [path]\n  Change directory. Use cd - to jump to OLDPWD.');
+
+  register('ls', async (args)=>{
+    let long = false, all = false, target = env.PWD;
+    for (const a of args) {
+      if (a === '-l') long = true; else if (a==='-a' || a==='-la' || a==='-al') { all = true; long = a.includes('l'); }
+      else target = resolvePath(a);
+    }
+    const node = getNode(target);
+    if (!node) throw new Error('no such file or directory: ' + target);
+    if (node.type === 'file') return formatLs(node, long) + '\n';
+    const items = listDir(node).map(n=>formatLs(n,long));
+    return items.join('\n') + (items.length?'\n':'');
+  }, 'ls [-l] [-a] [path]\n  List directory contents.');
+
+  register('cat', async (args, stdin)=>{
+    if (args.length === 0) return stdin + (stdin.endsWith('\n')?'':'\n');
+    const path = resolvePath(args[0]);
+    const node = getNode(path);
+    if (!node || node.type !== 'file') throw new Error('no such file: ' + args[0]);
+    return node.content;
+  }, 'cat [file]\n  Print file or stdin.');
+
+  register('touch', async (args)=>{
+    ensureArgc(args,1,'usage: touch <file>');
+    const p = resolvePath(args[0]);
+    const node = getNode(p);
+    if (node && node.type==='file') { node.mtime = nowISO(); saveFS(); }
+    else writeFile(p, '');
+    return '';
+  }, 'touch <file>\n  Create empty file or update mtime.');
+
+  register('mkdir', async (args)=>{
+    ensureArgc(args,1,'usage: mkdir <dir>');
+    const p = resolvePath(args[0]);
+    const { dir, base } = ensureParent(p);
+    if (dir.children[base]) throw new Error('file exists: ' + args[0]);
+    dir.children[base] = makeDir(base); dir.mtime = nowISO(); saveFS(); return '';
+  }, 'mkdir <dir>\n  Create directory.');
+
+  register('rmdir', async (args)=>{
+    ensureArgc(args,1,'usage: rmdir <dir>');
+    const p = resolvePath(args[0]);
+    const node = getNode(p);
+    if (!node || node.type!=='dir') throw new Error('no such directory: ' + args[0]);
+    if (Object.keys(node.children).length) throw new Error('directory not empty');
+    removePath(p); return '';
+  }, 'rmdir <dir>\n  Remove empty directory.');
+
+  register('rm', async (args)=>{
+    ensureArgc(args,1,'usage: rm <path>');
+    const p = resolvePath(args[0]);
+    const node = getNode(p);
+    if (!node) throw new Error('no such file or directory: ' + args[0]);
+    if (node.type==='dir') throw new Error('is a directory (use rmdir)');
+    removePath(p); return '';
+  }, 'rm <file>\n  Remove file.');
+
+  register('mv', async (args)=>{
+    ensureArgc(args,2,'usage: mv <src> <dst>');
+    const src = resolvePath(args[0]);
+    const dst = resolvePath(args[1]);
+    const srcNode = getNode(src);
+    if (!srcNode) throw new Error('no such file or directory: ' + args[0]);
+    const { dir, base } = ensureParent(dst);
+    dir.children[base] = JSON.parse(JSON.stringify(srcNode)); // clone
+    removePath(src); saveFS(); return '';
+  }, 'mv <src> <dst>\n  Move/rename file or directory.');
+
+  register('cp', async (args)=>{
+    ensureArgc(args,2,'usage: cp <src> <dst>');
+    const src = getNode(resolvePath(args[0]));
+    if (!src) throw new Error('no such file or directory: ' + args[0]);
+    const { dir, base } = ensureParent(resolvePath(args[1]));
+    dir.children[base] = JSON.parse(JSON.stringify(src)); saveFS(); return '';
+  }, 'cp <src> <dst>\n  Copy file or directory.');
+
+  register('tree', async (args)=>{
+    const start = getNode(resolvePath(args[0] || env.PWD));
+    if (!start) throw new Error('no such path');
+    const lines=[]; let count=0;
+    function walk(node, pref='') {
+      lines.push(pref + node.name + (node.type==='dir'?'/':'')); count++;
+      if (node.type==='dir') {
+        const kids = listDir(node);
+        kids.forEach((k,i)=>walk(k, pref + (pref?'  ':'') + (i===kids.length-1?'└─ ':'├─ ')));
+      }
+    }
+    const fakeRoot = { ...start, name: start===fs?'/':start.name };
+    walk(fakeRoot,'');
+    return lines.join('\n') + `\n\n${count} item(s)\n`;
+  }, 'tree [path]\n  Pretty-print directory tree.');
+
+  register('head', async (args, stdin)=>{
+    let n=10, file=null;
+    if (args[0]==='-n') { n=parseInt(args[1]||'10',10); file=args[2]; }
+    else file=args[0];
+    const text = file? getNode(resolvePath(file))?.content : stdin;
+    if (text==null) throw new Error('no input');
+    return text.split(/\r?\n/).slice(0,n).join('\n') + '\n';
+  }, 'head [-n N] [file]\n  Show first N lines.');
+
+  register('tail', async (args, stdin)=>{
+    let n=10, file=null;
+    if (args[0]==='-n') { n=parseInt(args[1]||'10',10); file=args[2]; }
+    else file=args[0];
+    const text = file? getNode(resolvePath(file))?.content : stdin;
+    if (text==null) throw new Error('no input');
+    const lines = text.split(/\r?\n/);
+    return lines.slice(Math.max(0, lines.length-n)).join('\n') + '\n';
+  }, 'tail [-n N] [file]\n  Show last N lines.');
+
+  register('wc', async (args, stdin)=>{
+    const text = args[0]? getNode(resolvePath(args[0]))?.content : stdin;
+    if (text==null) throw new Error('no input');
+    const lines = text.split(/\r?\n/).length - 1;
+    const words = (text.trim().match(/\S+/g)||[]).length;
+    const bytes = new TextEncoder().encode(text).length;
+    return `${lines} ${words} ${bytes}\n`;
+  }, 'wc [file]\n  Print line, word, and byte counts.');
+
+  register('grep', async (args, stdin)=>{
+    if (args.length===0 && !stdin) throw new Error('usage: grep <pattern> [file]');
+    let pattern = args[0];
+    let flags = 'i';
+    if (/^\/(.*)\/(\w*)$/.test(pattern)) { const m=pattern.match(/^\/(.*)\/(\w*)$/); pattern=m[1]; flags=m[2]||''; }
+    const re = new RegExp(pattern, flags);
+    const text = args[1]? getNode(resolvePath(args[1]))?.content : stdin;
+    if (text==null) throw new Error('no input');
+    return text.split(/\r?\n/).filter(l=>re.test(l)).join('\n') + '\n';
+  }, 'grep <pattern> [file]\n  Search matching lines. Supports /re/flags syntax.');
+
+  register('hexdump', async (args, stdin)=>{
+    const text = args[0]? getNode(resolvePath(args[0]))?.content : stdin;
+    if (text==null) throw new Error('no input');
+    const bytes = new TextEncoder().encode(text);
+    let out='';
+    for (let i=0;i<bytes.length;i+=16){
+      const slice=bytes.slice(i,i+16);
+      const hex=Array.from(slice).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+      const ascii=Array.from(slice).map(b=> (b>=32 && b<127)?String.fromCharCode(b):'.').join('');
+      out += i.toString(16).padStart(8,'0')+ '  ' + hex.padEnd(16*3,' ') + '  |' + ascii + '|\n';
+    }
+    return out || '\n';
+  }, 'hexdump [file]\n  Hex view of data.');
+
+  register('base64', async (args, stdin)=>{
+    if (args[0]==='-d') {
+      const data = args[1]? getNode(resolvePath(args[1]))?.content : (stdin||'');
+      try { return atob(data) + '\n'; } catch { throw new Error('invalid base64'); }
+    } else {
+      const data = args[0]? getNode(resolvePath(args[0]))?.content : (stdin||'');
+      return btoa(data) + '\n';
+    }
+  }, 'base64 [-d] [file]\n  Encode/decode Base64.');
+
+  register('date', async (args)=>{
+    if (args[0]?.startsWith('+')) {
+      // Minimal strftime-like
+      const d = new Date();
+      const fmt = args[0].slice(1);
+      const map = { Y:d.getFullYear(), m:pad(d.getMonth()+1), d:pad(d.getDate()), H:pad(d.getHours()), M:pad(d.getMinutes()), S:pad(d.getSeconds()) };
+      return fmt.replace(/%([YmdHMS])/g, (_,k)=>map[k]).replace(/%%/g,'%') + '\n';
+    }
+    return new Date().toString() + '\n';
+  }, 'date ["+%Y-%m-%d %H:%M:%S"]\n  Show current date/time.');
+
+  register('uname', async (args)=> `WebShell ${navigator.platform} ${navigator.userAgent}\n`, 'uname\n  Print system information.');
+
+  register('whoami', async ()=> env.USER + '\n', 'whoami\n  Print current user.');
+
+  register('env', async ()=> Object.entries(env).map(([k,v])=>`${k}=${typeof v==='object'?JSON.stringify(v):v}`).join('\n')+'\n', 'env\n  List environment variables.');
+
+  register('set', async (args)=>{
+    ensureArgc(args,1,'usage: set VAR=VALUE');
+    const m = args[0].match(/^(\w+)=(.*)$/);
+    if (!m) throw new Error('usage: set VAR=VALUE');
+    env[m[1]] = m[2]; saveEnv(); return '';
+  }, 'set VAR=VALUE\n  Set an environment variable.');
+
+  register('export', async (args)=>{
+    return builtins.get('set').run(args);
+  }, 'export VAR=VALUE\n  Alias for set.');
+
+  register('unset', async (args)=>{ ensureArgc(args,1,'usage: unset VAR'); delete env[args[0]]; saveEnv(); return ''; }, 'unset VAR\n  Remove an environment variable.');
+
+  register('history', async ()=> history.map((h,i)=>`${i+1}  ${h}`).join('\n') + (history.length?'\n':''), 'history\n  Show recent commands.');
+
+  register('alias', async (args)=>{
+    if (args.length===0) return Object.entries(env.ALIAS||{}).map(([k,v])=>`${k}='${v}'`).join('\n')+'\n';
+    for (const a of args) {
+      const m = a.match(/^(\w+)=(.*)$/);
+      if (!m) throw new Error('usage: alias name=command');
+      env.ALIAS = env.ALIAS||{}; env.ALIAS[m[1]] = m[2].replace(/^'|"|`|\(|\)|\{|\}$/g,'');
+    }
+    saveEnv(); return '';
+  }, 'alias [name=cmd]\n  Create or list aliases.');
+
+  register('unalias', async (args)=>{ ensureArgc(args,1,'usage: unalias name'); if(env.ALIAS) delete env.ALIAS[args[0]]; saveEnv(); return ''; }, 'unalias name\n  Remove an alias.');
+
+  register('which', async (args)=>{
+    ensureArgc(args,1,'usage: which <cmd>');
+    const name = args[0];
+    if (builtins.has(name)) return `/builtins/${name}\n`;
+    return `not found\n`;
+  }, 'which <cmd>\n  Show command location.');
+
+  register('uuid', async ()=> (crypto.randomUUID?.() || ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16))) + '\n', 'uuid\n  Generate a random UUID.');
+
+  register('sha256', async (args, stdin)=>{
+    const text = args[0]? getNode(resolvePath(args[0]))?.content : (stdin || '');
+    const hex = await sha256Hex(toBytes(text));
+    return hex + '\n';
+  }, 'sha256 [file]\n  SHA‑256 hash of input.');
+
+  register('calc', async (args)=>{
+    const expr = args.join(' ');
+    if (!expr) throw new Error('usage: calc <expression>');
+    // Very small safe-ish eval: allow digits, ops, parentheses, decimal points, Math.* functions
+    const safe = expr.replace(/Math\.[a-zA-Z]+|[0-9+\-*/%.() ,^]|\s|pi|e/gi, m=>m);
+    // Replace ^ with **
+    const js = safe.replace(/\^/g,'**').replace(/\bpi\b/gi, 'Math.PI').replace(/\be\b/g, 'Math.E');
+    let result;
+    try { result = Function('return (' + js + ')')(); } catch { throw new Error('invalid expression'); }
+    if (typeof result === 'number' && Number.isFinite(result)) return String(result) + '\n';
+    return JSON.stringify(result) + '\n';
+  }, 'calc <expr>\n  Quick calculator. Supports + - * / % ** ^, Math.* and pi, e.');
+
+  register('sleep', async (args)=>{ const ms=parseInt(args[0]||'0',10); await sleep(clamp(ms,0,20000)); return ''; }, 'sleep <ms>\n  Pause for milliseconds (max 20000).');
+
+  register('curl', async (args)=>{
+    const url = args[0];
+    if (!url) throw new Error('usage: curl <url>');
+    try {
+      const res = await fetch(url);
+      const txt = await res.text();
+      return txt + (txt.endsWith('\n')?'':'\n');
+    } catch (e) {
+      throw new Error('curl: ' + e.message + ' (CORS may block some URLs)');
+    }
+  }, 'curl <url>\n  HTTP GET (subject to CORS).');
+
+  register('open', async (args, stdin)=>{
+    // Download stdin or file as a text file
+    let name = args[0] || 'output.txt';
+    let data = stdin;
+    if (args[0] && getNode(resolvePath(args[0]))) { name = splitPath(resolvePath(args[0])).pop(); data = getNode(resolvePath(args[0]))?.content; }
+    const blob = new Blob([data||''], {type:'text/plain'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href);
+    return '';
+  }, 'open [file]\n  Download a file (or stdin) to your device.');
+
+  // Simple inline editor
+  const editor = $('#editor');
+  const edTitle = $('#edTitle');
+  const edPath = $('#edPath');
+  const edArea = $('#edArea');
+  const edSave = $('#edSave');
+  const edCancel = $('#edCancel');
+  let edCurrentPath = null;
+
+  register('nano', async (args)=>{
+    ensureArgc(args,1,'usage: nano <file>');
+    const p = resolvePath(args[0]);
+    const node = getNode(p);
+    edCurrentPath = p;
+    edTitle.textContent = 'nano — ' + splitPath(p).pop();
+    edPath.textContent = p;
+    edArea.value = node?.content || '';
+    editor.showModal();
+    return '';
+  }, 'nano <file>\n  Edit a text file in a modal editor.');
+
+  edSave.addEventListener('click', () => {
+    writeFile(edCurrentPath, edArea.value);
+    editor.close();
+    print(`Saved ${escapeHtml(edCurrentPath)}`, 'ok');
+  });
+  edCancel.addEventListener('click', () => editor.close());
+
+  register('theme', async (args)=>{ const t = args[0]|| (env.THEME==='dark'?'light':'dark'); applyTheme(t); env.THEME=t; saveEnv(); return `theme=${t}\n`; }, 'theme [dark|light]\n  Toggle or set UI theme.');
+
+  register('backup', async ()=>{
+    const blob = new Blob([JSON.stringify({ fs, env }, null, 2)], {type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='webshell-backup.json'; a.click(); URL.revokeObjectURL(a.href); return '';
+  }, 'backup\n  Download FS+env as JSON.');
+
+  register('restore', async (args)=>{
+    throw new Error('Use the Restore button in the header to import JSON.');
+  }, 'restore\n  Import FS+env from JSON (use the header button).');
+
+  register('find', async (args)=>{
+    const start = getNode(resolvePath(args[0]||env.PWD));
+    const namePat = args.includes('-name') ? args[args.indexOf('-name')+1] : null;
+    const re = namePat ? new RegExp(namePat.replace(/\*/g,'.*')) : null;
+    const results=[];
+    function walk(node, path) {
+      if (node!==fs) {
+        if (!re || re.test(node.name)) results.push(path);
+      }
+      if (node.type==='dir') for (const c of listDir(node)) walk(c, path + '/' + c.name);
+    }
+    const basePath = resolvePath(args[0]||env.PWD);
+    walk(start, basePath==='/'?'':basePath);
+    return results.join('\n') + (results.length?'\n':'');
+  }, 'find [path] [-name pattern]\n  Find files by name (supports * wildcards).');
+
+  // ------------------------------
+  // UI wiring
+  // ------------------------------
+  function refreshPS1() {
+    const p = env.PS1.replace(/\$\{USER\}/g, env.USER).replace(/\$\{PWD\}/g, env.PWD);
+    ps1.innerHTML = `<span class="prompt">${escapeHtml(env.USER)}@webshell</span>:<span class="path">${escapeHtml(env.PWD)}</span>$`;
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = (theme==='light'?'light':'dark');
+  }
+
+  function showTip() {
+    tip.innerHTML = `<span class="badge">${history.length}</span> in history — try <span class="keycaps">Tab</span> to complete, <span class="keycaps">Ctrl</span>+<span class="keycaps">L</span> to clear`;
+  }
+
+  // Tab completion
+  function complete(part) {
+    const names = Array.from(builtins.keys());
+    // File names in current dir
+    const cur = getNode(env.PWD);
+    const files = cur && cur.type==='dir' ? Object.keys(cur.children) : [];
+    const opts = [...names, ...files];
+    const matches = opts.filter(o=>o.startsWith(part));
+    if (matches.length===1) return matches[0];
+    if (matches.length>1) print(matches.join('  '));
+    return part;
+  }
+
+  // Header buttons
+  $('#btnTheme').addEventListener('click', ()=>{
+    builtins.get('theme').run([]).then(out=> out && print(out));
+  });
+  $('#btnExport').addEventListener('click', ()=>{
+    builtins.get('backup').run([]);
+  });
+  $('#btnImport').addEventListener('click', async ()=>{
+    const inp = document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
+    inp.onchange = async () => {
+      const file = inp.files[0]; if (!file) return;
+      const text = await file.text();
+      try {
+        const obj = JSON.parse(text);
+        if (obj.fs && obj.env) { fs=obj.fs; env=obj.env; saveFS(); saveEnv(); refreshPS1(); term.innerHTML=''; print('Restore complete.','ok'); }
+        else throw new Error('invalid backup file');
+      } catch (e) { print('Restore failed: ' + e.message, 'err'); }
+    };
+    inp.click();
+  });
+
+  // Keyboard & input
+  let histIdx = history.length;
+  document.addEventListener('keydown', (e)=>{
+    if (e.ctrlKey && e.key.toLowerCase()==='l') { e.preventDefault(); term.innerHTML=''; return; }
+  });
+
+  input.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const line = input.value.trim();
+      if (!line) { printPrompt(env); input.value=''; return; }
+      history.push(line); saveHistory(); histIdx = history.length;
+      // Echo the prompt + command
+      print(`<span class="prompt">${escapeHtml(env.USER)}@webshell</span>:<span class="path">${escapeHtml(env.PWD)}</span>$ ${escapeHtml(line)}`);
+      input.value='';
+      (async ()=>{
+        try {
+          const out = await execute(line);
+          if (out) print(escapeHtml(out));
+        } catch (err) {
+          print(escapeHtml(String(err.message || err)), 'err');
+        } finally {
+          printPrompt(env);
+        }
+      })();
+    } else if (e.key === 'ArrowUp') {
+      histIdx = clamp(histIdx-1, 0, history.length);
+      input.value = history[histIdx] || '';
+      setTimeout(()=>input.setSelectionRange(input.value.length, input.value.length));
+    } else if (e.key === 'ArrowDown') {
+      histIdx = clamp(histIdx+1, 0, history.length);
+      input.value = history[histIdx] || '';
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      const val = input.value;
+      const parts = val.split(/\s+/);
+      const last = parts.pop();
+      const comp = complete(last);
+      input.value = parts.concat([comp]).join(' ');
+    }
+  });
+
+  // Drag & drop: drop files into current directory
+  document.addEventListener('dragover', e=>{ e.preventDefault(); });
+  document.addEventListener('drop', async (e)=>{
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    for (const f of files) {
+      const text = await f.text();
+      const path = resolvePath('./' + f.name);
+      writeFile(path, text);
+      print(`Imported ${escapeHtml(f.name)} (${text.length} bytes)`, 'ok');
+    }
+  });
+
+  // Boot
+  loadState();
+  refreshPS1();
+  print('Welcome to <b>WebShell</b>. Type <span class="keycaps">help</span> to see built-ins. Drag & drop text files to import.','hint');
+  printPrompt(env);
+  showTip();
+  input.focus();
+})();
+</script>
+</body>
+</html>
