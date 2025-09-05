@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3D Function Plotter with Time/Frequency Shifting</title>
+  <title>3D Function Plotter + Time/Freq + I/Q</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
   <style>
@@ -11,7 +11,7 @@
       margin: 2rem;
       background-color: #f0f0f0;
     }
-    #plot {
+    #plot, #iqPlot {
       width: 100%;
       height: 600px;
     }
@@ -27,7 +27,7 @@
   </style>
 </head>
 <body>
-  <h1>3D Function Plotter + Time/Frequency Shifting</h1>
+  <h1>3D Function Plotter + Time/Frequency + I/Q</h1>
 
   <div class="controls">
     <label for="presetSelect">Choose a preset:</label>
@@ -47,9 +47,12 @@
     <input type="range" id="freq" min="0" max="10" step="0.1" value="1" oninput="updateLabel('freq')">
 
     <button onclick="drawPlot()">Draw</button>
+    <button onclick="drawIQPlot()">Plot I/Q Constellation</button>
   </div>
 
   <div id="plot"></div>
+  <h2>I/Q Constellation Plot</h2>
+  <div id="iqPlot"></div>
 
   <script>
     function setPresetFunction() {
@@ -96,7 +99,41 @@
       Plotly.newPlot('plot', data);
     }
 
+    function drawIQPlot() {
+      const shiftT = parseFloat(document.getElementById("shiftT").value);
+      const freq = parseFloat(document.getElementById("freq").value);
+      const t = numeric.linspace(-2 * Math.PI, 2 * Math.PI, 100);
+      let I = [], Q = [];
+
+      for (let i = 0; i < t.length; i++) {
+        const tt = t[i];
+        I.push(Math.cos(freq * (tt - shiftT)));
+        Q.push(Math.sin(freq * (tt - shiftT)));
+      }
+
+      const trace = {
+        x: I,
+        y: Q,
+        mode: 'lines+markers',
+        name: 'I/Q Trace',
+        type: 'scatter',
+        marker: { size: 4 },
+        line: { shape: 'spline' }
+      };
+
+      const layout = {
+        title: 'I/Q Constellation (Circular Orbit at Frequency)',
+        xaxis: { title: 'In-Phase (I)' },
+        yaxis: { title: 'Quadrature (Q)' },
+        width: 600,
+        height: 600
+      };
+
+      Plotly.newPlot('iqPlot', [trace], layout);
+    }
+
     drawPlot();
+    drawIQPlot();
   </script>
 </body>
 </html>
