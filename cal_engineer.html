@@ -90,6 +90,9 @@
         <a href="#civil">🏗️ Civil</a>
         <a href="#mechanical">⚙️ Mechanical</a>
         <a href="#software">💻 Software</a>
+      $1
+      <nav style="margin-top:8px">
+        <a href="#rf">📡 RF</a>
       </nav>
       <div class="hr"></div>
       <div class="small muted">Tip: Values are SI by default. Hover labels for hints. Use the Reset buttons to clear forms.</div>
@@ -451,8 +454,115 @@
           </div>
         </div>
       </section>
+      <!-- RF -->
+      <section id="rf" class="section">
+        <h2>📡 RF Engineering</h2>
+        <p>Quick radio helpers: dBm↔mW, wavelength, free‑space path loss, link budget, VSWR/return loss, and noise floor.</p>
+        <div class="cards">
+          <div class="card">
+            <h3>dBm ↔ mW & Wavelength</h3>
+            <div class="row">
+              <div>
+                <label>Power (dBm)</label>
+                <input id="rf_dbm" type="number" step="any" placeholder="30" />
+              </div>
+              <div>
+                <label>Power (mW)</label>
+                <input id="rf_mw" type="number" step="any" placeholder="1000" />
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label>Frequency f (MHz)</label>
+                <input id="rf_f_mhz" type="number" step="any" placeholder="2400" />
+              </div>
+              <div style="align-self:end">
+                <button class="btn" onclick="rfPowerConvert()">Convert</button>
+              </div>
+            </div>
+            <div id="rf_basic_out" class="result" hidden></div>
+            <div class="note">mW = 10<sup>dBm/10</sup>; dBm = 10·log₁₀(mW). Wavelength λ = c / f. Quarter‑wave = λ/4.</div>
+          </div>
 
-      <!-- SOFTWARE -->
+          <div class="card">
+            <h3>FSPL & Link Budget (Friis)</h3>
+            <div class="row">
+              <div>
+                <label>Frequency f (MHz)</label>
+                <input id="fspl_f" type="number" step="any" placeholder="2400" />
+              </div>
+              <div>
+                <label>Distance d (km)</label>
+                <input id="fspl_d" type="number" step="any" placeholder="1" />
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label>P<sub>t</sub> (dBm)</label>
+                <input id="fspl_pt" type="number" step="any" placeholder="20" />
+              </div>
+              <div>
+                <label>G<sub>t</sub>/G<sub>r</sub> (dBi)</label>
+                <div class="row">
+                  <input id="fspl_gt" type="number" step="any" placeholder="2" />
+                  <input id="fspl_gr" type="number" step="any" placeholder="2" />
+                </div>
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label>Misc Loss L (dB)</label>
+                <input id="fspl_l" type="number" step="any" value="0" />
+              </div>
+              <div style="align-self:end">
+                <button class="btn" onclick="fsplLinkBudget()">Compute</button>
+              </div>
+            </div>
+            <div id="fspl_out" class="result" hidden></div>
+            <div class="note">FSPL(dB)=32.44+20log₁₀(f<sub>MHz</sub>)+20log₁₀(d<sub>km</sub>). Friis: P<sub>r</sub>=P<sub>t</sub>+G<sub>t</sub>+G<sub>r</sub>−FSPL−L.</div>
+          </div>
+
+          <div class="card">
+            <h3>VSWR / Return Loss & Noise</h3>
+            <div class="row">
+              <div>
+                <label>VSWR</label>
+                <input id="vswr_v" type="number" step="any" placeholder="1.5" />
+              </div>
+              <div>
+                <label>Bandwidth (Hz)</label>
+                <input id="noise_bw" type="number" step="any" placeholder="20000000" />
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label>Noise Figure NF (dB)</label>
+                <input id="noise_nf" type="number" step="any" placeholder="5" />
+              </div>
+              <div style="align-self:end">
+                <button class="btn" onclick="vswrAndNoise()">Calculate</button>
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label>Antenna size D (m)</label>
+                <input id="ff_d" type="number" step="any" placeholder="0.1" />
+              </div>
+              <div>
+                <label>Use f (MHz) above</label>
+                <input id="ff_f_mhz" type="number" step="any" placeholder="2400" />
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn secondary" onclick="farFieldBoundary()">Far‑Field Boundary</button>
+            </div>
+            <div id="vswr_noise_out" class="result" hidden></div>
+            <div class="note">Γ=(VSWR−1)/(VSWR+1); RL=−20log₁₀|Γ|; mismatch loss = −10log₁₀(1−|Γ|²). Noise floor ≈ −174 dBm/Hz + 10log₁₀(BW) + NF.</div>
+          </div>
+        </div>
+      </section>
+
+      $1
       <section id="software" class="section">
         <h2>💻 Software Engineering</h2>
         <p>Bandwidth/download time, SLA uptime ⇒ downtime, and bits required.</p>
@@ -739,6 +849,58 @@
       out.innerHTML = `Bits required = ${bits}`;
       show(out,true);
     }
-  </script>
+  
+    // ---------- RF ----------
+    function rfPowerConvert(){
+      const dbm = num('rf_dbm'); const mw = num('rf_mw'); const fMHz = num('rf_f_mhz');
+      const out = document.getElementById('rf_basic_out');
+      let d = dbm, m = mw;
+      if(d===null && m===null){ out.innerHTML = '<span style="color:var(--danger)">Enter dBm or mW.</span>'; show(out,true); return }
+      if(d===null) d = 10*Math.log10(m);
+      if(m===null) m = Math.pow(10, d/10);
+      set('rf_dbm', +d.toFixed(6)); set('rf_mw', +m.toFixed(6));
+      let msg = [`${d.toFixed(3)} dBm ↔ ${m.toFixed(3)} mW`];
+      if(fMHz!==null && fMHz>0){
+        const c = 299792458; const fHz = fMHz*1e6; const lambda = c/fHz; const q = lambda/4;
+        msg.push(`λ=${lambda.toFixed(4)} m (λ/4=${q.toFixed(4)} m)`);
+      }
+      out.innerHTML = msg.join(' · '); show(out,true);
+    }
+
+    function fsplLinkBudget(){
+      const f = num('fspl_f'); const d = num('fspl_d'); const pt = num('fspl_pt'); const gt = num('fspl_gt'); const gr = num('fspl_gr'); const L = num('fspl_l');
+      const out = document.getElementById('fspl_out');
+      if([f,d,pt,gt,gr].some(v=>v===null||v<=0) || L===null){ out.innerHTML = '<span style="color:var(--danger)">Fill f, d, Pt, Gt, Gr, and L.</span>'; show(out,true); return }
+      const FSPL = 32.44 + 20*Math.log10(f) + 20*Math.log10(d);
+      const pr = pt + gt + gr - FSPL - L;
+      out.innerHTML = `FSPL=${FSPL.toFixed(2)} dB · P<sub>r</sub>=${pr.toFixed(2)} dBm`;
+      show(out,true);
+    }
+
+    function vswrAndNoise(){
+      const vswr = num('vswr_v'); const bw = num('noise_bw'); const nf = num('noise_nf');
+      const out = document.getElementById('vswr_noise_out');
+      if(vswr===null || vswr<1){ out.innerHTML = '<span style="color:var(--danger)">VSWR must be ≥ 1.</span>'; show(out,true); return }
+      const gamma = (vswr-1)/(vswr+1);
+      const RL = -20*Math.log10(Math.abs(gamma));
+      const ML = -10*Math.log10(1-Math.pow(gamma,2));
+      let msg = [`Γ=${gamma.toFixed(4)} · RL=${RL.toFixed(2)} dB · mismatch=${ML.toFixed(2)} dB`];
+      if(bw!==null && bw>0 && nf!==null){
+        const noise = -174 + 10*Math.log10(bw) + nf; // dBm
+        msg.push(`Noise floor ≈ ${noise.toFixed(2)} dBm`);
+      }
+      out.innerHTML = msg.join(' · '); show(out,true);
+    }
+
+    function farFieldBoundary(){
+      const D = num('ff_d'); let fMHz = num('ff_f_mhz');
+      const out = document.getElementById('vswr_noise_out');
+      if(D===null || D<=0 || fMHz===null || fMHz<=0){ out.innerHTML = '<span style="color:var(--danger)">Enter antenna size D and frequency f.</span>'; show(out,true); return }
+      const c = 299792458; const lambda = c/(fMHz*1e6);
+      const Rff = 2*Math.pow(D,2)/lambda;
+      out.innerHTML = `Far‑field boundary R<sub>ff</sub> ≈ ${Rff.toFixed(3)} m (λ=${lambda.toFixed(4)} m)`;
+      show(out,true);
+    }
+  $1
 </body>
 </html>
