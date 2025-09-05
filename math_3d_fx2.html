@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Function Plotter</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background-color: #f0f0f0;
+    }
+    #plot {
+      width: 100%;
+      height: 600px;
+    }
+    input, button, select {
+      font-size: 1rem;
+      margin: 0.5rem 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>3D Function Plotter</h1>
+
+  <label for="presetSelect">Choose a preset:</label><br>
+  <select id="presetSelect" onchange="setPresetFunction()">
+    <option value="Math.sin(x) * Math.cos(y)">sin(x) * cos(y)</option>
+    <option value="Math.sqrt(x*x + y*y)">sqrt(x² + y²)</option>
+    <option value="Math.exp(-(x*x + y*y)/10)">exp(-(x² + y²)/10)</option>
+    <option value="Math.sin(Math.sqrt(x*x + y*y))">sin(sqrt(x² + y²))</option>
+    <option value="x * Math.exp(-x*x - y*y)">x * exp(-x² - y²)</option>
+    <option value="Math.sin(x) + Math.cos(y)">sin(x) + cos(y)</option>
+    <option value="Math.pow(x*x + y*y, 0.25)">4th root of (x² + y²)</option>
+    <option value="Math.tan(x*y/25)">tan(xy/25)</option>
+    <option value="Math.sin(x*y/10)">sin(xy/10)</option>
+    <option value="Math.abs(Math.sin(x) * Math.cos(y))">abs(sin(x) * cos(y))</option>
+  </select><br>
+
+  <label for="functionInput">Or enter custom function z = f(x, y):</label><br>
+  <input type="text" id="functionInput" value="Math.sin(x) * Math.cos(y)" style="width: 100%;">
+  <button onclick="drawPlot()">Draw</button>
+  <div id="plot"></div>
+
+  <script>
+    function setPresetFunction() {
+      const select = document.getElementById("presetSelect");
+      document.getElementById("functionInput").value = select.value;
+    }
+
+    function drawPlot() {
+      const funcStr = document.getElementById("functionInput").value;
+      const xRange = numeric.linspace(-10, 10, 50);
+      const yRange = numeric.linspace(-10, 10, 50);
+
+      let zData = [];
+
+      for (let i = 0; i < xRange.length; i++) {
+        let zRow = [];
+        for (let j = 0; j < yRange.length; j++) {
+          const x = xRange[i];
+          const y = yRange[j];
+          try {
+            const z = eval(funcStr);
+            zRow.push(z);
+          } catch (e) {
+            zRow.push(0);
+          }
+        }
+        zData.push(zRow);
+      }
+
+      const data = [{
+        z: zData,
+        x: xRange,
+        y: yRange,
+        type: 'surface'
+      }];
+
+      Plotly.newPlot('plot', data);
+    }
+
+    // Load numeric.js for linspace
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js';
+    document.head.appendChild(script);
+  </script>
+</body>
+</html>
