@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Programmer Shell</title>
+  <style>
+    :root{
+      --bg:#0b0f12; --panel:#0f1419; --text:#e6edf3; --muted:#9fb1c1; --accent:#4cc2ff; --ok:#34d399; --err:#ff6b6b;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background: radial-gradient(1200px 700px at 80% -100px, #15314a40, transparent 70%), var(--bg);
+      color:var(--text); font-family: var(--mono); display:grid; place-items:stretch; line-height:1.45;
+    }
+    .wrap{max-width:1100px; margin:32px auto; width:95%;}
+    .title{display:flex; align-items:center; gap:12px; color:var(--muted); margin-bottom:10px;}
+    .title b{color:var(--text)}
+    .terminal{
+      background:linear-gradient(180deg, #0f1419 0%, #0c1116 100%);
+      border:1px solid #1d2630; border-radius:14px; box-shadow:0 20px 60px #0008, inset 0 0 0 1px #0a0f14; 
+      overflow:hidden; display:flex; flex-direction:column; min-height:540px;
+    }
+    .term-header{display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid #17202a; background:#0c1116;}
+    .dots{display:flex; gap:8px}
+    .dot{width:12px; height:12px; border-radius:50%;}
+    .dot.red{background:#ff5f56} .dot.yellow{background:#ffbd2e} .dot.green{background:#27c93f}
+    .titlebar{flex:1; text-align:center; color:#b1c5d1; font-weight:600; letter-spacing:.02em}
+    .screen{flex:1; padding:16px; overflow:auto; font-size:14px;}
+    .line{white-space:pre-wrap; word-break:break-word}
+    .prompt{display:flex; gap:10px; padding:12px 14px; border-top:1px solid #17202a; background:#0c1116}
+    .ps1{color:var(--accent)}
+    #input{flex:1; background:transparent; color:var(--text); border:none; outline:none; font:inherit; font-size:14px}
+    .help dt{color:#b1c5d1; font-weight:600}
+    .help dd{margin:0 0 12px 0; color:#9fb1c1}
+    .muted{color:var(--muted)}
+    code{background:#0b1218; border:1px solid #14202b; padding:.1em .35em; border-radius:6px}
+    .ok{color:var(--ok)} .err{color:var(--err)}
+    .footer{margin-top:12px; color:#89a5b9; font-size:12px}
+    .chip{display:inline-block; padding:.15rem .45rem; border:1px solid #1d2a36; border-radius:999px; background:#0b1218; color:#9fb1c1; margin-right:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">
+      <span class="chip">Web CLI</span>
+      <b>Programmer Shell</b>
+      <span class="muted">— built‑in bitwise, bases, CRC32, ASCII, and size helpers</span>
+    </div>
+
+    <div class="terminal" role="application" aria-label="programmer shell">
+      <div class="term-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="titlebar">shell://programmer</div>
+      </div>
+      <div id="screen" class="screen" tabindex="0" aria-live="polite"></div>
+      <div class="prompt">
+        <span class="ps1">&gt;</span>
+        <input id="input" type="text" autocomplete="off" spellcheck="false" aria-label="command input" />
+      </div>
+    </div>
+
+    <div class="footer">Tip: numbers accept <code>0x</code>, <code>0b</code>, <code>0o</code>, underscores, and negatives. Use <code>help</code> to see all commands.</div>
+  </div>
+
+<script>
+(function(){
+  const screen = document.getElementById('screen');
+  const input = document.getElementById('input');
+
+  // ---- Shell State ----
+  let HISTORY = [];
+  let HINDEX = -1;
+  let BIT_WIDTH = 32n; // default bit width for bitwise ops
+  const VERSION = '1.0.0';
+
+  // ---- Utilities ----
+  const clampWidth = (n) => {
+    const w = BigInt(n);
+    if (![8n,16n,32n,64n].includes(w)) throw new Error('width must be 8,16,32, or 64');
+    return w;
+  }
+
+  const maskByWidth = (x, width=BIT_WIDTH) => {
+    const m = (1n << width) - 1n;
+    return (x & m);
+  };
+
+  function toGroups(binStr){
+    // group binary by nibble for readability
+    const pad = (4 - (binStr.length % 4)) % 4;
+    const s = '0'.repeat(pad) + binStr;
+    return s.replace(/(.{4})/g, '$1 ').trim();
+  }
+
+  function formatAll(x, width=BIT_WIDTH){
+    const u = maskByWidth(x, width);
+    const signedMax = (1n << (width-1n)) - 1n;
+    const signedVal = (u <= signedMax) ? u : (u - (1n << width));
+    return (
+`hex:  0x${u.toString(16).toUpperCase()}\n`+
+`dec:  ${u.toString(10)} (signed: ${signedVal.toString(10)})\n`+
+`oct:  0o${u.toString(8)}\n`+
+`bin:  0b${toGroups(u.toString(2))}`
+    );
+  }
+
+  function parseNumber(tok){
+    // accepts 0x.. 0b.. 0o.. decimal; underscores allowed; negative supported
+    if (typeof tok !== 'string') throw new Error('bad number');
+    const s = tok.replaceAll('_','').trim();
+    if (!s) throw new Error('empty number');
+    const neg = s.startsWith('-');
+    const body = neg ? s.slice(1) : s;
+    let base = 10;
+    if (/^0x/i.test(body)) base = 16; else if (/^0b/i.test(body)) base = 2; else if (/^0o/i.test(body)) base = 8;
+    const digits = (base===10? body : body.slice(2));
+    if (!digits || !/^[0-9a-fA-F]+$/.test(digits)) throw new Error('invalid number: '+tok);
+    let val = BigInt(parseInt(digits, base));
+    // above parseInt limits to Number; replace with manual BigInt parse:
+    val = BigInt(0);
+    for (const ch of digits){
+      const d = parseInt(ch,16);
+      if (d>=base) throw new Error('invalid digit in '+tok);
+      val = BigInt(base)*val + BigInt(d);
+    }
+    return neg ? -val : val;
+  }
+
+  function parseMaybeNumber(tok){
+    try { return parseNumber(tok); } catch { return null; }
+  }
+
+  function groupBytesHex(buf){
+    return Array.from(buf).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+  }
+
+  function asciiCodes(str){
+    const out = [];
+    for (const ch of str){ out.push(ch.codePointAt(0)); }
+    return out;
+  }
+
+  // CRC32 (IEEE 802.3, polynomial 0xEDB88320, init 0xFFFFFFFF, xorout 0xFFFFFFFF)
+  const CRC32_TABLE = (()=>{
+    const table = new Uint32Array(256);
+    for (let i=0; i<256; i++){
+      let c = i;
+      for (let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[i] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function crc32_bytes(bytes){
+    let crc = 0xFFFFFFFF >>> 0;
+    for (let i=0;i<bytes.length;i++){
+      const b = bytes[i];
+      const idx = (crc ^ b) & 0xFF;
+      crc = (CRC32_TABLE[idx] ^ (crc >>> 8)) >>> 0;
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function parseBytesOrString(rest){
+    const trimmed = rest.trim();
+    if (!trimmed) return { kind:'string', str:'' };
+    // quoted string
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))){
+      const str = trimmed.slice(1,-1);
+      return { kind:'string', str };
+    }
+    // try list of numbers/hex bytes
+    const toks = trimmed.split(/\s+/);
+    let bytes = [];
+    for (const t of toks){
+      let b=null;
+      if (/^0x[0-9a-fA-F]+$/.test(t)) b = parseInt(t,16);
+      else if (/^[0-9]+$/.test(t)) b = parseInt(t,10);
+      else if (/^[0-9a-fA-F]{2}$/.test(t)) b = parseInt(t,16);
+      else { bytes = null; break; }
+      if (b<0 || b>255 || Number.isNaN(b)) { bytes=null; break; }
+      bytes.push(b);
+    }
+    if (bytes) return { kind:'bytes', bytes: new Uint8Array(bytes) };
+    // fallback: treat as raw string
+    return { kind:'string', str: trimmed };
+  }
+
+  function toUint8ArrayFromString(str){
+    // encode UTF-8
+    return new TextEncoder().encode(str);
+  }
+
+  function ok(msg){ return `<span class="ok">${escapeHtml(msg)}</span>` }
+  function err(msg){ return `<span class="err">${escapeHtml(msg)}</span>` }
+  function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+  function print(text){
+    const line = document.createElement('div');
+    line.className = 'line';
+    line.innerHTML = text;
+    screen.appendChild(line);
+    screen.scrollTop = screen.scrollHeight;
+  }
+
+  function ps(){ return `<span class="muted">$</span>` }
+
+  function welcome(){
+    print(`<div class="muted">Programmer Shell ${VERSION} — type <code>help</code> for commands. Use Up/Down for history.</div>`);
+    print(`Examples:\n<code>hex 255</code> · <code>bin 0xDEADBEEF</code> · <code>and 0b1100 0b1010</code> · <code>setbit 0x12 4</code>`);
+    print(`<code>crc32 "Hello, world"</code> · <code>crc32 01 02 03 04</code> · <code>ascii "ABC"</code> · <code>char 0x41</code>`);
+    print(`<code>setwidth 64</code> then try <code>shl 1 40</code>. <code>clear</code> to wipe screen.`);
+  }
+
+  // ---- Commands ----
+  const commands = {
+    help(){
+      const doc = `\n<b>Base conversions</b>\n  bin &lt;num&gt; | oct &lt;num&gt; | dec &lt;num&gt; | hex &lt;num&gt;\n\n<b>Bitwise</b>\n  and &lt;a&gt; &lt;b&gt;  ·  or &lt;a&gt; &lt;b&gt;  ·  xor &lt;a&gt; &lt;b&gt;  ·  not &lt;a&gt;\n  shl &lt;a&gt; &lt;n&gt;  ·  shr &lt;a&gt; &lt;n&gt; (logical, width-bound)\n  mask &lt;v&gt; &lt;bit&gt;  ·  setbit &lt;v&gt; &lt;bit&gt;  ·  clrbit &lt;v&gt; &lt;bit&gt;  ·  toggle &lt;v&gt; &lt;bit&gt;\n  setwidth &lt;8|16|32|64&gt; (current: ${BIT_WIDTH} bits)\n\n<b>Math</b>\n  mod &lt;a&gt; &lt;b&gt;  ·  pow &lt;a&gt; &lt;b&gt;  ·  gcd &lt;a&gt; &lt;b&gt;  ·  lcm &lt;a&gt; &lt;b&gt;\n\n<b>Encoding</b>\n  ascii &lt;string or 'quoted'&gt; → code points\n  char &lt;code&gt; → single character\n  binstr &lt;string or 'quoted'&gt; → binary bits per char\n  crc32 &lt;"text" | bytes...&gt; → IEEE 802.3 (init 0xFFFFFFFF, xorout 0xFFFFFFFF)\n\n<b>Memory sizes</b>\n  kb &lt;n&gt; · mb &lt;n&gt; · gb &lt;n&gt;  (×1024, prints value in bytes + hex)\n\n<b>Shell</b>\n  clear · history · version`;
+      print(doc);
+    },
+
+    // ---- Base Conversions ----
+    bin(arg){ const n=parseNumber(arg); print(`0b${toGroups(n.toString(2))}`); },
+    oct(arg){ const n=parseNumber(arg); print(`0o${n.toString(8)}`); },
+    dec(arg){ const n=parseNumber(arg); print(n.toString(10)); },
+    hex(arg){ const n=parseNumber(arg); print(`0x${n.toString(16).toUpperCase()}`); },
+
+    // ---- Bitwise ----
+    and(a,b){
+      const A=parseNumber(a), B=parseNumber(b);
+      const r = maskByWidth(A) & maskByWidth(B); print(formatAll(r));
+    },
+    or(a,b){ const A=parseNumber(a), B=parseNumber(b); const r = maskByWidth(A)|maskByWidth(B); print(formatAll(r)); },
+    xor(a,b){ const A=parseNumber(a), B=parseNumber(b); const r = maskByWidth(A)^maskByWidth(B); print(formatAll(r)); },
+    not(a){ const A=parseNumber(a); const r = maskByWidth(~A); print(formatAll(r)); },
+    shl(a,n){ const A=parseNumber(a), N=parseNumber(n); const r = maskByWidth(maskByWidth(A) << N); print(formatAll(r)); },
+    shr(a,n){
+      const A=parseNumber(a), N=parseNumber(n);
+      const masked = maskByWidth(A);
+      const r = masked >> N; // logical due to masking positive range
+      print(formatAll(r));
+    },
+    mask(v, bit){ const V=parseNumber(v), B=parseNumber(bit); const r = (maskByWidth(V) & (1n<<B)) ? 1 : 0; print(String(r)); },
+    setbit(v, bit){ const V=parseNumber(v), B=parseNumber(bit); const r = maskByWidth(V | (1n<<B)); print(formatAll(r)); },
+    clrbit(v, bit){ const V=parseNumber(v), B=parseNumber(bit); const r = maskByWidth(V & ~(1n<<B)); print(formatAll(r)); },
+    toggle(v, bit){ const V=parseNumber(v), B=parseNumber(bit); const r = maskByWidth(V ^ (1n<<B)); print(formatAll(r)); },
+    setwidth(bits){ BIT_WIDTH = clampWidth(bits); print(ok(`bit width set to ${BIT_WIDTH} bits`)); },
+
+    // ---- Math ----
+    mod(a,b){ const A=parseNumber(a), B=parseNumber(b); if (B===0n) throw new Error('mod by zero'); print((A%B).toString()); },
+    pow(a,b){ const A=parseNumber(a), B=parseNumber(b); if (B<0n) throw new Error('negative powers not supported'); let r=1n; for(let i=0n;i<B;i++) r*=A; print(r.toString()); },
+    gcd(a,b){ let A=absBI(parseNumber(a)), B=absBI(parseNumber(b)); while(B){ [A,B]=[B, A%B]; } print(A.toString()); },
+    lcm(a,b){ const A=absBI(parseNumber(a)), B=absBI(parseNumber(b)); if (A===0n||B===0n) return print('0'); const g=gcdBI(A,B); const r=(A/g)*B; print(r.toString()); },
+
+    // ---- Encoding ----
+    ascii(...rest){ const s = rest.join(' '); const parsed = parseBytesOrString(s); if (parsed.kind==='string'){ const codes=asciiCodes(parsed.str); print(codes.join(' ')); } else { print(parsed.bytes.join(' ')); } },
+    char(code){ const n=Number(parseNumber(code)); if (n<0 || n>0x10FFFF) throw new Error('code out of range'); print(String.fromCodePoint(n)); },
+    binstr(...rest){ const s = rest.join(' '); const parsed = parseBytesOrString(s); let bytes; if (parsed.kind==='string') bytes = toUint8ArrayFromString(parsed.str); else bytes = parsed.bytes; const bits = Array.from(bytes).map(b=>'0b'+toGroups(b.toString(2).padStart(8,'0'))).join(' '); print(bits); },
+    crc32(...rest){ const s = rest.join(' '); const parsed = parseBytesOrString(s); const bytes = (parsed.kind==='string') ? toUint8ArrayFromString(parsed.str) : parsed.bytes; const c = crc32_bytes(bytes); print(`0x${c.toString(16).toUpperCase().padStart(8,'0')}  (${c} dec)  [${groupBytesHex(bytes)}]`); },
+
+    // ---- Size helpers ----
+    kb(n){ sizeHelper(n, 1); },
+    mb(n){ sizeHelper(n, 2); },
+    gb(n){ sizeHelper(n, 3); },
+
+    // ---- Shell extras ----
+    clear(){ screen.innerHTML=''; },
+    history(){ HISTORY.forEach((h,i)=>print(`${i+1}: ${escapeHtml(h)}`)); },
+    version(){ print(`Programmer Shell ${VERSION}`); }
+  };
+
+  function absBI(x){ return x<0n ? -x : x; }
+  function gcdBI(a,b){ while(b){ [a,b]=[b,a%b]; } return a; }
+  function sizeHelper(n, pow){ const N=parseNumber(n); const bytes = N * (1024n ** BigInt(pow)); const hex = '0x'+bytes.toString(16).toUpperCase(); print(`${bytes.toString()} bytes  (${hex})`); }
+
+  // ---- Command Dispatcher ----
+  function dispatch(raw){
+    const line = raw.trim();
+    if (!line) return;
+    const parts = line.match(/\s*(\S+)/);
+    if (!parts) return;
+    const [cmd, ...rest] = splitArgs(line);
+    const fn = commands[cmd];
+    if (!fn){ print(err(`unknown command: ${cmd}`)); return; }
+    try{
+      const out = fn.apply(null, rest);
+      if (out !== undefined && out !== null) print(String(out));
+    }catch(e){ print(err(String(e.message||e))); }
+  }
+
+  // Split arguments: first token is command; the rest are args; preserve quoted strings
+  function splitArgs(line){
+    const tokens = [];
+    let cur = '';
+    let inQ = false; let qCh = '';
+    for (let i=0;i<line.length;i++){
+      const ch = line[i];
+      if (!inQ && (ch==="'" || ch==='"')){ inQ=true; qCh=ch; cur+=ch; }
+      else if (inQ && ch===qCh){ inQ=false; cur+=ch; }
+      else if (!inQ && /\s/.test(ch)){ if (cur){ tokens.push(cur); cur=''; } }
+      else { cur+=ch; }
+    }
+    if (cur) tokens.push(cur);
+    const cmd = tokens.shift() || '';
+    return [cmd, ...tokens];
+  }
+
+  // ---- Input wiring ----
+  input.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter'){
+      const raw = input.value; input.value='';
+      if (raw.trim()) { HISTORY.push(raw); HINDEX = HISTORY.length; }
+      print(`${ps()} ${escapeHtml(raw)}`);
+      // Support multi-line paste: run each line
+      raw.split(/\r?\n/).forEach(line=> dispatch(line));
+    } else if (e.key === 'ArrowUp'){
+      if (HINDEX > 0){ HINDEX--; input.value = HISTORY[HINDEX]; setTimeout(()=>input.setSelectionRange(input.value.length, input.value.length)); }
+      e.preventDefault();
+    } else if (e.key === 'ArrowDown'){
+      if (HINDEX < HISTORY.length-1){ HINDEX++; input.value = HISTORY[HINDEX]; }
+      else { HINDEX = HISTORY.length; input.value=''; }
+      e.preventDefault();
+    }
+  });
+
+  // Focus on click anywhere inside
+  document.querySelector('.terminal').addEventListener('click', ()=> input.focus());
+
+  // Boot
+  welcome();
+  input.focus();
+})();
+</script>
+</body>
+</html>
