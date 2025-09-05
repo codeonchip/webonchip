@@ -12,8 +12,9 @@
     }
     .sidebar {
       width: 280px;
-      background: #f8f9fa;
-      border-right: 1px solid #ddd;
+      background: #2f2f2f; /* dark gray background */
+      color: #f1f1f1;       /* light gray/white text */
+      border-right: 1px solid #444;
       overflow-y: auto;
       padding: 15px;
     }
@@ -21,13 +22,16 @@
       font-size: 20px;
       text-align: center;
       margin: 10px 0 15px 0;
+      color: #ffffff;
     }
     .sidebar h2 {
       margin-top: 15px;
-      font-size: 16px;
-      border-bottom: 1px solid #ccc;
+      font-size: 14px;
+      border-bottom: 1px solid #555;
       padding-bottom: 3px;
-      color: #333;
+      color: #ccc;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .sidebar ul {
       list-style: none;
@@ -39,24 +43,31 @@
     }
     .sidebar a {
       text-decoration: none;
-      color: #007bff;
+      color: #9ecbff; /* light blue links */
       font-size: 14px;
+      display: block;
+      padding: 4px 6px;
+      border-radius: 4px;
     }
     .sidebar a:hover {
-      text-decoration: underline;
+      background: #444;
+      color: #fff;
     }
     #searchBox {
       width: 100%;
       padding: 8px;
       margin-bottom: 15px;
-      border: 1px solid #ccc;
+      border: 1px solid #555;
       border-radius: 4px;
       font-size: 14px;
+      background: #3a3a3a;
+      color: #f1f1f1;
     }
     .content {
       flex: 1;
       display: flex;
       flex-direction: column;
+      background: #fff;
     }
     iframe {
       flex: 1;
