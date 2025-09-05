@@ -11,7 +11,7 @@
     }
     h1 {
       text-align: center;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
     }
     h2 {
       margin-top: 25px;
@@ -41,11 +41,24 @@
       border-radius: 10px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
+    #searchBox {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>HTML Tools Index</h1>
+
+    <input type="text" id="searchBox" placeholder="Search tools...">
 
     <h2>Calculators</h2>
     <ul>
@@ -114,7 +127,29 @@
     <ul>
       <li><a href="word_search.html">Word Search</a></li>
     </ul>
-
   </div>
+
+  <script>
+    const searchBox = document.getElementById('searchBox');
+    searchBox.addEventListener('keyup', function() {
+      const filter = searchBox.value.toLowerCase();
+      const sections = document.querySelectorAll('.container h2, .container ul li');
+
+      sections.forEach(el => {
+        if (el.tagName === 'LI') {
+          const text = el.innerText.toLowerCase();
+          el.style.display = text.includes(filter) ? '' : 'none';
+        }
+      });
+
+      // Hide entire category if all its items are hidden
+      const categories = document.querySelectorAll('.container h2');
+      categories.forEach(h2 => {
+        const listItems = h2.nextElementSibling.querySelectorAll('li');
+        const visible = Array.from(listItems).some(li => li.style.display !== 'none');
+        h2.style.display = visible ? '' : 'none';
+      });
+    });
+  </script>
 </body>
 </html>
