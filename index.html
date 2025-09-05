@@ -2,138 +2,152 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Index of HTML Tools</title>
+  <title>HTML Tools Index</title>
   <style>
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+    }
+    .sidebar {
+      width: 280px;
       background: #f8f9fa;
-      margin: 20px;
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+      padding: 15px;
     }
-    h1 {
+    .sidebar h1 {
+      font-size: 20px;
       text-align: center;
-      margin-bottom: 20px;
+      margin: 10px 0 15px 0;
     }
-    h2 {
-      margin-top: 25px;
+    .sidebar h2 {
+      margin-top: 15px;
+      font-size: 16px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 3px;
       color: #333;
-      border-bottom: 2px solid #ddd;
-      padding-bottom: 5px;
     }
-    ul {
+    .sidebar ul {
       list-style: none;
       padding: 0;
+      margin: 0;
     }
-    li {
-      margin: 6px 0;
+    .sidebar li {
+      margin: 5px 0;
     }
-    a {
+    .sidebar a {
       text-decoration: none;
       color: #007bff;
+      font-size: 14px;
     }
-    a:hover {
+    .sidebar a:hover {
       text-decoration: underline;
-    }
-    .container {
-      max-width: 700px;
-      margin: auto;
-      background: #fff;
-      padding: 25px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     #searchBox {
       width: 100%;
-      padding: 10px;
-      margin-bottom: 20px;
+      padding: 8px;
+      margin-bottom: 15px;
       border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 16px;
+      border-radius: 4px;
+      font-size: 14px;
     }
-    .hidden {
-      display: none;
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    iframe {
+      flex: 1;
+      border: none;
+      width: 100%;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>HTML Tools Index</h1>
-
-    <input type="text" id="searchBox" placeholder="Search tools...">
+  <div class="sidebar">
+    <h1>HTML Tools</h1>
+    <input type="text" id="searchBox" placeholder="Search...">
 
     <h2>Calculators</h2>
     <ul>
-      <li><a href="cal_chemical.html">Chemical Calculator</a></li>
-      <li><a href="cal_civil.html">Civil Calculator</a></li>
-      <li><a href="cal_electrical.html">Electrical Calculator</a></li>
-      <li><a href="cal_mechanical.html">Mechanical Calculator</a></li>
-      <li><a href="cal_mechanical2.html">Mechanical Calculator 2</a></li>
-      <li><a href="cal_print.html">Print Calculator</a></li>
-      <li><a href="cal_print2.html">Print Calculator 2</a></li>
-      <li><a href="cal_rf.html">RF Calculator</a></li>
-      <li><a href="cal_rf2.html">RF Calculator 2</a></li>
+      <li><a href="cal_chemical.html" target="viewer">Chemical Calculator</a></li>
+      <li><a href="cal_civil.html" target="viewer">Civil Calculator</a></li>
+      <li><a href="cal_electrical.html" target="viewer">Electrical Calculator</a></li>
+      <li><a href="cal_mechanical.html" target="viewer">Mechanical Calculator</a></li>
+      <li><a href="cal_mechanical2.html" target="viewer">Mechanical Calculator 2</a></li>
+      <li><a href="cal_print.html" target="viewer">Print Calculator</a></li>
+      <li><a href="cal_print2.html" target="viewer">Print Calculator 2</a></li>
+      <li><a href="cal_rf.html" target="viewer">RF Calculator</a></li>
+      <li><a href="cal_rf2.html" target="viewer">RF Calculator 2</a></li>
     </ul>
 
     <h2>Math</h2>
     <ul>
-      <li><a href="calculus.html">Calculus</a></li>
-      <li><a href="calculus2.html">Calculus 2</a></li>
-      <li><a href="calculus3.html">Calculus 3</a></li>
-      <li><a href="linear_algebra.html">Linear Algebra</a></li>
+      <li><a href="calculus.html" target="viewer">Calculus</a></li>
+      <li><a href="calculus2.html" target="viewer">Calculus 2</a></li>
+      <li><a href="calculus3.html" target="viewer">Calculus 3</a></li>
+      <li><a href="linear_algebra.html" target="viewer">Linear Algebra</a></li>
     </ul>
 
     <h2>Computer & Hardware</h2>
     <ul>
-      <li><a href="i8051.html">Intel 8051</a></li>
-      <li><a href="mc68000.html">MC68000</a></li>
-      <li><a href="ne555.html">NE555 Timer</a></li>
-      <li><a href="ns16550.html">NS16550 UART</a></li>
-      <li><a href="commodore.html">Commodore Emulator</a></li>
+      <li><a href="i8051.html" target="viewer">Intel 8051</a></li>
+      <li><a href="mc68000.html" target="viewer">MC68000</a></li>
+      <li><a href="ne555.html" target="viewer">NE555 Timer</a></li>
+      <li><a href="ns16550.html" target="viewer">NS16550 UART</a></li>
+      <li><a href="commodore.html" target="viewer">Commodore Emulator</a></li>
     </ul>
 
     <h2>Memory</h2>
     <ul>
-      <li><a href="ddr.html">DDR Memory</a></li>
-      <li><a href="dram.html">DRAM Memory</a></li>
+      <li><a href="ddr.html" target="viewer">DDR Memory</a></li>
+      <li><a href="dram.html" target="viewer">DRAM Memory</a></li>
     </ul>
 
     <h2>Protocols & Tools</h2>
     <ul>
-      <li><a href="j1939_converter.html">J1939 Converter</a></li>
-      <li><a href="jtag.html">JTAG Tool</a></li>
-      <li><a href="crc32.html">CRC32 Calculator</a></li>
-      <li><a href="crc8.html">CRC8 Calculator</a></li>
+      <li><a href="j1939_converter.html" target="viewer">J1939 Converter</a></li>
+      <li><a href="jtag.html" target="viewer">JTAG Tool</a></li>
+      <li><a href="crc32.html" target="viewer">CRC32 Calculator</a></li>
+      <li><a href="crc8.html" target="viewer">CRC8 Calculator</a></li>
     </ul>
 
     <h2>Software & OS</h2>
     <ul>
-      <li><a href="vxworks.html">VxWorks</a></li>
-      <li><a href="vxworks2.html">VxWorks 2</a></li>
+      <li><a href="vxworks.html" target="viewer">VxWorks</a></li>
+      <li><a href="vxworks2.html" target="viewer">VxWorks 2</a></li>
     </ul>
 
     <h2>Programming Languages</h2>
     <ul>
-      <li><a href="lisp.html">LISP</a></li>
-      <li><a href="lisp2.html">LISP 2</a></li>
-      <li><a href="prolog.html">Prolog</a></li>
+      <li><a href="lisp.html" target="viewer">LISP</a></li>
+      <li><a href="lisp2.html" target="viewer">LISP 2</a></li>
+      <li><a href="prolog.html" target="viewer">Prolog</a></li>
     </ul>
 
     <h2>Chips & Controllers</h2>
     <ul>
-      <li><a href="tie9180d.html">TLE9180D</a></li>
-      <li><a href="tl35584.html">TLF35584</a></li>
+      <li><a href="tie9180d.html" target="viewer">TLE9180D</a></li>
+      <li><a href="tl35584.html" target="viewer">TLF35584</a></li>
     </ul>
 
     <h2>Fun</h2>
     <ul>
-      <li><a href="word_search.html">Word Search</a></li>
+      <li><a href="word_search.html" target="viewer">Word Search</a></li>
     </ul>
+  </div>
+
+  <div class="content">
+    <iframe name="viewer" src=""></iframe>
   </div>
 
   <script>
     const searchBox = document.getElementById('searchBox');
     searchBox.addEventListener('keyup', function() {
       const filter = searchBox.value.toLowerCase();
-      const sections = document.querySelectorAll('.container h2, .container ul li');
+      const sections = document.querySelectorAll('.sidebar h2, .sidebar ul li');
 
       sections.forEach(el => {
         if (el.tagName === 'LI') {
@@ -142,8 +156,8 @@
         }
       });
 
-      // Hide entire category if all its items are hidden
-      const categories = document.querySelectorAll('.container h2');
+      // Hide category headers if all items are hidden
+      const categories = document.querySelectorAll('.sidebar h2');
       categories.forEach(h2 => {
         const listItems = h2.nextElementSibling.querySelectorAll('li');
         const visible = Array.from(listItems).some(li => li.style.display !== 'none');
