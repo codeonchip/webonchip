@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Luette — Lua‑like Interpreter (Browser, No Libs)</title>
+  <style>
+    :root{
+      --bg:#0f172a; /* slate-900 */
+      --panel:#111827; /* gray-900 */
+      --panel-muted:#1f2937; /* gray-800 */
+      --text:#e5e7eb; /* gray-200 */
+      --accent:#10b981; /* emerald-500 */
+      --accent-2:#22d3ee; /* cyan-400 */
+      --warn:#f59e0b; /* amber-500 */
+      --error:#ef4444; /* red-500 */
+      --ok:#34d399; /* green-400 */
+      --muted:#9ca3af; /* gray-400 */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;}
+    body{margin:0;background:linear-gradient(120deg,var(--bg),#0b1222);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .app{display:grid;grid-template-rows:auto 1fr;min-height:100vh}
+    header{display:flex;gap:14px;align-items:center;padding:14px 18px;border-bottom:1px solid #111826;background:rgba(17,24,39,.8);backdrop-filter: blur(6px);position:sticky;top:0;z-index:10}
+    header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.3px}
+    header .badge{font-size:11px;color:var(--muted);border:1px solid #253046;padding:2px 6px;border-radius:8px}
+    .container{display:grid;grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);gap:0;min-height:0}
+    .pane{display:flex;flex-direction:column;min-height:0}
+    .pane.left{background:var(--panel);border-right:1px solid #0b1222}
+    .pane.right{background:#0c1324}
+    .toolbar{display:flex;gap:8px;align-items:center;padding:10px;border-bottom:1px solid #0b1222;background:var(--panel-muted)}
+    button,.btn{border:1px solid #2a3a57;background:#0f1b34;color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer;transition:.15s transform,.15s background,.15s border}
+    button:hover{background:#122144}
+    button:active{transform:translateY(1px)}
+    .btn.primary{border-color:#0e7a5f;background:#0c2a23}
+    .btn.primary:hover{background:#0e3329}
+    .btn.warn{border-color:#664a14;background:#2a1e08}
+    .btn.warn:hover{background:#34260a}
+    select, .inp{border:1px solid #22314e;background:#0e162a;color:var(--text);padding:8px 10px;border-radius:10px}
+    .grow{flex:1}
+    #editor{flex:1;min-height:0;width:100%;resize:none;border:none;padding:14px 16px;background:#0b1222;color:#e8edf7;font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace}
+    #editor:focus{outline:none}
+    .statusbar{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;color:var(--muted);border-top:1px solid #0b1222;background:#0a101f;font-size:12px}
+    #output{flex:1;min-height:0;padding:14px 16px;font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;overflow:auto}
+    .line{white-space:pre-wrap}
+    .line .caret{display:inline-block;width:8px;background:#ffffff33;animation:blink 1s steps(1,end) infinite}
+    @keyframes blink{50%{opacity:0}}
+    .tag{display:inline-block;border:1px solid #2a3a57;border-radius:999px;padding:2px 8px;font-size:11px;margin-right:6px}
+    .tag.ok{border-color: #0d5; color:#8ff}
+    .tag.err{border-color: var(--error); color:#ffb7b7}
+    .muted{color:var(--muted)}
+    .hint{color:#95d5ff}
+    .hr{height:1px;background:#112; margin:10px 0}
+    .kbd{border:1px solid #333;padding:2px 6px;border-radius:6px;background:#111;color:#ddd;font-size:12px}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Luette — Lua‑like Interpreter (No external libs)</h1>
+    <span class="badge">subset: numbers, strings, booleans, nil, vars, =, if/then/else/end, while/do/end, function…end, return, calls, print()</span>
+    <div class="grow"></div>
+    <span class="muted">Run: <span class="kbd">Shift</span>+<span class="kbd">Enter</span></span>
+  </header>
+  <div class="container">
+    <section class="pane left">
+      <div class="toolbar">
+        <button class="btn primary" id="runBtn">▶ Run</button>
+        <button class="btn" id="clearBtn">⟲ Reset</button>
+        <button class="btn warn" id="stopBtn" title="Stop execution">■ Stop</button>
+        <div class="grow"></div>
+        <select id="demoSel" title="Load demo">
+          <option value="demo1">Demo: factorial & loop</option>
+          <option value="demo2">Demo: if/else & while</option>
+          <option value="demo3">Demo: functions & recursion</option>
+        </select>
+        <button class="btn" id="loadDemoBtn">Load</button>
+      </div>
+      <textarea id="editor" spellcheck="false"></textarea>
+      <div class="statusbar">
+        <div id="statusLeft">Ready.</div>
+        <div id="statusRight">Instr cap: <span id="cap">20000</span></div>
+      </div>
+    </section>
+    <section class="pane right">
+      <div class="toolbar">
+        <span class="tag ok">Output</span>
+        <div class="grow"></div>
+        <button class="btn" id="copyBtn">Copy</button>
+        <button class="btn" id="clrOutBtn">Clear</button>
+      </div>
+      <div id="output"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+// -------------- Minimal Lua-like Interpreter in JS (single file) --------------
+// Subset: numbers, strings, booleans, nil, identifiers, assignment, arithmetic
+//  + if/then/else/end, while/do/end, function … end (no closures), return, calls
+//  + builtin: print(...)
+// Notes: This mirrors the toy C interpreter's grammar.
+
+(function(){
+  const outEl = document.getElementById('output');
+  const editor = document.getElementById('editor');
+  const statusLeft = document.getElementById('statusLeft');
+  const capEl = document.getElementById('cap');
+  const runBtn = document.getElementById('runBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const demoSel = document.getElementById('demoSel');
+  const loadDemoBtn = document.getElementById('loadDemoBtn');
+  const copyBtn = document.getElementById('copyBtn');
+  const clrOutBtn = document.getElementById('clrOutBtn');
+
+  let stopFlag = false;
+  let INSTR_CAP = 20000; // simple runaway loop guard
+
+  function println(txt, cls){
+    const div = document.createElement('div');
+    div.className = 'line' + (cls? ' '+cls : '');
+    div.textContent = txt;
+    outEl.appendChild(div);
+    outEl.scrollTop = outEl.scrollHeight;
+  }
+  function printErr(txt){ println(txt, 'err'); }
+
+  // ---------------- Lexer ----------------
+  const TT = {
+    EOF:0, ID:1, NUM:2, STR:3,
+    KIF:10, KTHEN:11, KELSE:12, KEND:13, KWHILE:14, KDO:15, KFUNCTION:16, KRETURN:17,
+    KTRUE:18, KFALSE:19, KNIL:20, KAND:21, KOR:22, KNOT:23,
+    LP:40, RP:41, COMMA:42, SEMI:43, ASSIGN:44,
+    PLUS:45, MINUS:46, STAR:47, SLASH:48, PCT:49, CARET:50,
+    EQ:51, NE:52, LT:53, LE:54, GT:55, GE:56
+  };
+  const KEYWORDS = new Map([
+    ['if',TT.KIF],['then',TT.KTHEN],['else',TT.KELSE],['end',TT.KEND],
+    ['while',TT.KWHILE],['do',TT.KDO],['function',TT.KFUNCTION],['return',TT.KRETURN],
+    ['true',TT.KTRUE],['false',TT.KFALSE],['nil',TT.KNIL],['and',TT.KAND],['or',TT.KOR],['not',TT.KNOT]
+  ]);
+
+  class Lexer{
+    constructor(src){ this.src=src; this.i=0; this.len=src.length; this.line=1; this.tok=TT.EOF; this.lex=''; this.num=0; this.next(); }
+    isId0(c){ return /[A-Za-z_]/.test(c); }
+    isId(c){ return /[A-Za-z0-9_]/.test(c); }
+    skip(){
+      while(this.i<this.len){
+        let c=this.src[this.i];
+        if(c==='\n'){ this.line++; this.i++; }
+        else if(/\s/.test(c)) this.i++;
+        else if(c==='-' && this.src[this.i+1]==='-'){
+          this.i+=2; while(this.i<this.len && this.src[this.i]!=="\n") this.i++;
+        } else break;
+      }
+    }
+    next(){
+      this.skip();
+      if(this.i>=this.len){ this.tok=TT.EOF; this.lex=''; return; }
+      let c=this.src[this.i++];
+      const peek = () => this.src[this.i];
+      const take = () => this.src[this.i++];
+      switch(c){
+        case '(': this.tok=TT.LP; return;
+        case ')': this.tok=TT.RP; return;
+        case ',': this.tok=TT.COMMA; return;
+        case ';': this.tok=TT.SEMI; return;
+        case '+': this.tok=TT.PLUS; return;
+        case '-': this.tok=TT.MINUS; return;
+        case '*': this.tok=TT.STAR; return;
+        case '/': this.tok=TT.SLASH; return;
+        case '%': this.tok=TT.PCT; return;
+        case '^': this.tok=TT.CARET; return;
+        case '=': this.tok = (peek()==='=') ? (this.i++, TT.EQ) : TT.ASSIGN; return;
+        case '<': this.tok = (peek()==='=') ? (this.i++, TT.LE) : TT.LT; return;
+        case '>': this.tok = (peek()==='=') ? (this.i++, TT.GE) : TT.GT; return;
+        case '~': if(peek()==='='){ this.i++; this.tok=TT.NE; return; } throw this.err("unexpected '~'");
+        case '"':{
+          let buf='';
+          while(this.i<this.len){
+            let d=take();
+            if(d==='"') break;
+            if(d==='\\'){
+              let e=take();
+              if(e==='n') d='\n'; else if(e==='t') d='\t'; else d=e;
+            }
+            buf+=d;
+          }
+          if(this.src[this.i-1] !== '"') throw this.err('unterminated string');
+          this.lex=buf; this.tok=TT.STR; return;
+        }
+        default:
+          if(/[0-9]/.test(c) || (c==='.' && /[0-9]/.test(peek()))){
+            let s=this.i-1; while(this.i<this.len && /[0-9eE+\-.]/.test(this.src[this.i])) this.i++;
+            this.lex=this.src.slice(s,this.i); this.num=Number(this.lex); this.tok=TT.NUM; return;
+          } else if(this.isId0(c)){
+            let s=this.i-1; while(this.i<this.len && this.isId(this.src[this.i])) this.i++;
+            this.lex=this.src.slice(s,this.i);
+            this.tok=KEYWORDS.get(this.lex) ?? TT.ID; return;
+          }
+          throw this.err(`bad char '${c}'`);
+      }
+    }
+    err(msg){ return new Error(`line ${this.line}: ${msg}`); }
+  }
+
+  // ---------------- AST Nodes ----------------
+  const NT = { BLOCK:1, NUM:2, STR:3, BOOL:4, NIL:5, VAR:6, ASSIGN:7, BIN:8, UN:9, CALL:10, IF:11, WHILE:12, FUNDEF:13, RETURN:14 };
+  const binPrec = t => ({
+    [TT.CARET]:8, [TT.STAR]:7,[TT.SLASH]:7,[TT.PCT]:7, [TT.PLUS]:6,[TT.MINUS]:6,
+    [TT.LT]:5,[TT.LE]:5,[TT.GT]:5,[TT.GE]:5, [TT.EQ]:4,[TT.NE]:4,
+    [TT.KAND]:3, [TT.KOR]:2
+  })[t] ?? -1;
+  const rightAssoc = t => t===TT.CARET;
+
+  // ---------------- Parser ----------------
+  class Parser{
+    constructor(src){ this.L=new Lexer(src); }
+    expect(t){ if(this.L.tok!==t) throw this.L.err(`expected token ${t}`); this.L.next(); }
+    accept(t){ if(this.L.tok===t){ this.L.next(); return true;} return false; }
+
+    parse(){ const b=this.block(); if(this.L.tok!==TT.EOF) throw this.L.err('unexpected tokens'); return b; }
+
+    block(){ const n={t:NT.BLOCK, line:this.L.line, stmts:[]};
+      while(![TT.EOF,TT.KEND,TT.KELSE,TT.KTHEN,TT.KDO,TT.RP].includes(this.L.tok)){
+        n.stmts.push(this.stmt());
+      }
+      return n;
+    }
+
+    stmt(){ const L=this.L;
+      if(this.accept(TT.SEMI)) return {t:NT.BLOCK, line:L.line, stmts:[]};
+      if(this.accept(TT.KIF)){
+        const line=L.line; const cond=this.exp(); this.expect(TT.KTHEN);
+        const thn=this.block(); let els=null; if(this.accept(TT.KELSE)) els=this.block(); this.expect(TT.KEND);
+        return {t:NT.IF,line,cond,thn,els};
+      }
+      if(this.accept(TT.KWHILE)){
+        const line=L.line; const cond=this.exp(); this.expect(TT.KDO); const body=this.block(); this.expect(TT.KEND);
+        return {t:NT.WHILE,line,cond,body};
+      }
+      if(this.accept(TT.KFUNCTION)){
+        if(L.tok!==TT.ID) throw L.err('function name expected'); const name=L.lex; L.next();
+        this.expect(TT.LP); const params=[]; if(L.tok!==TT.RP){ do{ if(L.tok!==TT.ID) throw L.err('param name expected'); params.push(L.lex); L.next(); } while(this.accept(TT.COMMA)); }
+        this.expect(TT.RP); const body=this.block(); this.expect(TT.KEND);
+        return {t:NT.FUNDEF, line:L.line, name, params, body};
+      }
+      if(this.accept(TT.KRETURN)){
+        const line=L.line; const exprs=[]; if(![TT.SEMI,TT.KEND,TT.EOF].includes(L.tok)){
+          exprs.push(this.exp()); while(this.accept(TT.COMMA)) exprs.push(this.exp());
+        }
+        return {t:NT.RETURN,line,exprs};
+      }
+      const e=this.exp(); this.accept(TT.SEMI); return e;
+    }
+
+    exp(){
+      // assignment lookahead
+      if(this.L.tok===TT.ID){
+        const save={i:this.L.i,line:this.L.line,lex:this.L.lex};
+        const name=this.L.lex; this.L.next();
+        if(this.L.tok===TT.ASSIGN){ this.L.next(); const expr=this.exp(); return {t:NT.ASSIGN,line:save.line,name,expr}; }
+        // rollback
+        this.L.i=save.i; this.L.line=save.line; this.L.lex=save.lex; this.L.tok=TT.ID;
+      }
+      const u=this.unary(); return this.binRHS(1,u);
+    }
+
+    unary(){ const L=this.L;
+      if(this.accept(TT.KNOT)) { const a=this.unary(); return {t:NT.UN,line:L.line,op:TT.KNOT,a}; }
+      if(this.accept(TT.MINUS)) { const a=this.unary(); return {t:NT.UN,line:L.line,op:TT.MINUS,a}; }
+      return this.primary();
+    }
+
+    primary(){ const L=this.L;
+      if(L.tok===TT.NUM){ const n={t:NT.NUM,line:L.line,num:L.num}; L.next(); return n; }
+      if(L.tok===TT.STR){ const n={t:NT.STR,line:L.line,s:L.lex}; L.next(); return n; }
+      if(L.tok===TT.KTRUE){ L.next(); return {t:NT.BOOL,line:L.line,b:true}; }
+      if(L.tok===TT.KFALSE){ L.next(); return {t:NT.BOOL,line:L.line,b:false}; }
+      if(L.tok===TT.KNIL){ L.next(); return {t:NT.NIL,line:L.line}; }
+      if(L.tok===TT.ID){ const id=L.lex; L.next();
+        if(this.accept(TT.LP)){
+          const args=[]; if(this.L.tok!==TT.RP){ do{ args.push(this.exp()); } while(this.accept(TT.COMMA)); }
+          this.expect(TT.RP); return {t:NT.CALL,line:L.line,name:id,args};
+        }
+        return {t:NT.VAR,line:L.line,name:id};
+      }
+      if(this.accept(TT.LP)){ const e=this.exp(); this.expect(TT.RP); return e; }
+      throw L.err('bad expression');
+    }
+
+    binRHS(minp,lhs){
+      for(;;){
+        const t=this.L.tok; const p=binPrec(t); if(p<minp) return lhs; const line=this.L.line; this.L.next();
+        let rhs=this.unary(); const t2=this.L.tok; const p2=binPrec(t2);
+        if(p2>p || (p2===p && (t2===TT.CARET))){ rhs=this.binRHS(p+1,rhs); }
+        lhs={t:NT.BIN,line,op:t,a:lhs,b:rhs};
+      }
+    }
+  }
+
+  // ---------------- VM ----------------
+  const VT = { NIL:0, NUM:1, BOOL:2, STR:3, FUNC:4 };
+  function V_nil(){return {t:VT.NIL};}
+  function V_num(x){return {t:VT.NUM,n:x};}
+  function V_bool(b){return {t:VT.BOOL,b:!!b};}
+  function V_str(s){return {t:VT.STR,s:s};}
+  function V_func(fnode){return {t:VT.FUNC,f:fnode};}
+  function vToStr(v){ switch(v.t){ case VT.NIL:return 'nil'; case VT.BOOL:return v.b?'true':'false'; case VT.NUM:return String(v.n); case VT.STR:return v.s; case VT.FUNC:return 'function:'+String(v.f); } }
+
+  class Env{ constructor(parent=null){ this.parent=parent; this.map=new Map(); }
+    set(name,val){ if(this.map.has(name)) this.map.set(name,val); else this.map.set(name,val); }
+    get(name){ for(let e=this;e;e=e.parent){ if(e.map.has(name)) return e.map.get(name);} return undefined; }
+  }
+
+  function isTruthy(v){ if(v.t===VT.NIL) return false; if(v.t===VT.BOOL) return !!v.b; return true; }
+
+  function asNum(node,v){ if(v.t!==VT.NUM) throw new Error(`line ${node.line}: expected number, got ${vToStrType(v)}`); return v.n; }
+  function vToStrType(v){ return ({0:'nil',1:'number',2:'boolean',3:'string',4:'function'})[v.t]; }
+
+  function evalNode(vm, env, n){
+    vm.steps++; if(vm.steps>vm.cap) throw new Error(`instruction cap exceeded (${vm.cap}) — possible infinite loop`);
+    switch(n.t){
+      case NT.BLOCK: { let r=V_nil(); for(const s of n.stmts){ r=evalNode(vm,env,s); if(vm.retFlag) return r; } return r; }
+      case NT.NUM: return V_num(n.num);
+      case NT.STR: return V_str(n.s);
+      case NT.BOOL: return V_bool(n.b);
+      case NT.NIL: return V_nil();
+      case NT.VAR: {
+        // builtin print
+        if(n.name==='print') return V_func({builtin:'print'});
+        const v=env.get(n.name); if(v===undefined) throw new Error(`line ${n.line}: undefined variable '${n.name}'`); return v;
+      }
+      case NT.ASSIGN: { const v=evalNode(vm,env,n.expr); env.set(n.name,v); return v; }
+      case NT.UN: {
+        const a=evalNode(vm,env,n.a);
+        if(n.op===TT.KNOT) return V_bool(!isTruthy(a));
+        if(n.op===TT.MINUS) return V_num(-asNum(n,a));
+        throw new Error(`line ${n.line}: bad unary op`);
+      }
+      case NT.BIN: {
+        if(n.op===TT.KAND){ const A=evalNode(vm,env,n.a); return isTruthy(A)? evalNode(vm,env,n.b): A; }
+        if(n.op===TT.KOR){ const A=evalNode(vm,env,n.a); return isTruthy(A)? A: evalNode(vm,env,n.b); }
+        const A=evalNode(vm,env,n.a), B=evalNode(vm,env,n.b);
+        switch(n.op){
+          case TT.PLUS: return V_num(asNum(n,A)+asNum(n,B));
+          case TT.MINUS: return V_num(asNum(n,A)-asNum(n,B));
+          case TT.STAR: return V_num(asNum(n,A)*asNum(n,B));
+          case TT.SLASH: return V_num(asNum(n,A)/asNum(n,B));
+          case TT.PCT: return V_num(asNum(n,A)%asNum(n,B));
+          case TT.CARET: return V_num(Math.pow(asNum(n,A),asNum(n,B)));
+          case TT.LT: return V_bool(asNum(n,A)<asNum(n,B));
+          case TT.LE: return V_bool(asNum(n,A)<=asNum(n,B));
+          case TT.GT: return V_bool(asNum(n,A)>asNum(n,B));
+          case TT.GE: return V_bool(asNum(n,A)>=asNum(n,B));
+          case TT.EQ: return V_bool(eqVals(A,B));
+          case TT.NE: return V_bool(!eqVals(A,B));
+          default: throw new Error(`line ${n.line}: bad binop`);
+        }
+      }
+      case NT.CALL: {
+        // builtin print
+        if(n.name==='print'){
+          const vals=n.args.map(a=>evalNode(vm,env,a));
+          println(vals.map(v=>vToStr(v)).join('\t'));
+          return V_nil();
+        }
+        const f=env.get(n.name); if(!f || f.t!==VT.FUNC) throw new Error(`line ${n.line}: attempt to call non-function '${n.name}'`);
+        const argv=n.args.map(a=>evalNode(vm,env,a));
+        return callFunc(vm, env, f.f, argv);
+      }
+      case NT.IF: { const c=evalNode(vm,env,n.cond); if(isTruthy(c)) return evalNode(vm,env,n.thn); if(n.els) return evalNode(vm,env,n.els); return V_nil(); }
+      case NT.WHILE: { while(isTruthy(evalNode(vm,env,n.cond))){ evalNode(vm,env,n.body); if(vm.retFlag) break; if(stopFlag) throw new Error('stopped by user'); } return V_nil(); }
+      case NT.FUNDEF: { env.set(n.name, V_func(n)); return V_nil(); }
+      case NT.RETURN: { const r = n.exprs && n.exprs.length? evalNode(vm,env,n.exprs[0]): V_nil(); vm.retVal=r; vm.retFlag=true; return r; }
+      default: throw new Error(`line ${n.line}: unhandled node`);
+    }
+  }
+
+  function callFunc(vm, env, fnode, argv){
+    const E = new Env(env); // dynamic scoping (no closures) — same as toy C
+    const params = fnode.params || [];
+    for(let i=0;i<params.length;i++){ E.set(params[i], i<argv.length? argv[i] : V_nil()); }
+    const oldRet = {flag:vm.retFlag, val:vm.retVal}; vm.retFlag=false; vm.retVal=V_nil();
+    const r = evalNode(vm,E,fnode.body);
+    const ret = vm.retFlag? vm.retVal : r; vm.retFlag=oldRet.flag; vm.retVal=oldRet.val; return ret;
+  }
+
+  function eqVals(a,b){
+    if(a.t!==b.t) return false;
+    switch(a.t){
+      case VT.NIL: return true; case VT.BOOL: return a.b===b.b; case VT.NUM: return a.n===b.n; case VT.STR: return a.s===b.s; case VT.FUNC: return a.f===b.f;
+      default: return false;
+    }
+  }
+
+  function run(code){
+    stopFlag=false;
+    capEl.textContent = INSTR_CAP;
+    try{
+      const parser = new Parser(code);
+      const ast = parser.parse();
+      const vm = { steps:0, cap:INSTR_CAP, retFlag:false, retVal:V_nil() };
+      const G = new Env(null);
+      evalNode(vm, G, ast);
+      statusLeft.textContent = `Done. Steps: ${vm.steps}`;
+    } catch(e){
+      printErr(e.message);
+      statusLeft.textContent = 'Error.';
+    }
+  }
+
+  // ---------------- UI Wiring ----------------
+  const DEMOS = {
+    demo1: `-- factorial\nfunction fact(n)\n  if n == 0 then return 1 end\n  return n * fact(n-1)\nend\n\nprint("fact:", fact(5))\n\n-- loop\ni = 1\nwhile i <= 5 do\n  print(i, i^2)\n  i = i + 1\nend\n`,
+    demo2: `-- if / else\nfunction sign(x)\n  if x < 0 then return -1 end\n  if x == 0 then return 0 end\n  return 1\nend\n\nprint("sign(-3)", sign(-3))\nprint("sign(0)", sign(0))\nprint("sign(8)", sign(8))\n\n-- while\nsum = 0\ni = 1\nwhile i <= 10 do\n  sum = sum + i\n  i = i + 1\nend\nprint("sum1..10", sum)\n`,
+    demo3: `-- recursion & arithmetic\nfunction fib(n)\n  if n <= 1 then return n end\n  return fib(n-1) + fib(n-2)\nend\n\nforN = 8\nprint("fib(8)", fib(forN))\n`
+  };
+
+  function loadDemo(){ editor.value = DEMOS[demoSel.value]; statusLeft.textContent='Demo loaded.'; editor.focus(); }
+
+  runBtn.addEventListener('click', ()=> run(editor.value));
+  clearBtn.addEventListener('click', ()=>{ editor.value = DEMOS.demo1; outEl.innerHTML=''; statusLeft.textContent='Reset.'; });
+  stopBtn.addEventListener('click', ()=>{ stopFlag=true; statusLeft.textContent='Stopping...'; });
+  loadDemoBtn.addEventListener('click', loadDemo);
+  copyBtn.addEventListener('click', ()=>{
+    const txt = Array.from(outEl.querySelectorAll('.line')).map(el=>el.textContent).join('\n');
+    navigator.clipboard.writeText(txt).then(()=>{ statusLeft.textContent='Output copied.'; });
+  });
+  clrOutBtn.addEventListener('click', ()=>{ outEl.innerHTML=''; statusLeft.textContent='Output cleared.'; });
+
+  editor.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && e.shiftKey){ e.preventDefault(); run(editor.value); }
+  });
+
+  // Load default demo
+  loadDemo();
+})();
+</script>
+</body>
+</html>
