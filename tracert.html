@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traceroute (tracert) Demo</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #0d1117;
+      color: #e6edf3;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      padding: 1rem;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+    }
+    h1 { margin: 0; font-size: 1.2rem; }
+    main {
+      padding: 1rem;
+    }
+    input[type="text"] {
+      padding: 0.4rem;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #e6edf3;
+      width: 250px;
+    }
+    button {
+      padding: 0.4rem 0.8rem;
+      margin-left: 0.4rem;
+      border: none;
+      border-radius: 6px;
+      background: #238636;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #2ea043;
+    }
+    pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin-top: 1rem;
+    }
+    .hop {
+      margin: 0.2rem 0;
+    }
+    .ip { color: #58a6ff; }
+    .time { color: #a5d6a7; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Traceroute (tracert) Demo</h1>
+  </header>
+  <main>
+    <label>Destination: <input type="text" id="target" placeholder="example.com" /></label>
+    <button onclick="startTrace()">Start</button>
+    <pre id="output"></pre>
+  </main>
+
+  <script>
+    const output = document.getElementById("output");
+    const hopsMax = 12;
+
+    function fakeIP() {
+      return `${Math.floor(Math.random()*256)}.${Math.floor(Math.random()*256)}.${Math.floor(Math.random()*256)}.${Math.floor(Math.random()*256)}`;
+    }
+
+    function randomTime() {
+      return (10 + Math.random()*90).toFixed(1);
+    }
+
+    function sleep(ms) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+
+    async function startTrace() {
+      output.textContent = "Tracing route...\n";
+      const target = document.getElementById("target").value || "example.com";
+      for (let i=1; i<=hopsMax; i++) {
+        await sleep(600);
+        let line = `${i}  `;
+        const ip = fakeIP();
+        line += `<span class="time">${randomTime()} ms</span>  `;
+        line += `<span class="time">${randomTime()} ms</span>  `;
+        line += `<span class="time">${randomTime()} ms</span>  `;
+        line += `<span class="ip">${ip}</span>`;
+        output.innerHTML += `<div class='hop'>${line}</div>`;
+        if (i === hopsMax) {
+          output.innerHTML += `\nTrace complete to <span class='ip'>${target}</span>`;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
