@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quilt Designer — Web‑Based</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#111a30; --ink:#e6ecff; --muted:#9aa4c0; --line:#243059; --accent:#7dd3fc; --accent2:#a78bfa; --good:#34d399; --warn:#fbbf24;
+  }
+  html,body{height:100%}
+  body{margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:radial-gradient(1200px 800px at 25% -10%, #172654, var(--bg)); color:var(--ink)}
+  header{display:flex; gap:12px; align-items:center; padding:12px 16px; background:linear-gradient(180deg, rgba(18,26,47,.95), rgba(18,26,47,.6)); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; backdrop-filter: blur(8px)}
+  h1{margin:0; font-size:clamp(18px,2.6vw,28px)}
+  .sub{color:var(--muted); font-size:12px}
+  .wrap{display:grid; grid-template-columns: 320px 1fr; gap:14px; padding:14px}
+  .panel{background:linear-gradient(180deg, var(--panel), #0d1428); border:1px solid var(--line); border-radius:16px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .sec{border-top:1px solid var(--line); margin-top:10px; padding-top:10px}
+  label{display:block; font-size:12px; color:var(--muted); margin:6px 0 4px}
+  input[type="number"],select,input[type="text"]{width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:#0f1830; color:var(--ink)}
+  input[type="range"]{width:100%}
+  button{background:linear-gradient(180deg,#1a2446,#121a2f); color:var(--ink); border:1px solid var(--line); padding:8px 12px; border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 2px 0 #0b1020 inset, 0 1px 0 #223160}
+  button:hover{filter:brightness(1.06)} button:active{transform:translateY(1px)}
+  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .palette{display:grid; grid-template-columns: repeat(8, 1fr); gap:6px}
+  .sw{width:28px; height:28px; border-radius:8px; border:1px solid var(--line); cursor:pointer}
+  .sw.sel{outline:2px solid var(--accent)}
+  .tools{display:grid; grid-template-columns: repeat(3, 1fr); gap:8px}
+  .tool{padding:8px; background:#0f1830; border:1px solid var(--line); border-radius:10px; text-align:center; cursor:pointer; font-size:12px}
+  .tool.sel{outline:2px solid var(--accent)}
+  .kbd{font-size:12px; border:1px solid var(--line); padding:2px 6px; border-radius:8px; background:#0f1830}
+  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+  canvas{width:100%; height:auto; display:block; background:#0a1126; border-radius:12px}
+  .footer{display:flex; gap:10px; justify-content:space-between; color:var(--muted); font-size:12px; margin-top:6px}
+  @media(max-width:1000px){ .wrap{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Quilt Designer</h1>
+      <div class="sub">Click to paint blocks. Use tools for triangles/strips. <span class="kbd">R</span> rotate, <span class="kbd">M</span> mirror, <span class="kbd">E</span> eyedropper, <span class="kbd">Ctrl+Z</span> undo.</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <aside class="panel">
+      <div class="row" style="justify-content:space-between; align-items:end">
+        <div style="flex:1">
+          <label>Grid Size (cols × rows)</label>
+          <div class="row">
+            <input id="cols" type="number" min="2" max="64" value="12" style="width:80px"> ×
+            <input id="rows" type="number" min="2" max="64" value="12" style="width:80px">
+            <button id="applySize">Apply</button>
+          </div>
+        </div>
+        <div style="width:120px">
+          <label>Block Size (px)</label>
+          <input id="cellSize" type="range" min="16" max="64" value="36">
+        </div>
+      </div>
+
+      <div class="sec">
+        <label>Tool</label>
+        <div class="tools" id="tools">
+          <div class="tool sel" data-tool="solid">Solid</div>
+          <div class="tool" data-tool="hst">HST</div>
+          <div class="tool" data-tool="geese">Geese</div>
+          <div class="tool" data-tool="stripe">Stripe</div>
+          <div class="tool" data-tool="nine">Nine‑Patch</div>
+          <div class="tool" data-tool="erase">Erase</div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="rotateBtn" title="Rotate (R)">Rotate</button>
+          <button id="mirrorBtn" title="Mirror (M)">Mirror</button>
+          <button id="eyedropBtn" title="Eyedropper (E)">Eyedropper</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <label>Palette</label>
+        <div id="palette" class="palette"></div>
+        <div class="row" style="margin-top:8px">
+          <input id="newColor" type="color" value="#7dd3fc" style="width:52px; height:32px; padding:0; border-radius:8px">
+          <button id="addColor">Add</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <label>Save / Load</label>
+        <div class="row">
+          <button id="saveBtn">Export PNG</button>
+          <button id="downloadBtn">Download JSON</button>
+          <label class="row" style="gap:6px">
+            <input id="fileInput" type="file" accept="application/json"> Load JSON
+          </label>
+        </div>
+      </div>
+
+      <div class="sec">
+        <label>Yardage Estimate</label>
+        <div id="yardage" class="mono" style="font-size:12px; color:var(--muted)">—</div>
+        <div class="row" style="margin-top:6px">
+          <span class="kbd">Assumes 42" WOF</span>
+          <input id="seamAllow" type="number" value="0.25" step="0.01" style="width:80px"> in seam
+        </div>
+      </div>
+
+      <div class="sec" style="font-size:12px; color:var(--muted)">
+        Tips: Hold <span class="kbd">Shift</span> to paint a line. Right‑click to erase. Use mouse wheel to zoom (canvas scales when exporting).
+      </div>
+    </aside>
+
+    <section class="panel">
+      <canvas id="cv" width="1200" height="1200"></canvas>
+      <div class="footer">
+        <div>Blocks: <span id="infoBlocks">12×12</span> • Tool: <span id="infoTool">Solid</span> • Rotation: <span id="infoRot">0°</span> • Mirror: <span id="infoMir">off</span></div>
+        <div>Zoom: <span id="infoZoom">100%</span></div>
+      </div>
+    </section>
+  </main>
+
+<script>
+/* =================== State =================== */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let COLS = 12, ROWS = 12, CELL = 36; // px
+let zoom = 1; let offsetX=0, offsetY=0;
+const EMPTY = { type:'empty' };
+let grid = []; // grid[r][c] -> cell object
+let palette = ['#111827','#fefefe','#e11d48','#f59e0b','#10b981','#3b82f6','#8b5cf6','#f472b6','#94a3b8'];
+let currentColor = palette[2];
+let tool = 'solid';
+let rot = 0; // 0,90,180,270
+let mir = false;
+let eyedrop = false;
+let undoStack = [];
+
+function initGrid(cols, rows){ grid = Array.from({length:rows},()=> Array.from({length:cols},()=> ({...EMPTY})) ); }
+initGrid(COLS, ROWS);
+
+/* =================== UI: palette =================== */
+const palEl = document.getElementById('palette');
+function renderPalette(){ palEl.innerHTML=''; palette.forEach((c,i)=>{ const sw=document.createElement('button'); sw.className='sw'+(c===currentColor?' sel':''); sw.style.background=c; sw.onclick=()=>{ currentColor=c; renderPalette(); }; palEl.appendChild(sw); }); }
+renderPalette();
+
+document.getElementById('addColor').onclick = ()=>{ const c=document.getElementById('newColor').value; if (!palette.includes(c)){ palette.push(c); currentColor=c; renderPalette(); }};
+
+/* =================== UI: tools =================== */
+const toolsEl = document.getElementById('tools');
+for (const el of toolsEl.children){ el.onclick = ()=>{ for (const ch of toolsEl.children) ch.classList.remove('sel'); el.classList.add('sel'); tool = el.dataset.tool; eyedrop=false; info(); }; }
+
+document.getElementById('rotateBtn').onclick = ()=>{ rot=(rot+90)%360; info(); draw(); };
+document.getElementById('mirrorBtn').onclick = ()=>{ mir=!mir; info(); draw(); };
+document.getElementById('eyedropBtn').onclick = ()=>{ eyedrop=true; info(); };
+
+/* =================== UI: grid size & cell size =================== */
+function applySize(){ const c = Math.max(2, Math.min(64, parseInt(document.getElementById('cols').value||COLS))); const r = Math.max(2, Math.min(64, parseInt(document.getElementById('rows').value||ROWS))); COLS=c; ROWS=r; initGrid(COLS, ROWS); cv.width = Math.max(600, COLS*CELL); cv.height = Math.max(600, ROWS*CELL); info(); draw(); yardage(); }
+
+document.getElementById('applySize').onclick = applySize;
+document.getElementById('cellSize').oninput = (e)=>{ CELL=parseInt(e.target.value); cv.width = Math.max(600, COLS*CELL); cv.height = Math.max(600, ROWS*CELL); draw(); };
+
+/* =================== Painting =================== */
+cv.addEventListener('contextmenu', e=> e.preventDefault());
+let isDown=false, lastCell=null;
+cv.addEventListener('mousedown', e=>{ isDown=true; paintFromEvent(e); });
+window.addEventListener('mouseup', ()=> isDown=false);
+cv.addEventListener('mousemove', e=>{ if (isDown) paintFromEvent(e, true); });
+
+function getCell(e){ const rect=cv.getBoundingClientRect(); const x=(e.clientX-rect.left)/rect.width * (COLS*CELL); const y=(e.clientY-rect.top)/rect.height * (ROWS*CELL); const c=Math.floor(x/CELL), r=Math.floor(y/CELL); return {r,c}; }
+
+function pushUndo(){ undoStack.push(JSON.stringify(grid)); if (undoStack.length>40) undoStack.shift(); }
+function undo(){ if (undoStack.length){ grid = JSON.parse(undoStack.pop()); draw(); yardage(); } }
+
+window.addEventListener('keydown', (e)=>{
+  const k=e.key.toLowerCase();
+  if (k==='r'){ rot=(rot+90)%360; info(); draw(); }
+  if (k==='m'){ mir=!mir; info(); draw(); }
+  if (k==='e'){ eyedrop=!eyedrop; info(); }
+  if ((e.ctrlKey||e.metaKey) && k==='z'){ e.preventDefault(); undo(); }
+});
+
+function paintFromEvent(e, dragging=false){ const {r,c}=getCell(e); if (r<0||c<0||r>=ROWS||c>=COLS) return; if (lastCell && dragging && (lastCell.r===r && lastCell.c===c)) return; lastCell={r,c};
+  pushUndo();
+  if (eyedrop){ const cell=grid[r][c]; if (cell.type==='solid'){ currentColor=cell.color; renderPalette(); eyedrop=false; info(); return; } }
+  if (e.button===2 || tool==='erase'){ grid[r][c] = {...EMPTY}; }
+  else{
+    if (tool==='solid'){ grid[r][c] = { type:'solid', color: currentColor }; }
+    else if (tool==='hst'){ // half-square triangle within cell
+      grid[r][c] = { type:'hst', a: currentColor, b: nearestContrast(currentColor), rot, mir };
+    }
+    else if (tool==='geese'){
+      grid[r][c] = { type:'geese', a: currentColor, b: nearestContrast(currentColor), rot, mir };
+    }
+    else if (tool==='stripe'){
+      grid[r][c] = { type:'stripe', a: currentColor, b: nearestContrast(currentColor), rot, mir };
+    }
+    else if (tool==='nine'){
+      grid[r][c] = { type:'nine', colors: ninePatchColors(currentColor), rot, mir };
+    }
+  }
+  draw(); yardage();
+}
+
+/* =================== Rendering =================== */
+function draw(){ ctx.clearRect(0,0,cv.width,cv.height); ctx.save(); ctx.scale(zoom,zoom); for (let r=0;r<ROWS;r++){ for (let c=0;c<COLS;c++){ drawCell(r,c, grid[r][c]); } }
+  // grid lines
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; for (let r=0;r<=ROWS;r++){ line(0,r*CELL, COLS*CELL, r*CELL); } for (let c=0;c<=COLS;c++){ line(c*CELL,0, c*CELL, ROWS*CELL); }
+  ctx.restore(); document.getElementById('infoZoom').textContent = Math.round(zoom*100)+'%'; }
+
+function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1+.5,y1+.5); ctx.lineTo(x2+.5,y2+.5); ctx.stroke(); }
+
+function drawCell(r,c,cell){ const x=c*CELL, y=r*CELL; if (!cell || cell.type==='empty') return; if (cell.type==='solid'){ rect(x,y,CELL,CELL, cell.color); return; }
+  if (cell.type==='hst'){ patternHST(x,y, cell); return; }
+  if (cell.type==='geese'){ patternGeese(x,y, cell); return; }
+  if (cell.type==='stripe'){ patternStripe(x,y, cell); return; }
+  if (cell.type==='nine'){ patternNine(x,y, cell); return; }
+}
+
+function rect(x,y,w,h,color){ ctx.fillStyle=color; ctx.fillRect(x,y,w,h); }
+
+function applyRotMirror(points, cell){ const cx = CELL/2, cy = CELL/2; let pts = points.map(([px,py])=>[px,py]); if (cell.mir){ pts = pts.map(([px,py])=> [CELL-px, py]); } const rad = (cell.rot||0)*Math.PI/180; if (rad!==0){ pts = pts.map(([px,py])=>{ const dx=px-cx, dy=py-cy; const rx = dx*Math.cos(rad)-dy*Math.sin(rad); const ry = dx*Math.sin(rad)+dy*Math.cos(rad); return [rx+cx, ry+cy]; }); } return pts; }
+
+function tri(points, color){ ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(points[0][0], points[0][1]); for (let i=1;i<points.length;i++) ctx.lineTo(points[i][0], points[i][1]); ctx.closePath(); ctx.fill(); }
+
+function patternHST(x,y, cell){ const A=[[0,0],[CELL,0],[CELL,CELL]], B=[[0,0],[0,CELL],[CELL,CELL]]; const a=applyRotMirror(A.map(p=>[p[0]+x,p[1]+y]), cell); const b=applyRotMirror(B.map(p=>[p[0]+x,p[1]+y]), cell); tri(a, cell.a); tri(b, cell.b); }
+
+function patternGeese(x,y, cell){ // simple flying geese: big triangle + two corners
+  let A=[[CELL/2,0],[CELL, CELL*0.8],[0, CELL*0.8]], B1=[[0,CELL*0.8],[CELL*0.25,CELL],[0,CELL]], B2=[[CELL,CELL*0.8],[CELL,CELL],[CELL*0.75,CELL]];
+  A=applyRotMirror(A.map(p=>[p[0]+x,p[1]+y]), cell); B1=applyRotMirror(B1.map(p=>[p[0]+x,p[1]+y]), cell); B2=applyRotMirror(B2.map(p=>[p[0]+x,p[1]+y]), cell);
+  tri(A, cell.a); tri(B1, cell.b); tri(B2, cell.b);
+}
+
+function patternStripe(x,y, cell){ // diagonal stripe
+  let A=[[0,0],[CELL*0.6,0],[0,CELL*0.6]], B=[[CELL, CELL],[CELL*0.4, CELL],[CELL, CELL*0.4]];
+  A=applyRotMirror(A.map(p=>[p[0]+x,p[1]+y]), cell); B=applyRotMirror(B.map(p=>[p[0]+x,p[1]+y]), cell);
+  tri(A, cell.a); tri(B, cell.a); rect(x,y,CELL,CELL, cell.b);
+}
+
+function patternNine(x,y, cell){ const s=CELL/3; let k=0; for (let r=0;r<3;r++){ for (let c=0;c<3;c++){ const pts = applyRotMirror([[c*s, r*s],[c*s+s, r*s],[c*s+s, r*s+s],[c*s, r*s+s]].map(([px,py])=>[px+x,py+y]), cell); ctx.fillStyle = cell.colors[k++]; ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for (let i=1;i<4;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.closePath(); ctx.fill(); } }
+
+function ninePatchColors(base){ // simple alternating palette
+  const b = nearestContrast(base); return [base,b,base, b,base,b, base,b,base]; }
+
+function nearestContrast(hex){ // pick a different palette color farthest in LAB-ish
+  let best=palette[0], bestScore=-1; for (const c of palette){ if (c===hex) continue; const s=colorDist(hex,c); if (s>bestScore){ best=c; bestScore=s; } } return best; }
+
+function colorDist(a,b){ const A=hexToRgb(a), B=hexToRgb(b); const dr=A.r-B.r, dg=A.g-B.g, db=A.b-B.b; return Math.sqrt(dr*dr+dg*dg+db*db); }
+function hexToRgb(hex){ const h=hex.replace('#',''); return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) } }
+
+/* =================== Zoom (wheel) =================== */
+cv.addEventListener('wheel', e=>{ e.preventDefault(); const dir = e.deltaY<0 ? 1.1 : 0.9; zoom = Math.max(.5, Math.min(3, zoom*dir)); draw(); document.getElementById('infoZoom').textContent = Math.round(zoom*100)+'%'; }, {passive:false});
+
+/* =================== Save / Load =================== */
+document.getElementById('downloadBtn').onclick = ()=>{ const data = { COLS, ROWS, CELL, grid, palette }; const blob=new Blob([JSON.stringify(data)], {type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='quilt.json'; a.click(); };
+
+document.getElementById('fileInput').onchange = (e)=>{ const f=e.target.files[0]; if (!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); COLS=d.COLS; ROWS=d.ROWS; CELL=d.CELL||CELL; grid=d.grid; palette=d.palette||palette; document.getElementById('cols').value=COLS; document.getElementById('rows').value=ROWS; renderPalette(); cv.width=Math.max(600,COLS*CELL); cv.height=Math.max(600,ROWS*CELL); info(); draw(); yardage(); }catch(err){ alert('Invalid file'); } }; r.readAsText(f); };
+
+document.getElementById('saveBtn').onclick = ()=>{ const tmp=document.createElement('canvas'); tmp.width = COLS*CELL; tmp.height = ROWS*CELL; const t=tmp.getContext('2d'); const oldZoom=zoom; zoom=1; const oldCtx=ctx; // re-draw onto tmp
+  const prev=ctx; // copy draw using temp context
+  // hack: override ctx temporarily
+  const savedDraw = { ctx }; window.ctx = t; draw(); window.ctx = prev; zoom=oldZoom; const url=tmp.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download='quilt.png'; a.click(); };
+
+/* =================== Yardage =================== */
+function yardage(){ // naive: count area per color, add seam allowance per edge
+  const seam = parseFloat(document.getElementById('seamAllow').value||0.25); // inches
+  const inchesPerCell = 4; // treat each block as 4" finished (for estimate); could be a setting
+  const finished = inchesPerCell; const cut = finished + 2*seam; const areaPerCell = cut*cut; // sq in
+  const byColor = new Map();
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++){
+    const cell = grid[r][c]; let colors=[];
+    if (cell.type==='solid') colors=[cell.color];
+    else if (cell.type==='hst' || cell.type==='geese' || cell.type==='stripe') colors=[cell.a, cell.b];
+    else if (cell.type==='nine') colors=cell.colors;
+    else continue;
+    for (const col of colors){ byColor.set(col, (byColor.get(col)||0) + areaPerCell/colors.length); }
+  }
+  // convert sq in -> yards of 42" WOF
+  const WOF = 42; let lines=[]; let totalYards=0;
+  for (const [col, sqin] of byColor.entries()){
+    const yards = (sqin / (WOF*36)); totalYards += yards; lines.push(`<div><span class='sw' style='display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--line);background:${col}'></span> ${col} — ${yards.toFixed(2)} yd</div>`); }
+  document.getElementById('yardage').innerHTML = lines.join('') || '—';
+}
+
+/* =================== Info =================== */
+function info(){ document.getElementById('infoBlocks').textContent = `${COLS}×${ROWS}`; document.getElementById('infoTool').textContent = tool[0].toUpperCase()+tool.slice(1); document.getElementById('infoRot').textContent = rot+'°'; document.getElementById('infoMir').textContent = mir?'on':'off'; }
+
+// Initial draw
+cv.width = Math.max(600, COLS*CELL); cv.height = Math.max(600, ROWS*CELL); info(); draw(); yardage();
+</script>
+</body>
+</html>
