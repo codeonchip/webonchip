@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Hidden‑Object Game — June‑style</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2f; --ink:#e6ecff; --muted:#9aa4c0; --accent:#7dd3fc; --accent2:#a78bfa; --good:#34d399; --warn:#fbbf24; --bad:#fb7185;
+  }
+  html,body{height:100%;}
+  body{margin:0; background:radial-gradient(1200px 800px at 30% -10%, #172654, var(--bg)); color:var(--ink); font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  header{display:flex; gap:14px; align-items:center; padding:14px 16px; background:linear-gradient(180deg, rgba(18,26,47,.95), rgba(18,26,47,.6)); border-bottom:1px solid #26335e; position:sticky; top:0; backdrop-filter: blur(8px); z-index:3}
+  h1{margin:0; font-size:clamp(18px,2.6vw,28px)}
+  .sub{color:var(--muted); font-size:12px}
+  .controls{margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  button, select{background:linear-gradient(180deg,#1a2446,#0f1730); color:var(--ink); border:1px solid #26335e; padding:8px 12px; border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 2px 0 #0b1020 inset, 0 1px 0 #223160}
+  button:hover{filter:brightness(1.06)} button:active{transform: translateY(1px)}
+  .pill{padding:6px 10px; border-radius:999px; border:1px solid #2a3869; background:#0e152b; font-size:12px}
+  .wrap{display:grid; grid-template-columns: 1fr 330px; gap:12px; padding:12px}
+  .panel{background:linear-gradient(180deg, #121a2f, #0c142a); border:1px solid #1e2b51; border-radius:16px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .sceneWrap{position:relative; overflow:hidden; border-radius:16px}
+  .scene{width:100%; height:calc(100vh - 200px); min-height:420px; background:#0b132b; display:grid; place-items:center}
+  .hud{display:flex; gap:10px; flex-wrap:wrap; font-size:13px; margin-bottom:8px}
+  .badge{border:1px solid #2a3869; background:#0e152b; padding:6px 10px; border-radius:999px}
+  .list{display:grid; gap:6px; grid-template-columns: 1fr}
+  .item{display:flex; align-items:center; gap:8px; padding:8px; border:1px solid #243059; background:#0e152b; border-radius:12px}
+  .item .dot{width:10px; height:10px; border-radius:999px; background:#7aa0ff}
+  .item.found{opacity:.6}
+  .item.found .dot{background:var(--good)}
+  .item .name{font-weight:700}
+  .hint{font-size:12px; color:var(--muted)}
+  .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:#0e152b; border:1px solid #2a3869; padding:10px 14px; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.35); z-index:10}
+  .pulse{animation:pulse 1s ease-out 4}
+  @keyframes pulse{ 0%{ filter:drop-shadow(0 0 0px #fff) } 50%{ filter:drop-shadow(0 0 8px #fff) } 100%{ filter:drop-shadow(0 0 0px #fff) } }
+  .target{outline:2px dashed #fff; outline-offset:2px; border-radius:6px}
+  .zoomTips{position:absolute; right:10px; top:10px; font-size:12px; color:#cfe2ff; background:rgba(0,0,0,.35); padding:6px 10px; border-radius:8px; border:1px solid #2a3869}
+  @media(max-width:1020px){ .wrap{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Hidden‑Object Game — June‑style</h1>
+      <div class="sub">Find all the listed objects in each scene. Zoom with mouse‑wheel / pinch, drag to pan. Use a hint if stuck (costs points).</div>
+    </div>
+    <div class="controls">
+      <button id="btnNew">New Game</button>
+      <button id="btnHint">Hint (‑50)</button>
+      <button id="btnResetView">Reset View</button>
+      <span class="pill">Difficulty
+        <select id="selDiff" style="margin-left:8px; background:transparent; border:none; color:var(--ink)">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </span>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel sceneWrap">
+      <div class="hud">
+        <span class="badge">Scene <span id="hudScene">1</span>/3</span>
+        <span class="badge">Found <span id="hudFound">0</span>/<span id="hudTotal">0</span></span>
+        <span class="badge">Score <span id="hudScore">0</span></span>
+        <span class="badge">Time <span id="hudTime">0:00</span></span>
+      </div>
+      <div id="viewport" class="scene" tabindex="0" aria-label="Hidden object scene">
+        <!-- SVG scene inserted here -->
+        <div class="zoomTips">Scroll/Pinch to Zoom • Drag to Pan</div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h3 style="margin:.2rem 0 .6rem 0">Find These</h3>
+      <div id="list" class="list"></div>
+      <div style="height:10px"></div>
+      <h3 style="margin:.2rem 0 .6rem 0">Log</h3>
+      <div id="log" style="height:220px; overflow:auto; border:1px solid #243059; border-radius:12px; padding:10px; background:#0a1022; font-size:12px"></div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" style="display:none"></div>
+
+<script>
+/******************** Utility ********************/
+const $ = sel => document.querySelector(sel);
+const log = (s)=>{ const el=$('#log'); el.innerHTML = `<div>${new Date().toLocaleTimeString()} — ${s}</div>` + el.innerHTML; };
+const clamp=(v,a,b)=> Math.max(a, Math.min(b,v));
+function fmtTime(s){ const m=Math.floor(s/60), ss=Math.floor(s%60); return `${m}:${ss.toString().padStart(2,'0')}`; }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=> t.style.display='none', 1400); }
+
+/******************** Game Data ********************/
+// We procedurally place vector icons into a stylized room SVG so everything is single‑file.
+// Each scene uses a different seed and palette; positions are deterministic per seed.
+const SCENES = [
+  { name:'Study', seed: 101, palette:['#f2d4b7','#d2b48c','#8b5e3c','#364153'], items:['pocket watch','feather','glasses','key','crown','violin','butterfly','compass'] },
+  { name:'Parlor', seed: 202, palette:['#d9e0ff','#b0c0ff','#8892bf','#2f3a66'], items:['teapot','cat','rose','mask','pipe','hourglass','book','umbrella'] },
+  { name:'Garden', seed: 303, palette:['#cfead1','#9bd3a8','#5aa879','#2c5240'], items:['bird','watering can','lantern','apple','shoe','ladder','bow','scissors'] },
+];
+
+/******************** RNG ********************/
+function mulberry32(a){ return function(){ var t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; } }
+
+/******************** Scene Builder (SVG) ********************/
+function buildScene(seed, palette, items){
+  const rnd = mulberry32(seed);
+  const W=1600, H=1000; // internal canvas
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  svg.setAttribute('width','100%'); svg.setAttribute('height','100%');
+  svg.style.background = palette[0];
+
+  // Background walls/floor
+  const rect = (x,y,w,h,fill)=>{ const r=document.createElementNS(svgNS,'rect'); r.setAttribute('x',x); r.setAttribute('y',y); r.setAttribute('width',w); r.setAttribute('height',h); r.setAttribute('fill',fill); svg.appendChild(r); return r; };
+  rect(0,0,W,H*0.6,palette[1]);
+  rect(0,H*0.6,W,H*0.4,palette[2]);
+
+  // Furniture blocks for clutter
+  for(let i=0;i<12;i++){
+    const x=rnd()*W*0.9, y=H*0.2 + rnd()*H*0.6, w=80 + rnd()*220, h=30 + rnd()*120;
+    const g=document.createElementNS(svgNS,'g');
+    const r=rect(x,y,w,h, i%3? palette[3]: palette[2]); r.setAttribute('rx',6);
+    g.appendChild(r); svg.appendChild(g);
+  }
+
+  // Icon draw helpers (very simple silhouettes)
+  const icons = {
+    'pocket watch': (x,y)=>{ const g=el('g'); c(g,x,y,18,'#f6e7b2'); line(g,x,y-18,x,y+18); small(g,x-6,y+8); small(g,x+6,y+8); ring(g,x,y-26); return g; },
+    feather: (x,y)=>{ const g=el('g'); path(g,`M ${x-4} ${y} C ${x+10} ${y-40}, ${x+30} ${y-10}, ${x+36} ${y-26}`, '#fff',2,'none'); path(g,`M ${x-2} ${y-4} Q ${x+14} ${y-14} ${x+28} ${y-22}`,'#fff',1.6,'none'); return g; },
+    glasses: (x,y)=>{ const g=el('g'); ring(g,x-16,y,10); ring(g,x+16,y,10); line(g,x-6,y,x+6,y); return g; },
+    key: (x,y)=>{ const g=el('g'); ring(g,x-14,y,8); rect2(g,x-6,y-2,26,4); rect2(g,x+12,y-4,6,4); rect2(g,x+20,y-4,6,4); return g; },
+    crown: (x,y)=>{ const g=el('g'); path(g,`M ${x-22} ${y} L ${x-14} ${y-18} L ${x-6} ${y} L ${x+2} ${y-18} L ${x+10} ${y} L ${x+18} ${y-18} L ${x+26} ${y} Z`,'#ffd54a',1,'#ffd54a'); return g; },
+    violin: (x,y)=>{ const g=el('g'); rect2(g,x-16,y-6,32,12,'#8b5e3c'); c(g,x+12,y,8,'#5c3a24'); line(g,x-20,y-8,x+24,y-8); line(g,x-20,y+8,x+24,y+8); return g; },
+    butterfly: (x,y)=>{ const g=el('g'); c(g,x-8,y,10,'#e57373'); c(g,x+8,y,10,'#ba68c8'); rect2(g,x-2,y-2,4,4,'#222'); return g; },
+    compass: (x,y)=>{ const g=el('g'); ring(g,x,y,14); path(g,`M ${x} ${y-10} L ${x+4} ${y+8} L ${x-4} ${y+8} Z`,'#fff',1,'#fff'); return g; },
+
+    teapot: (x,y)=>{ const g=el('g'); c(g,x,y,16,'#cfe'); rect2(g,x-8,y-20,16,8,'#cfe'); line(g,x+12,y-6,x+22,y-12); line(g,x-14,y-4,x-26,y-2); return g; },
+    cat: (x,y)=>{ const g=el('g'); c(g,x,y,10,'#333'); c(g,x,y-12,7,'#333'); tri(g,x-8,y-18,x-2,y-26,x-2,y-16); tri(g,x+8,y-18,x+2,y-26,x+2,y-16); return g; },
+    rose: (x,y)=>{ const g=el('g'); c(g,x,y,8,'#e57373'); rect2(g,x-1,y,2,14,'#4caf50'); return g; },
+    mask: (x,y)=>{ const g=el('g'); rect2(g,x-18,y-6,36,12,'#eee'); c(g,x-8,y,3,'#0b1020'); c(g,x+8,y,3,'#0b1020'); return g; },
+    pipe: (x,y)=>{ const g=el('g'); rect2(g,x-16,y,20,6,'#5c3a24'); c(g,x+10,y+2,8,'#8b5e3c'); return g; },
+    hourglass: (x,y)=>{ const g=el('g'); rect2(g,x-8,y-18,16,4,'#ddd'); rect2(g,x-8,y+14,16,4,'#ddd'); path(g,`M ${x-8} ${y-14} L ${x+8} ${y+10} L ${x-8} ${y+10} Z`,'#cfe',1,'#cfe'); return g; },
+    book: (x,y)=>{ const g=el('g'); rect2(g,x-18,y-12,36,24,'#8892bf'); line(g,x,y-12,x,y+12); return g; },
+    umbrella: (x,y)=>{ const g=el('g'); path(g,`M ${x-24} ${y} Q ${x} ${y-18} ${x+24} ${y}`,'#a78bfa',2); line(g,x,y-18,x,y+18); return g; },
+
+    bird: (x,y)=>{ const g=el('g'); path(g,`M ${x-14} ${y} Q ${x} ${y-10} ${x+14} ${y}`,'#000',2); c(g,x,y-4,4,'#222'); return g; },
+    'watering can': (x,y)=>{ const g=el('g'); rect2(g,x-10,y-10,20,16,'#9bd3a8'); line(g,x+10,y-6,x+22,y-12); rect2(g,x-6,y-20,12,8,'#9bd3a8'); return g; },
+    lantern: (x,y)=>{ const g=el('g'); rect2(g,x-8,y-12,16,24,'#ffd54a'); ring(g,x,y-14,6); return g; },
+    apple: (x,y)=>{ const g=el('g'); c(g,x,y,9,'#e53935'); path(g,`M ${x} ${y-12} Q ${x+4} ${y-22} ${x+8} ${y-12}`,'#4caf50',2,'none'); return g; },
+    shoe: (x,y)=>{ const g=el('g'); rect2(g,x-14,y,28,8,'#795548'); rect2(g,x-16,y-4,10,6,'#6d4c41'); return g; },
+    ladder: (x,y)=>{ const g=el('g'); line(g,x-10,y-16,x-10,y+16); line(g,x+10,y-16,x+10,y+16); for(let i=-12;i<=12;i+=6) line(g,x-10,y+i,x+10,y+i); return g; },
+    bow: (x,y)=>{ const g=el('g'); path(g,`M ${x-16} ${y} Q ${x} ${y-10} ${x+16} ${y}`,'#c2185b',4); return g; },
+    scissors: (x,y)=>{ const g=el('g'); ring(g,x-6,y,5); ring(g,x+6,y,5); line(g,x-2,y-2,x+12,y+10); line(g,x-2,y+2,x+12,y-10); return g; },
+  };
+
+  // Helper creators
+  function el(name){ return document.createElementNS(svgNS,name); }
+  function c(g,x,y,r,fill='#fff'){ const s=el('circle'); s.setAttribute('cx',x); s.setAttribute('cy',y); s.setAttribute('r',r); s.setAttribute('fill',fill||'#fff'); g.appendChild(s); svg.appendChild(g); return g; }
+  function rect2(g,x,y,w,h,fill='#eee'){ const r=el('rect'); r.setAttribute('x',x-w/2); r.setAttribute('y',y-h/2); r.setAttribute('width',w); r.setAttribute('height',h); r.setAttribute('fill',fill); g.appendChild(r); svg.appendChild(g); return g; }
+  function line(g,x1,y1,x2,y2,stroke='#222',w=2){ const l=el('line'); l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2); l.setAttribute('stroke',stroke); l.setAttribute('stroke-width',w); g.appendChild(l); svg.appendChild(g); return g; }
+  function path(g,d,stroke='#222',w=2,fill='none'){ const p=el('path'); p.setAttribute('d',d); p.setAttribute('stroke',stroke); p.setAttribute('stroke-width',w); p.setAttribute('fill',fill); g.appendChild(p); svg.appendChild(g); return g; }
+  function ring(g,x,y,r){ const a=el('circle'); a.setAttribute('cx',x); a.setAttribute('cy',y); a.setAttribute('r',r); a.setAttribute('fill','none'); a.setAttribute('stroke','#eee'); a.setAttribute('stroke-width','2'); g.appendChild(a); svg.appendChild(g); return g; }
+  function tri(g,x1,y1,x2,y2,x3,y3){ const p=el('polygon'); p.setAttribute('points',`${x1},${y1} ${x2},${y2} ${x3},${y3}`); p.setAttribute('fill','#333'); g.appendChild(p); svg.appendChild(g); return g; }
+
+  // Place items in random but plausible spots
+  const placed=[];
+  for (const name of items){
+    const gx = 100 + rnd()*(W-200);
+    const gy = 140 + rnd()*(H-240);
+    const draw = icons[name];
+    const g = draw(gx, gy); g.dataset.name = name; g.style.cursor='pointer'; g.style.opacity='0.95';
+    g.addEventListener('click',()=> onPick(name, g));
+    placed.push({name, el:g});
+  }
+
+  return { svg, placed, size:[W,H] };
+}
+
+/******************** Game State ********************/
+let state = { sceneIndex:0, found:new Set(), total:0, score:0, start:0, time:0, timer:null, zoom:1, panX:0, panY:0 };
+
+function startGame(){ state.sceneIndex=0; state.score=0; nextScene(); }
+function nextScene(){ state.found.clear?.(); state.found=new Set(); loadScene(SCENES[state.sceneIndex]); }
+
+let current = { svg:null, placed:[], size:[1600,1000] };
+
+function loadScene(def){
+  $('#viewport').innerHTML = '<div class="zoomTips">Scroll/Pinch to Zoom • Drag to Pan</div>';
+  current = buildScene(def.seed, def.palette, def.items);
+  $('#viewport').appendChild(current.svg);
+  state.total = current.placed.length; state.start = performance.now(); state.time=0; clearInterval(state.timer);
+  state.timer = setInterval(()=>{ state.time = (performance.now() - state.start)/1000; updateHUD(); }, 200);
+  buildList(def.items);
+  state.zoom=1; state.panX=0; state.panY=0; applyView();
+  updateHUD();
+  $('#hudScene').textContent = (state.sceneIndex+1);
+}
+
+function buildList(items){
+  const el=$('#list'); el.innerHTML='';
+  for (const name of items){ const row=document.createElement('div'); row.className='item'; row.dataset.name=name; row.innerHTML=`<div class="dot"></div><div class="name">${name}</div><div class="hint"></div>`; el.appendChild(row); }
+}
+
+function updateHUD(){ $('#hudFound').textContent = state.found.size; $('#hudTotal').textContent = state.total; $('#hudScore').textContent = state.score; $('#hudTime').textContent = fmtTime(state.time); }
+
+function onPick(name, el){ if (state.found.has(name)) return; state.found.add(name); el.classList.add('pulse'); el.style.opacity='0.6';
+  state.score += 100; const row = document.querySelector(`.item[data-name="${name}"]`); if (row){ row.classList.add('found'); row.querySelector('.hint').textContent='✓'; }
+  log(`Found: ${name} (+100)`); updateHUD();
+  if (state.found.size === state.total){ clearInterval(state.timer); toast(`Scene complete! +${Math.max(0,500 - Math.floor(state.time))}`); state.score += Math.max(0,500 - Math.floor(state.time));
+    setTimeout(()=>{ state.sceneIndex = (state.sceneIndex+1)%SCENES.length; nextScene(); }, 900);
+  }
+}
+
+/******************** Zoom & Pan ********************/
+const vp = $('#viewport');
+vp.addEventListener('wheel', (e)=>{ e.preventDefault(); const rect=vp.getBoundingClientRect(); const mx = (e.clientX-rect.left)/rect.width; const my=(e.clientY-rect.top)/rect.height; const old=state.zoom; state.zoom = clamp(state.zoom * (e.deltaY<0?1.1:0.9), 0.6, 3.0); // zoom
+  // keep mouse anchor
+  state.panX = clamp(state.panX + (mx - mx*state.zoom/old), -0.6, 0.6);
+  state.panY = clamp(state.panY + (my - my*state.zoom/old), -0.6, 0.6);
+  applyView(); }, {passive:false});
+
+let dragging=false, lastX=0, lastY=0;
+vp.addEventListener('mousedown', (e)=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
+window.addEventListener('mouseup', ()=> dragging=false);
+window.addEventListener('mousemove', (e)=>{ if (!dragging) return; const rect=vp.getBoundingClientRect(); const dx=(e.clientX-lastX)/rect.width; const dy=(e.clientY-lastY)/rect.height; lastX=e.clientX; lastY=e.clientY; state.panX = clamp(state.panX + dx, -0.8, 0.8); state.panY = clamp(state.panY + dy, -0.8, 0.8); applyView(); });
+
+function applyView(){ const s = current.svg; if (!s) return; s.style.transformOrigin='0 0'; s.style.transform = `translate(${state.panX*10}%, ${state.panY*10}%) scale(${state.zoom})`; }
+$('#btnResetView').onclick = ()=>{ state.zoom=1; state.panX=0; state.panY=0; applyView(); };
+
+/******************** Hints ********************/
+$('#btnHint').onclick = ()=>{
+  const remaining = current.placed.filter(p=> !state.found.has(p.name));
+  if (remaining.length===0) return;
+  const choice = remaining[Math.floor(Math.random()*remaining.length)];
+  state.score = Math.max(0, state.score - 50); updateHUD();
+  choice.el.classList.add('target','pulse'); setTimeout(()=> choice.el.classList.remove('target'), 1800);
+  const row = document.querySelector(`.item[data-name="${choice.name}"] .hint`); if (row) row.textContent = '👀';
+  log(`Hint used: −50 (highlighting "${choice.name}")`);
+};
+
+/******************** Difficulty ********************/
+$('#selDiff').addEventListener('change', ()=>{
+  const v=$('#selDiff').value;
+  // Normal is baseline; easy gives more reward and bigger icons; hard less reward and smaller icons
+  document.documentElement.style.setProperty('--rewardScale', v==='easy'?1.2: v==='hard'?0.8:1);
+});
+
+/******************** New Game ********************/
+$('#btnNew').onclick = ()=> startGame();
+
+// Boot
+startGame();
+</script>
+</body>
+</html>
