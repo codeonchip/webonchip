@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Function Block Editor — Web</title>
+<style>
+  :root{
+    --bg:#f8f9fb; --panel:#ffffff; --ink:#111; --muted:#666; --line:#d0d7de; --accent:#0b6bcb; --accent2:#8b5cf6; --bad:#c62828;
+  }
+  html,body{height:100%}
+  body{margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg); color:var(--ink)}
+  header{display:flex; gap:12px; align-items:center; padding:12px 16px; background:#f0f2f6; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10}
+  h1{margin:0; font-size:clamp(18px,2.6vw,28px)}
+  .sub{color:var(--muted); font-size:12px}
+  .wrap{display:grid; grid-template-columns: 280px 1fr 320px; gap:12px; padding:12px}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; box-shadow:0 2px 10px rgba(0,0,0,.04)}
+  .tools{display:grid; grid-template-columns: repeat(2, 1fr); gap:8px}
+  .btn{padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; text-align:center; font-weight:600}
+  .btn:hover{background:#f6f8fa}
+  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .kbd{font-size:12px; background:#f6f8fa; border:1px solid var(--line); border-radius:6px; padding:2px 6px}
+  label{display:block; font-size:12px; color:var(--muted); margin:4px 0}
+  input,select{width:100%; box-sizing:border-box; padding:7px 8px; border:1px solid var(--line); border-radius:8px; background:#fff}
+  #canvasWrap{position:relative; overflow:hidden; border-radius:10px}
+  svg{background:#fff; border:1px solid var(--line); border-radius:10px; width:100%; height:70vh}
+  .node rect{fill:#ffffff; stroke:#aeb8c2; stroke-width:1.2px; rx:10;}
+  .node.selected rect{stroke:var(--accent); stroke-width:2px;}
+  .node .title{font-weight:700; font-size:12px; fill:#111}
+  .port{cursor:pointer}
+  .port circle{fill:#fff; stroke:#8fa3b6;}
+  .port.out circle{stroke:#3b82f6}
+  .port.in circle{stroke:#0b6bcb}
+  .port text{font-size:10px; fill:#666}
+  .wire{stroke:#0b6bcb; stroke-width:2.2px; fill:none}
+  .wire.ghost{stroke-dasharray:4 4; opacity:.7}
+  .scope{font-size:11px; fill:#111}
+  .footer{display:flex; justify-content:space-between; font-size:12px; color:#666; margin-top:6px}
+  .danger{color:#fff; background:var(--bad); border-color:#b71c1c}
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Function Block Editor</h1>
+      <div class="sub">Drag blocks onto the canvas, connect ports, and press Run. <span class="kbd">Del</span> deletes, <span class="kbd">Ctrl/⌘+Z</span> undo, <span class="kbd">Space</span> pan.</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Left: Block Library -->
+    <aside class="panel">
+      <h3 style="margin:.2rem 0 .6rem 0">Blocks</h3>
+      <div id="lib" class="tools">
+        <div class="btn" data-type="Const">Const</div>
+        <div class="btn" data-type="Add">Add</div>
+        <div class="btn" data-type="Mul">Multiply</div>
+        <div class="btn" data-type="Gain">Gain</div>
+        <div class="btn" data-type="Sin">Sine</div>
+        <div class="btn" data-type="Integrate">Integrate</div>
+        <div class="btn" data-type="Time">Time</div>
+        <div class="btn" data-type="Scope">Scope</div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnRun" class="btn">Run ▶</button>
+        <button id="btnStep" class="btn">Step ▷</button>
+        <button id="btnStop" class="btn">Stop ⏹</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label>Δt (ms)</label>
+        <input id="dt" type="number" value="50" min="1" step="1"/>
+      </div>
+      <div class="sec" style="margin-top:10px">
+        <h3 style="margin:.2rem 0 .4rem 0">File</h3>
+        <div class="row">
+          <button id="btnSave" class="btn">Download JSON</button>
+          <label class="btn" style="margin:0">
+            Load JSON <input id="file" type="file" accept="application/json" style="display:none"/>
+          </label>
+          <button id="btnClear" class="btn danger">Clear</button>
+        </div>
+      </div>
+      <div class="sec" style="margin-top:10px; font-size:12px; color:#666">
+        Tip: Hold <span class="kbd">Shift</span> when dragging to duplicate a node.
+      </div>
+    </aside>
+
+    <!-- Middle: Canvas -->
+    <section id="canvasWrap" class="panel">
+      <svg id="svg" viewBox="0 0 1600 900" tabindex="0" aria-label="Function block canvas"></svg>
+      <div class="footer"><span id="status">Ready.</span><span>Zoom: <span id="zoomOut">100%</span></span></div>
+    </section>
+
+    <!-- Right: Inspector -->
+    <aside class="panel">
+      <h3 style="margin:.2rem 0 .6rem 0">Inspector</h3>
+      <div id="inspector">Select a node.</div>
+      <h3 style="margin:10px 0 6px 0">Console</h3>
+      <div id="log" style="height:300px; overflow:auto; border:1px solid var(--line); border-radius:8px; padding:8px; background:#fafbfc; font-size:12px"></div>
+    </aside>
+  </main>
+
+<script>
+/* ====================== Model ====================== */
+const svg = document.getElementById('svg');
+const NS = 'http://www.w3.org/2000/svg';
+let zoom = 1, viewX=0, viewY=0; // pan/zoom in viewBox space
+let nodes = []; // {id,type,x,y,params:{},state:{},w,h}
+let conns = []; // {from:{n,p}, to:{n,p}}
+let sel = null; let wireStart = null; let running=null; let undo=[];
+const log = (s)=>{ const el=document.getElementById('log'); el.innerHTML = `<div>${new Date().toLocaleTimeString()} — ${s}</div>` + el.innerHTML; };
+const status = (s)=> document.getElementById('status').textContent = s;
+
+const BLOCKS = {
+  Const:  { ins:[], outs:['out'], defaults:{ value:1 }, title:'Const' },
+  Time:   { ins:[], outs:['t'], defaults:{}, title:'Time' },
+  Add:    { ins:['a','b'], outs:['out'], defaults:{}, title:'Add' },
+  Mul:    { ins:['a','b'], outs:['out'], defaults:{}, title:'Multiply' },
+  Gain:   { ins:['in'], outs:['out'], defaults:{ k:2 }, title:'Gain' },
+  Sin:    { ins:['x'], outs:['sin'], defaults:{ amp:1, freq:1 }, title:'Sine' },
+  Integrate:{ ins:['in'], outs:['out'], defaults:{}, title:'Integrate' },
+  Scope:  { ins:['in'], outs:[], defaults:{ samples:20 }, title:'Scope' },
+};
+
+let idSeq=1;
+function addNode(type, x=200, y=120){
+  const def = BLOCKS[type]; if (!def) return;
+  const w = 130, h = Math.max(60, 22 + Math.max(def.ins.length, def.outs.length)*18);
+  const node = { id:idSeq++, type, x, y, w, h, params: JSON.parse(JSON.stringify(def.defaults||{})), state:{} };
+  nodes.push(node); pushUndo(); render(); select(node.id); return node;
+}
+
+function removeNode(id){
+  nodes = nodes.filter(n=> n.id!==id);
+  conns = conns.filter(c=> c.from.n!==id && c.to.n!==id);
+  if (sel && sel.id===id) sel=null; pushUndo(); render(); }
+
+function connect(from, to){ if (!from || !to) return; if (from.n===to.n) return; // no self
+  // prevent duplicate connections to same input
+  conns = conns.filter(c=> !(c.to.n===to.n && c.to.p===to.p));
+  conns.push({ from, to }); pushUndo(); render(); }
+
+function pushUndo(){ undo.push(JSON.stringify({nodes, conns})); if (undo.length>40) undo.shift(); }
+function undoPop(){ if (!undo.length) return; const s=undo.pop(); try{ const obj=JSON.parse(s); nodes=clone(obj.nodes); conns=clone(obj.conns); render(); }catch{} }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+/* ====================== Rendering ====================== */
+function render(){
+  svg.innerHTML='';
+  svg.setAttribute('viewBox',`${viewX} ${viewY} ${1600/zoom} ${900/zoom}`);
+  document.getElementById('zoomOut').textContent = Math.round(zoom*100)+'%';
+
+  // wires
+  for (const c of conns){ const a = portPos(c.from.n, c.from.p, 'out'); const b = portPos(c.to.n, c.to.p, 'in'); svg.appendChild(wirePath(a,b)); }
+  if (wireStart){ const a = portPos(wireStart.n, wireStart.p, 'out'); const b = mousePos; svg.appendChild(wirePath(a,b,true)); }
+
+  // nodes
+  for (const n of nodes){ svg.appendChild(nodeGroup(n)); }
+}
+
+function nodeGroup(n){
+  const g = el('g'); g.classList.add('node'); if (sel && sel.id===n.id) g.classList.add('selected'); g.setAttribute('data-id', n.id);
+  const r = rect(n.x, n.y, n.w, n.h);
+  const title = txt(n.x+10, n.y+18, BLOCKS[n.type].title, 'title');
+  g.appendChild(r); g.appendChild(title);
+  // ports
+  const ins = BLOCKS[n.type].ins || []; const outs = BLOCKS[n.type].outs || [];
+  for (let i=0;i<ins.length;i++){ g.appendChild(port(n, 'in', ins[i], i, ins.length)); }
+  for (let i=0;i<outs.length;i++){ g.appendChild(port(n, 'out', outs[i], i, outs.length)); }
+  // scope inline drawing (simple sparkline)
+  if (n.type==='Scope' && Array.isArray(n.state.buf)){
+    const x0=n.x+10, y0=n.y+n.h-18, w=n.w-20, h=28; const p=el('path'); p.setAttribute('stroke','#333'); p.setAttribute('fill','none');
+    const buf=n.state.buf; if (buf.length>1){ let d=`M ${x0} ${y0-h/2}`; const min=Math.min(...buf), max=Math.max(...buf)||1; for (let i=0;i<buf.length;i++){ const t=i/(buf.length-1); const vx = x0 + t*w; const vy = y0 - h*( (buf[i]-min)/((max-min)||1) - .5 ); d+=` L ${vx} ${vy}`; } p.setAttribute('d',d); p.setAttribute('stroke','#0b6bcb'); }
+    g.appendChild(p); g.appendChild(txt(x0, y0-h-2, 'Scope', 'scope'));
+  }
+  // drag
+  g.addEventListener('mousedown', (e)=> startDragNode(e, n));
+  g.addEventListener('dblclick', ()=> select(n.id, true));
+  return g;
+}
+
+function rect(x,y,w,h){ const r=el('rect'); r.setAttribute('x',x); r.setAttribute('y',y); r.setAttribute('width',w); r.setAttribute('height',h); return r; }
+function txt(x,y,s,cls){ const t=el('text'); t.setAttribute('x',x); t.setAttribute('y',y); if (cls) t.setAttribute('class',cls); t.textContent=s; return t; }
+function el(name){ return document.createElementNS(NS,name); }
+
+function port(n, kind, name, idx, total){
+  const g=el('g'); g.classList.add('port', kind); const x = kind==='in'? n.x-6 : n.x+n.w+6; const y = n.y + 30 + idx*(n.h-40)/Math.max(1,total);
+  const c=el('circle'); c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r',6); g.appendChild(c);
+  const t=txt(kind==='in'? x-8: x+8, y+3, name); t.setAttribute('text-anchor', kind==='in'? 'end' : 'start'); g.appendChild(t);
+  g.dataset.node=n.id; g.dataset.port=name; g.dataset.kind=kind;
+  if (kind==='out') g.addEventListener('mousedown', ()=> { wireStart={ n:n.id, p:name }; });
+  if (kind==='in') g.addEventListener('mousedown', ()=> { if (wireStart){ connect(wireStart, {n:n.id, p:name}); wireStart=null; } });
+  return g;
+}
+
+function wirePath(a,b,ghost=false){ const p=el('path'); const dx=Math.max(30, Math.abs(b.x-a.x)/2); const d=`M ${a.x} ${a.y} C ${a.x+dx} ${a.y}, ${b.x-dx} ${b.y}, ${b.x} ${b.y}`; p.setAttribute('d',d); p.setAttribute('class','wire'+(ghost?' ghost':'')); return p; }
+
+function portPos(nodeId, portName, kind){ const n = nodes.find(n=>n.id===nodeId); const def=BLOCKS[n.type]; const arr = kind==='in'? def.ins: def.outs; const idx = arr.indexOf(portName); const total=arr.length; const x = kind==='in'? n.x-6 : n.x+n.w+6; const y = n.y + 30 + idx*(n.h-40)/Math.max(1,total); return {x,y}; }
+
+/* ====================== Interactions ====================== */
+// Library drag-create
+const lib = document.getElementById('lib');
+for (const b of lib.children){ b.addEventListener('click', ()=>{ addNode(b.dataset.type, 120+Math.random()*200, 120+Math.random()*200); }); }
+
+// Canvas background => pan/zoom/select none
+let isPanning=false; let panStart={x:0,y:0}; let mousePos={x:0,y:0};
+svg.addEventListener('mousedown', (e)=>{ if (e.target===svg || e.code==='Space'){ isPanning=true; panStart={mx:e.clientX, my:e.clientY, vx:viewX, vy:viewY}; sel=null; render(); } });
+window.addEventListener('mousemove', (e)=>{ const pt = clientToSvg(e.clientX, e.clientY); mousePos=pt; if (isPanning){ const dx=(panStart.mx-e.clientX)/ (1600/zoom); const dy=(panStart.my-e.clientY)/ (900/zoom); viewX = panStart.vx + dx; viewY = panStart.vy + dy; render(); } else if (wireStart){ render(); } });
+window.addEventListener('mouseup', ()=>{ isPanning=false; wireStart=null; });
+svg.addEventListener('wheel', (e)=>{ e.preventDefault(); const factor = e.deltaY<0?1.1:0.9; const before = clientToSvg(e.clientX,e.clientY); zoom = Math.max(0.4, Math.min(2.5, zoom*factor)); const after = clientToSvg(e.clientX,e.clientY); viewX += before.x - after.x; viewY += before.y - after.y; render(); }, {passive:false});
+
+function clientToSvg(cx,cy){ const rect=svg.getBoundingClientRect(); const x = viewX + (cx-rect.left)/rect.width * (1600/zoom); const y = viewY + (cy-rect.top)/rect.height * (900/zoom); return {x,y}; }
+
+// Node dragging
+let drag={active:false, node:null, dx:0, dy:0, dup:false};
+function startDragNode(e, n){ const pt=clientToSvg(e.clientX,e.clientY); drag={active:true,node:n, dx:pt.x-n.x, dy:pt.y-n.y, dup:e.shiftKey}; select(n.id); }
+window.addEventListener('mousemove', (e)=>{ if (!drag.active) return; const pt=clientToSvg(e.clientX,e.clientY); let nx=pt.x-drag.dx, ny=pt.y-drag.dy; if (drag.dup && !drag.cloned){ n2=addNode(drag.node.type, drag.node.x+20, drag.node.y+20); n2.params = clone(drag.node.params); drag.node=n2; drag.cloned=true; }
+  drag.node.x=nx; drag.node.y=ny; render(); });
+window.addEventListener('mouseup', ()=>{ drag={active:false}; });
+
+// Selection + inspector
+function select(id, focus=false){ sel = nodes.find(n=>n.id===id) || null; render(); showInspector(); if (focus && sel){ status(sel.type+" #"+sel.id); } }
+
+function showInspector(){
+  const el=document.getElementById('inspector'); if (!sel){ el.textContent='Select a node.'; return; }
+  const def=BLOCKS[sel.type]; let html = `<div class='row' style='justify-content:space-between'><b>${def.title}</b><span style='color:#666'>#${sel.id}</span></div>`;
+  for (const [k,v] of Object.entries(sel.params||{})){
+    html += `<label>${k}</label><input data-k='${k}' value='${v}' />`;
+  }
+  html += `<div class='row' style='margin-top:8px'><button id='del' class='btn danger'>Delete</button></div>`;
+  el.innerHTML = html;
+  for (const inp of el.querySelectorAll('input[data-k]')){ inp.addEventListener('input', (e)=>{ const k=e.target.dataset.k; const val=parseFloat(e.target.value); sel.params[k] = isNaN(val)? e.target.value : val; }); }
+  el.querySelector('#del').onclick = ()=> removeNode(sel.id);
+}
+
+// Keyboard
+window.addEventListener('keydown', (e)=>{
+  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); undoPop(); }
+  if (e.key==='Delete' && sel){ removeNode(sel.id); }
+});
+
+/* ====================== Execution ====================== */
+function step(dt){ // compute DAG; naive scheduling
+  // Build mapping from outputs
+  const values = new Map();
+  const indeg = new Map(nodes.map(n=>[n.id,0]));
+  for (const c of conns){ indeg.set(c.to.n, (indeg.get(c.to.n)||0)+1); }
+  // Kahn's topological-like order (but we'll iterate many times to propagate)
+  const order = nodes.map(n=>n.id);
+
+  // supply inputs per node
+  const inputVals = new Map(nodes.map(n=>[n.id, {}]));
+  for (const c of conns){ const fromKey = `${c.from.n}:${c.from.p}`; const outVal = values.get(fromKey); /* may be undefined now */ }
+
+  // Evaluate nodes repeatedly (limited) for simple feed-forward; integrator keeps state
+  for (const n of nodes){ n.err=null; }
+  for (const id of order){
+    const n = nodes.find(x=>x.id===id); const inputs = {}; // gather current inputs from values
+    for (const c of conns.filter(cc=>cc.to.n===n.id)){
+      const v = values.get(`${c.from.n}:${c.from.p}`); if (v!==undefined) inputs[c.to.p]=v;
+    }
+    try{
+      const outs = evalNode(n, inputs, dt);
+      for (const [k,v] of Object.entries(outs||{})) values.set(`${n.id}:${k}`, v);
+    }catch(err){ n.err = err.message||String(err); }
+  }
+}
+
+function evalNode(n, I, dt){ const p=n.params; switch(n.type){
+  case 'Const': return { out: Number(p.value)||0 };
+  case 'Time':  n.state.t = (n.state.t||0) + dt/1000; return { t: n.state.t };
+  case 'Add':   return { out:(Number(I.a)||0) + (Number(I.b)||0) };
+  case 'Mul':   return { out:(Number(I.a)||0) * (Number(I.b)||0) };
+  case 'Gain':  return { out:(Number(I.in)||0) * (Number(p.k)||0) };
+  case 'Sin':   { const x = Number(I.x)||0; const a=Number(p.amp)||1, f=Number(p.freq)||1; return { sin: a*Math.sin(2*Math.PI*f*x) }; }
+  case 'Integrate': { const x = Number(I.in)||0; const y = (n.state.y||0) + x*(dt/1000); n.state.y=y; return { out:y }; }
+  case 'Scope': { const v = Number(I.in)||0; if (!n.state.buf) n.state.buf=[]; n.state.buf.push(v); if (n.state.buf.length>(n.params.samples||20)) n.state.buf.shift(); return {}; }
+  default: return {};
+  }
+}
+
+let timer=null; function run(){ const dt = Number(document.getElementById('dt').value)||50; if (timer) return; timer = setInterval(()=>{ step(dt); render(); }, dt); status('Running…'); }
+function stop(){ clearInterval(timer); timer=null; status('Stopped.'); }
+function once(){ const dt = Number(document.getElementById('dt').value)||50; step(dt); render(); status('Stepped.'); }
+
+document.getElementById('btnRun').onclick = run;
+document.getElementById('btnStop').onclick = stop;
+document.getElementById('btnStep').onclick = once;
+
+/* ====================== Save/Load ====================== */
+document.getElementById('btnSave').onclick = ()=>{ const data={nodes, conns}; const blob=new Blob([JSON.stringify(data)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='function_blocks.json'; a.click(); };
+document.getElementById('file').onchange = (e)=>{ const f=e.target.files[0]; if (!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); nodes=d.nodes||[]; conns=d.conns||[]; render(); }catch{ alert('Invalid JSON'); } }; r.readAsText(f); };
+document.getElementById('btnClear').onclick = ()=>{ nodes=[]; conns=[]; render(); };
+
+/* ====================== Demo Setup ====================== */
+addNode('Const', 160, 120).params.value=2;
+addNode('Const', 160, 200).params.value=3;
+const add = addNode('Add', 420, 150);
+connect({n:1,p:'out'}, {n:add.id,p:'a'});
+connect({n:2,p:'out'}, {n:add.id,p:'b'});
+const gain = addNode('Gain', 620, 150); gain.params.k=5; connect({n:add.id,p:'out'}, {n:gain.id,p:'in'});
+const sc = addNode('Scope', 820, 150); connect({n:gain.id,p:'out'},{n:sc.id,p:'in'});
+render();
+status('Ready. Click block buttons to add nodes; drag to move; click output → input to connect.');
+</script>
+</body>
+</html>
