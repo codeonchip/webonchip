@@ -20,7 +20,7 @@
   .wrap{display:grid; grid-template-columns: 1fr 330px; gap:12px; padding:12px}
   .panel{background:linear-gradient(180deg, #121a2f, #0c142a); border:1px solid #1e2b51; border-radius:16px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.25)}
   .sceneWrap{position:relative; overflow:hidden; border-radius:16px}
-  .scene{width:100%; height:calc(100vh - 200px); min-height:420px; background:#0b132b; display:grid; place-items:center}
+  .scene{width:100%; height:calc(100vh - 200px); min-height:520px; background:#0b132b; display:grid; place-items:center; border:1px solid #26335e}
   .hud{display:flex; gap:10px; flex-wrap:wrap; font-size:13px; margin-bottom:8px}
   .badge{border:1px solid #2a3869; background:#0e152b; padding:6px 10px; border-radius:999px}
   .list{display:grid; gap:6px; grid-template-columns: 1fr}
@@ -188,11 +188,26 @@ function nextScene(){ state.found.clear?.(); state.found=new Set(); loadScene(SC
 let current = { svg:null, placed:[], size:[1600,1000] };
 
 function loadScene(def){
-  $('#viewport').innerHTML = '<div class="zoomTips">Scroll/Pinch to Zoom • Drag to Pan</div>';
-  current = buildScene(def.seed, def.palette, def.items);
-  $('#viewport').appendChild(current.svg);
-  state.total = current.placed.length; state.start = performance.now(); state.time=0; clearInterval(state.timer);
-  state.timer = setInterval(()=>{ state.time = (performance.now() - state.start)/1000; updateHUD(); }, 200);
+  try{
+    const vp = $('#viewport');
+    vp.innerHTML = '<div class="zoomTips">Scroll/Pinch to Zoom • Drag to Pan</div>';
+    current = buildScene(def.seed, def.palette, def.items);
+    current.svg.style.width='100%'; current.svg.style.height='100%';
+    vp.appendChild(current.svg);
+    state.total = current.placed.length; state.start = performance.now(); state.time=0; clearInterval(state.timer);
+    state.timer = setInterval(()=>{ state.time = (performance.now() - state.start)/1000; updateHUD(); }, 200);
+    buildList(def.items);
+    state.zoom=1; state.panX=0; state.panY=0; applyView();
+    updateHUD();
+    $('#hudScene').textContent = (state.sceneIndex+1);
+    log(`Loaded scene: ${def.name}`);
+  }catch(e){
+    console.error(e);
+    log('⚠️ Render error — falling back to placeholder scene');
+    const vp = $('#viewport');
+    vp.innerHTML = '<div style="text-align:center; padding:20px">Placeholder scene loaded.<br/>Please click <b>New Game</b> again.</div>';
+  }
+}, 200);
   buildList(def.items);
   state.zoom=1; state.panX=0; state.panY=0; applyView();
   updateHUD();
