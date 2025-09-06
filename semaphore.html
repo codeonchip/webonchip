@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RTOS Concepts Demo — Tasks, Semaphore, Message Queue</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a2f;
+      --accent: #7dd3fc;
+      --accent2: #a78bfa;
+      --good: #34d399;
+      --warn: #fbbf24;
+      --bad: #fb7185;
+      --muted: #9aa4c0;
+      --text: #e6ecff;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 800px at 20% 0%, #10183a, var(--bg));
+      color: var(--text);
+    }
+    header{
+      padding: 18px 22px; position: sticky; top:0; backdrop-filter: blur(8px);
+      background: linear-gradient(180deg, rgba(16,24,58,.9), rgba(16,24,58,.6)); border-bottom:1px solid #1f2a4d;
+      display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    }
+    h1{font-size: clamp(18px, 2.4vw, 28px); margin:0; letter-spacing:.4px}
+    .sub{color:var(--muted); font-size: 13px}
+    .controls{margin-left:auto; display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+    button, select{
+      background:linear-gradient(180deg,#1a2446,#121a2f); color:var(--text); border:1px solid #243059; padding:8px 12px; border-radius:12px; font-weight:600; cursor:pointer;
+      box-shadow: 0 2px 0 #0b1020 inset, 0 1px 0 #223160;
+    }
+    button:hover{filter:brightness(1.06)}
+    button:active{transform:translateY(1px)}
+    .pill{padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid #2a3869; background:#121a2f}
+    .grid{display:grid; grid-template-columns: 300px 1fr 360px; gap:16px; padding:18px;}
+    .card{background: linear-gradient(180deg, #121a2f, #0e1428); border: 1px solid #1e2b51; border-radius:16px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,.25)}
+    .card h2{margin:.2rem 0 0.6rem 0; font-size:18px}
+    .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .task{padding:12px; border-radius:14px; border:1px solid #243059; background:#0e152b; display:grid; grid-template-columns: 28px 1fr; gap:10px; align-items:center}
+    .task + .task{margin-top:10px}
+    .dot{width:10px; height:10px; border-radius:999px}
+    .state{font-weight:700; font-size:12px; letter-spacing:.3px}
+    .small{font-size:12px; color:var(--muted)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+    .mq{display:grid; grid-template-columns: repeat(8, 1fr); gap:6px}
+    .cell{aspect-ratio: 1/1; border-radius:8px; border:1px solid #2a3869; display:grid; place-items:center; font-size:12px; color:#cfe2ff; background:#0b1226}
+    .cell.full{background:#14234a}
+    .legend{display:flex; gap:10px; flex-wrap:wrap}
+    .tag{font-size:11px; padding:4px 8px; border-radius:999px; border:1px solid #2a3869; background:#0e152b}
+    .tag .sw{display:inline-block; width:10px; height:10px; border-radius:999px; margin-right:6px; vertical-align:middle}
+    .log{height: 260px; overflow:auto; font-size:12px; line-height:1.5; background:#0a1022; border-radius:12px; border:1px solid #203060; padding:10px}
+    .kbd{font-size:12px; border:1px solid #2a3869; background:#0e152b; padding:2px 6px; border-radius:8px}
+    .meter{height:8px; width:100%; background:#0b1226; border:1px solid #2a3869; border-radius:999px; overflow:hidden}
+    .meter > div{height:100%; background:linear-gradient(90deg, var(--accent), var(--accent2)); width:0%}
+    .hr{height:1px; background:#1c2649; margin:10px 0}
+    .muted{color:#a8b5da}
+    .foot{font-size:12px; color:#8fa3d8}
+    .blink{animation: blink 1s linear infinite}
+    @keyframes blink{ 50%{ opacity:.25 } }
+    @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>RTOS Concepts Demo — Tasks, Semaphore, Message Queue</h1>
+      <div class="sub">Round‑robin cooperative scheduler, binary semaphore (mutex), and fixed‑capacity message queue — all simulated in the browser.</div>
+    </div>
+    <div class="controls">
+      <label class="pill">Speed
+        <input id="speed" type="range" min="0" max="5" step="1" value="3" style="vertical-align:middle; width:140px; margin-left:8px" />
+      </label>
+      <button id="btnStart">Start</button>
+      <button id="btnStop">Stop</button>
+      <button id="btnReset">Reset</button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- Left: Tasks -->
+    <section class="card">
+      <h2>Tasks</h2>
+      <div class="legend">
+        <span class="tag"><span class="sw" style="background:var(--good)"></span>READY</span>
+        <span class="tag"><span class="sw" style="background:var(--warn)"></span>RUNNING</span>
+        <span class="tag"><span class="sw" style="background:var(--bad)"></span>BLOCKED</span>
+        <span class="tag"><span class="sw" style="background:var(--muted)"></span>SLEEP</span>
+      </div>
+      <div id="tasks"></div>
+      <div class="hr"></div>
+      <div class="row small"><span class="kbd">Round‑Robin</span> time slice: <span id="sliceMs" class="mono">—</span> ms</div>
+      <div class="meter" title="Scheduler tick fill"><div id="meterFill"></div></div>
+    </section>
+
+    <!-- Middle: Message Queue + Semaphore -->
+    <section class="card">
+      <h2>Message Queue</h2>
+      <div class="row small"><span class="kbd">Capacity</span>&nbsp;<span id="mqCap" class="mono"></span>&nbsp;| <span class="kbd">Size</span>&nbsp;<span id="mqSize" class="mono"></span></div>
+      <div id="mq" class="mq" style="margin-top:8px"></div>
+      <div class="hr"></div>
+      <h2>Semaphore (Mutex)</h2>
+      <div class="row small">State: <span id="semState" class="mono">—</span> | Waiters: <span id="semWaiters" class="mono">0</span></div>
+      <div style="display:grid; grid-template-columns: repeat(2,1fr); gap:10px; margin-top:8px">
+        <div class="task">
+          <div class="dot" style="background:var(--accent)"></div>
+          <div>
+            <div><strong>Critical Section</strong> <span class="small">(guarded by mutex)</span></div>
+            <div class="small">Shared Counter: <span id="sharedCounter" class="mono">0</span></div>
+          </div>
+        </div>
+        <div class="task">
+          <div class="dot blink" style="background:var(--accent2)"></div>
+          <div>
+            <div><strong>Resource Owner</strong></div>
+            <div class="small">Who holds mutex: <span id="mutexOwner" class="mono">—</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: Log -->
+    <aside class="card">
+      <h2>Event Log</h2>
+      <div id="log" class="log"></div>
+      <div class="foot" style="margin-top:8px">Tip: Toggle speeds to see blocking/unblocking behavior. Reset to restart demo.</div>
+    </aside>
+  </main>
+
+<script>
+/******************** Core Utilities ********************/
+const sleepObj = ms => ({ type: 'sleep', wakeAt: performance.now() + ms });
+const waitObj  = (pred, why) => ({ type: 'wait', pred, why });
+
+class Task {
+  constructor(name, genFn, color){
+    this.name = name; this.genFn = genFn; this.color = color;
+    this.reset();
+  }
+  reset(){
+    this.iter = this.genFn(this);
+    this.state = 'READY'; // READY | RUNNING | BLOCKED | SLEEP
+    this.wait = null; this.wakeAt = 0; this.lastYield = null; this.ticks=0;
+  }
+  step(){
+    this.state = 'RUNNING';
+    const { value, done } = this.iter.next();
+    if (done){ this.state = 'SLEEP'; this.wakeAt = Infinity; return; }
+    this.lastYield = value;
+    if (!value){ this.state = 'READY'; return; }
+    if (value.type === 'sleep'){
+      this.state = 'SLEEP'; this.wakeAt = value.wakeAt; return;
+    }
+    if (value.type === 'wait'){
+      this.state = 'BLOCKED'; this.wait = value; return;
+    }
+    this.state = 'READY';
+  }
+}
+
+class Scheduler {
+  constructor(sliceMs=30){
+    this.sliceMs = sliceMs; this.tasks = []; this.timer = null; this.idx = 0;
+  }
+  add(task){ this.tasks.push(task); }
+  start(){ if (this.timer) return; const loop = ()=>{ this.tick(); this.timer = setTimeout(loop, this.sliceMs); }; loop(); }
+  stop(){ if (!this.timer) return; clearTimeout(this.timer); this.timer = null; }
+  reset(){ this.stop(); this.tasks.forEach(t=>t.reset()); this.idx=0; }
+  tick(){
+    // Wake sleepers
+    const now = performance.now();
+    this.tasks.forEach(t=>{ if (t.state==='SLEEP' && now>=t.wakeAt){ t.state='READY'; }});
+    // Unblock waits
+    this.tasks.forEach(t=>{
+      if (t.state==='BLOCKED' && t.wait && t.wait.pred()){
+        t.state='READY'; t.wait=null;
+      }
+    });
+    // Run next READY task (round‑robin)
+    for (let i=0;i<this.tasks.length;i++){
+      const t = this.tasks[this.idx];
+      this.idx = (this.idx+1) % this.tasks.length;
+      if (t.state==='READY') { t.ticks++; t.step(); break; }
+    }
+    uiRender();
+  }
+}
+
+/******************** Synchronization Primitives ********************/
+class BinarySemaphore { // mutex style
+  constructor(){ this.locked=false; this.owner=null; this.waitQueue=[]; }
+  tryTake(task){ if (!this.locked){ this.locked = true; this.owner = task.name; uiSem(); return true; } return false; }
+  take(task){
+    if (this.tryTake(task)) return null; // success, no wait needed
+    return waitObj(()=> this.tryTake(task), `wait mutex`);
+  }
+  give(){ this.locked=false; this.owner=null; uiSem(); }
+}
+
+class MessageQueue {
+  constructor(capacity=8){ this.buf=[]; this.capacity=capacity; }
+  size(){ return this.buf.length; }
+  trySend(msg){ if (this.buf.length < this.capacity){ this.buf.push(msg); uiMQ(); return true; } return false; }
+  send(msg){
+    if (this.trySend(msg)) return null; // success
+    return waitObj(()=> this.trySend(msg), 'mq full');
+  }
+  tryRecv(){ if (this.buf.length>0){ const m=this.buf.shift(); uiMQ(); return m; } return undefined; }
+  recv(){
+    const m = this.tryRecv();
+    if (m!==undefined) return m;
+    let out;
+    return waitObj(()=>{ const v=this.tryRecv(); if (v!==undefined){ out=v; }
+                        return out!==undefined; }, 'mq empty', out);
+  }
+}
+
+/******************** Demo Workloads ********************/
+const log = (msg)=>{
+  const el = document.getElementById('log');
+  const time = new Date().toLocaleTimeString();
+  el.innerHTML = `<div class="mono"><span class="muted">${time}</span> — ${msg}</div>` + el.innerHTML;
+};
+
+const mq = new MessageQueue(8);
+const mutex = new BinarySemaphore();
+let sharedCounter = 0;
+
+function* producer(task){
+  let i=1;
+  while(true){
+    // produce item
+    const item = { id:i, payload: Math.floor(Math.random()*100) };
+    log(`🟦 <strong>${task.name}</strong> produced #${i}`);
+    // try send into queue (block if full)
+    const w = mq.send(item);
+    if (w) { log(`🟦 ${task.name} blocked (queue full)`); yield w; }
+    else { log(`🟦 ${task.name} enqueued #${i}`); }
+    i++;
+    yield sleepObj(250 + Math.random()*350);
+  }
+}
+
+function* consumer(task){
+  while(true){
+    // try receive (block if empty)
+    let received;
+    const w = mq.recv();
+    if (w && w.type==='wait'){ log(`🟩 ${task.name} blocked (queue empty)`); yield w; continue; }
+    else if (w!==undefined){ received = w; }
+    else { // recv returned a wait with captured message via predicate path
+      // not used in this impl
+    }
+    if (!received){ // scheduler will unblock and rerun; pull actual msg
+      const m = mq.tryRecv(); if (m!==undefined) received=m; else { yield sleepObj(10); continue; }
+    }
+    log(`🟩 <strong>${task.name}</strong> consumed #${received.id} (payload=${received.payload})`);
+    // do some work under mutex
+    const t = mutex.take(task);
+    if (t){ log(`🔒 ${task.name} waiting for mutex`); yield t; }
+    document.getElementById('mutexOwner').textContent = mutex.owner||'—';
+    const old = sharedCounter; sharedCounter += received.payload % 7; uiShared();
+    yield sleepObj(120 + Math.random()*180); // inside critical section
+    mutex.give(); document.getElementById('mutexOwner').textContent = mutex.owner||'—';
+    log(`🔓 ${task.name} left critical section (counter ${old}→${sharedCounter})`);
+    yield sleepObj(80 + Math.random()*160);
+  }
+}
+
+function* blinker(task){
+  while(true){
+    // Periodically look at queue size and toggle small sleeps
+    const size = mq.size();
+    if (size>6){ log(`✨ ${task.name} notices high queue depth (${size})`); }
+    yield sleepObj(200 + (6-size)*30);
+  }
+}
+
+/******************** UI Binding ********************/
+const scheduler = new Scheduler(40);
+const tasks = [
+  new Task('Producer', producer, '#7dd3fc'),
+  new Task('Consumer', consumer, '#34d399'),
+  new Task('Observer', blinker,  '#a78bfa'),
+];
+
+tasks.forEach(t=>scheduler.add(t));
+
+function uiRender(){
+  const cont = document.getElementById('tasks'); cont.innerHTML='';
+  tasks.forEach(t=>{
+    const el = document.createElement('div'); el.className='task';
+    const dot = document.createElement('div'); dot.className='dot';
+    const state = document.createElement('div'); state.className='state';
+    const sub = document.createElement('div'); sub.className='small';
+
+    let color='var(--muted)';
+    if (t.state==='READY') color='var(--good)';
+    if (t.state==='RUNNING') color='var(--warn)';
+    if (t.state==='BLOCKED') color='var(--bad)';
+
+    dot.style.background = color;
+    state.innerHTML = `${t.name} — ${t.state}`;
+    sub.innerHTML = t.state==='BLOCKED' && t.wait ? `Reason: <span class="mono">${t.wait.why}</span>` : `Ticks: <span class="mono">${t.ticks}</span>`;
+
+    el.appendChild(dot);
+    const right = document.createElement('div'); right.appendChild(state); right.appendChild(sub);
+    el.appendChild(el.firstChild); // placeholder
+    el.innerHTML = '';
+    el.appendChild(dot); el.appendChild(right);
+    cont.appendChild(el);
+  });
+  document.getElementById('sliceMs').textContent = scheduler.sliceMs.toFixed(0);
+  const meter = document.getElementById('meterFill');
+  const pct = Math.min(100, (40/scheduler.sliceMs)*20); // purely cosmetic
+  meter.style.width = pct + '%';
+}
+
+function uiMQ(){
+  const cap = mq.capacity; const size = mq.size();
+  document.getElementById('mqCap').textContent = cap;
+  document.getElementById('mqSize').textContent = size;
+  const el = document.getElementById('mq'); el.innerHTML='';
+  for (let i=0;i<cap;i++){
+    const c = document.createElement('div'); c.className='cell';
+    if (i<size){ c.classList.add('full'); c.textContent = (mq.buf[i].id%100).toString(); }
+    el.appendChild(c);
+  }
+}
+
+function uiSem(){
+  document.getElementById('semState').textContent = mutex.locked ? 'LOCKED' : 'UNLOCKED';
+  document.getElementById('semWaiters').textContent = tasks.filter(t=> t.state==='BLOCKED' && t.wait && t.wait.why==='wait mutex').length;
+}
+function uiShared(){ document.getElementById('sharedCounter').textContent = sharedCounter; }
+
+/******************** Controls ********************/
+const speedMap = { 0: 180, 1: 120, 2: 80, 3: 40, 4: 20, 5: 10 };
+const speed = document.getElementById('speed');
+speed.addEventListener('input', ()=>{ scheduler.sliceMs = speedMap[speed.value] || 40; uiRender(); });
+
+document.getElementById('btnStart').addEventListener('click', ()=> scheduler.start());
+document.getElementById('btnStop').addEventListener('click', ()=> scheduler.stop());
+document.getElementById('btnReset').addEventListener('click', ()=>{ scheduler.reset(); mq.buf.length=0; sharedCounter=0; uiMQ(); uiSem(); uiShared(); log('↩️ Demo reset'); });
+
+// Boot
+uiRender(); uiMQ(); uiSem(); uiShared();
+log('🟣 Ready. Click Start to run the scheduler.');
+</script>
+</body>
+</html>
