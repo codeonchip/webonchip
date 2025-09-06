@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brick Breaker — Single‑File Web Game with Sound</title>
+<style>
+  :root{
+    --bg:#0b1020; --fg:#e6ecff; --muted:#9aa4c0;
+  }
+  body{margin:0; background:var(--bg); color:var(--fg); font-family:sans-serif;}
+  header{padding:10px; background:#121a2f; border-bottom:1px solid #243059;}
+  canvas{display:block; margin:0 auto; background:#0a1128;}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Brick Breaker with Sound</h1>
+    <p>Use ←/→ or A/D to move, Space to launch</p>
+  </header>
+  <canvas id="game" width="800" height="600"></canvas>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height;
+
+// Sound effects
+const sndHit=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQgAAAAA'); // tiny silent placeholder
+function beep(freq=440,duration=100,type='sine'){
+  try{
+    const ctxA=new(window.AudioContext||window.webkitAudioContext)();
+    const osc=ctxA.createOscillator();
+    const gain=ctxA.createGain();
+    osc.type=type; osc.frequency.value=freq;
+    osc.connect(gain); gain.connect(ctxA.destination);
+    osc.start();
+    gain.gain.setValueAtTime(0.1,ctxA.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctxA.currentTime+duration/1000);
+    osc.stop(ctxA.currentTime+duration/1000);
+  }catch(e){ console.log('no audio'); }
+}
+
+class Paddle{constructor(){this.w=100;this.h=15;this.x=W/2-this.w/2;this.y=H-40;this.speed=8;}
+ draw(){ctx.fillStyle='#7dd3fc';ctx.fillRect(this.x,this.y,this.w,this.h);} }
+class Ball{constructor(){this.x=W/2;this.y=H-60;this.r=8;this.vx=4;this.vy=-4;}
+ draw(){ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fillStyle='#fbbf24';ctx.fill();}}
+
+let paddle=new Paddle();
+let ball=new Ball();
+let bricks=[];const rows=5,cols=10,brickW=70,brickH=20,margin=30,pad=10;
+for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)bricks.push({x:margin+c*(brickW+pad),y:margin+r*(brickH+pad),w:brickW,h:brickH,dead:false});
+
+let keys={};document.addEventListener('keydown',e=>keys[e.key]=true);document.addEventListener('keyup',e=>keys[e.key]=false);
+
+function loop(){ctx.clearRect(0,0,W,H);
+ // paddle move
+ if(keys['ArrowLeft']||keys['a']) paddle.x-=paddle.speed;
+ if(keys['ArrowRight']||keys['d']) paddle.x+=paddle.speed;
+ paddle.x=Math.max(0,Math.min(W-paddle.w,paddle.x));
+ paddle.draw();
+ // ball
+ ball.x+=ball.vx;ball.y+=ball.vy;
+ if(ball.x-ball.r<0||ball.x+ball.r>W){ball.vx*=-1;beep(200,80,'square');}
+ if(ball.y-ball.r<0){ball.vy*=-1;beep(250,80,'square');}
+ if(ball.y+ball.r>H){ball=new Ball();beep(120,200,'sawtooth');}
+ // paddle collision
+ if(ball.y+ball.r>=paddle.y&&ball.x>=paddle.x&&ball.x<=paddle.x+paddle.w){ball.vy=-Math.abs(ball.vy);beep(400,80,'triangle');}
+ // bricks
+ for(const br of bricks){if(br.dead)continue;ctx.fillStyle='#a78bfa';ctx.fillRect(br.x,br.y,br.w,br.h);
+  if(ball.x>br.x&&ball.x<br.x+br.w&&ball.y>br.y&&ball.y<br.y+br.h){br.dead=true;ball.vy*=-1;beep(600,100,'sine');}}
+ ball.draw();
+ requestAnimationFrame(loop);}
+loop();
+</script>
+</body>
+</html>
