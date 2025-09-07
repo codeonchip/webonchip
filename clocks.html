@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>World Clocks — Single Page</title>
+<style>
+  :root{--bg:#0e1014;--panel:#151922;--muted:#98a2b3;--text:#e6eaf2;--accent:#5b8cff;--good:#22c55e;--warn:#f59e0b}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:radial-gradient(1200px 800px at 50% -20%, #161b27, #0b0d12);color:var(--text);display:grid;grid-template-rows:auto 1fr}
+  header{position:sticky;top:0;z-index:10;backdrop-filter:saturate(1.2) blur(6px);background:linear-gradient(180deg, #0f1422ee, #0f1422cc 60%, transparent);border-bottom:1px solid #1e2431}
+  .bar{display:flex;align-items:center;gap:12px;padding:12px 16px;flex-wrap:wrap}
+  .brand{font-weight:800;letter-spacing:.3px}
+  .badge{color:var(--muted);font-size:12px}
+  .group{display:flex;align-items:center;gap:8px;background:#121726;border:1px solid #222a3b;border-radius:12px;padding:8px}
+  input[type="text"], select{background:#0e1422;border:1px solid #20283a;color:var(--text);padding:8px 10px;border-radius:10px;min-width:220px}
+  button{appearance:none;border:1px solid #2a3450;background:#121a30;color:#dbe3ff;border-radius:10px;padding:8px 12px;cursor:pointer}
+  button:hover{filter:brightness(1.05)}
+  .switch{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .grid{padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .card{background:linear-gradient(180deg,#141a27,#111623);border:1px solid #1f2636;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 10px 30px #0005}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .city{font-weight:700}
+  .time{font:700 26px ui-sans-serif,system-ui,-apple-system,Segoe UI}
+  .date{color:var(--muted);font-size:12px}
+  .meta{color:var(--muted);font-size:12px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid #2a3450;border-radius:999px;padding:4px 8px;background:#0f1527}
+  .label{color:#a6b1c5;font-size:12px}
+  .right{display:flex;gap:6px;align-items:center}
+  .ghostbtn{background:transparent;border:1px dashed #2a3450}
+  .empty{opacity:.7;text-align:center;padding:40px 10px}
+  .hint{opacity:.7;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">🕒 World Clocks</div>
+    <div class="badge" id="localBadge"></div>
+    <div class="group">
+      <input id="search" type="text" placeholder="Search city or timezone… (e.g., Tokyo, Europe/London)"/>
+      <button id="addBtn">Add</button>
+    </div>
+    <div class="group">
+      <label class="switch"><input id="showSeconds" type="checkbox"/> Seconds</label>
+      <label class="switch"><input id="is24h" type="checkbox"/> 24‑hour</label>
+      <label class="switch"><input id="showUTC" type="checkbox" checked/> Show UTC card</label>
+      <label class="switch"><input id="sortByOffset" type="checkbox"/> Sort by UTC offset</label>
+    </div>
+    <div class="group">
+      <select id="quick">
+        <option value="">Quick add…</option>
+        <option>America/Chicago</option>
+        <option>America/New_York</option>
+        <option>America/Los_Angeles</option>
+        <option>America/Denver</option>
+        <option>Europe/London</option>
+        <option>Europe/Paris</option>
+        <option>Europe/Berlin</option>
+        <option>Europe/Istanbul</option>
+        <option>Europe/Moscow</option>
+        <option>Africa/Cairo</option>
+        <option>Africa/Johannesburg</option>
+        <option>Asia/Dubai</option>
+        <option>Asia/Tehran</option>
+        <option>Asia/Karachi</option>
+        <option>Asia/Kolkata</option>
+        <option>Asia/Dhaka</option>
+        <option>Asia/Bangkok</option>
+        <option>Asia/Singapore</option>
+        <option>Asia/Hong_Kong</option>
+        <option>Asia/Taipei</option>
+        <option>Asia/Shanghai</option>
+        <option>Asia/Seoul</option>
+        <option>Asia/Tokyo</option>
+        <option>Australia/Perth</option>
+        <option>Australia/Adelaide</option>
+        <option>Australia/Sydney</option>
+        <option>Pacific/Auckland</option>
+        <option>Pacific/Honolulu</option>
+      </select>
+    </div>
+  </div>
+</header>
+<main>
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty" style="display:none">
+    <div>No clocks yet. Use <b>Quick add…</b> or search a timezone to add your first card.</div>
+    <div class="hint">Examples: <code>Asia/Tokyo</code>, <code>Europe/London</code>, <code>America/Sao_Paulo</code></div>
+  </div>
+</main>
+<script>
+(function(){
+  const grid = document.getElementById('grid');
+  const search = document.getElementById('search');
+  const addBtn = document.getElementById('addBtn');
+  const quick = document.getElementById('quick');
+  const showSeconds = document.getElementById('showSeconds');
+  const is24h = document.getElementById('is24h');
+  const showUTC = document.getElementById('showUTC');
+  const sortByOffset = document.getElementById('sortByOffset');
+  const empty = document.getElementById('empty');
+  const localBadge = document.getElementById('localBadge');
+
+  const localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  localBadge.textContent = `Your timezone: ${localTZ}`;
+
+  // State
+  let state = {
+    zones: [], // array of timeZone strings
+    showSeconds: false,
+    is24h: false,
+    showUTC: true,
+    sortByOffset: false,
+  };
+
+  // Load & save
+  const key = 'world-clocks-state-v1';
+  function save(){ localStorage.setItem(key, JSON.stringify(state)); }
+  function load(){ try{ const s = JSON.parse(localStorage.getItem(key)||'null'); if (s) state = { ...state, ...s }; }catch{} }
+  load();
+
+  // Defaults on first run
+  if (state.zones.length===0) {
+    state.zones = [localTZ, 'UTC', 'America/New_York', 'Europe/London', 'Europe/Paris', 'Asia/Seoul', 'Asia/Tokyo'];
+  }
+
+  showSeconds.checked = state.showSeconds;
+  is24h.checked = state.is24h;
+  showUTC.checked = state.showUTC;
+  sortByOffset.checked = state.sortByOffset;
+
+  // Helpers
+  function fmt(dt, tz) {
+    const opts = { hour: '2-digit', minute: '2-digit', hour12: !state.is24h, timeZone: tz };
+    if (state.showSeconds) opts.second = '2-digit';
+    return new Intl.DateTimeFormat(undefined, opts).format(dt);
+  }
+  function fmtDate(dt, tz){
+    const opts = { weekday:'short', year:'numeric', month:'short', day:'numeric', timeZone: tz };
+    return new Intl.DateTimeFormat(undefined, opts).format(dt);
+  }
+  function offsetMinutes(tz){
+    const dt = new Date();
+    const local = dt.getTime();
+    const tzStr = dt.toLocaleString('en-CA', { timeZone: tz, hour12:false }); // YYYY-MM-DD HH:MM:SS
+    const m = tzStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+    if (!m) return 0;
+    const dtTz = Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+    return (dtTz - local) / 60000; // minutes ahead of local clock
+  }
+  function utcOffsetLabel(tz){
+    const dt = new Date();
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset', hour:'2-digit' }).formatToParts(dt);
+    const off = parts.find(p=>p.type==='timeZoneName')?.value || '';
+    return off.replace('GMT','UTC');
+  }
+  function isDST(tz){
+    const now = new Date();
+    const jan = new Date(now.getFullYear(),0,1);
+    const jul = new Date(now.getFullYear(),6,1);
+    const std = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
+    const cur = new Date().toLocaleString('en-US', { timeZone: tz });
+    const curOff = new Date(cur).getTimezoneOffset();
+    return curOff < std; // offset smaller => DST in effect
+  }
+
+  function normalize(input){
+    if (!input) return '';
+    let s = input.trim();
+    if (/^utc$/i.test(s)) return 'UTC';
+    if (/^gmt$/i.test(s)) return 'UTC';
+    // Try City only -> guess common zones
+    const map = {
+      'seoul':'Asia/Seoul','tokyo':'Asia/Tokyo','london':'Europe/London','paris':'Europe/Paris','berlin':'Europe/Berlin','istanbul':'Europe/Istanbul','moscow':'Europe/Moscow','dubai':'Asia/Dubai','tehran':'Asia/Tehran','karachi':'Asia/Karachi','delhi':'Asia/Kolkata','kolkata':'Asia/Kolkata','mumbai':'Asia/Kolkata','dhaka':'Asia/Dhaka','bangkok':'Asia/Bangkok','singapore':'Asia/Singapore','hong kong':'Asia/Hong_Kong','hongkong':'Asia/Hong_Kong','shanghai':'Asia/Shanghai','taipei':'Asia/Taipei','sydney':'Australia/Sydney','perth':'Australia/Perth','adelaide':'Australia/Adelaide','auckland':'Pacific/Auckland','honolulu':'Pacific/Honolulu','mexico city':'America/Mexico_City','new york':'America/New_York','chicago':'America/Chicago','los angeles':'America/Los_Angeles','denver':'America/Denver','sao paulo':'America/Sao_Paulo','buenos aires':'America/Argentina/Buenos_Aires','cairo':'Africa/Cairo','johannesburg':'Africa/Johannesburg','nairobi':'Africa/Nairobi','reykjavik':'Atlantic/Reykjavik'};
+    const k = s.toLowerCase();
+    if (map[k]) return map[k];
+    return s; // assume full IANA name
+  }
+
+  function addZone(tz){
+    try {
+      // validate
+      new Intl.DateTimeFormat(undefined, { timeZone: tz }).format(new Date());
+      if (!state.zones.includes(tz)) state.zones.push(tz);
+      save();
+      render();
+    } catch { alert('Unknown timezone: '+tz+'\nTry an IANA name like "Asia/Tokyo".'); }
+  }
+
+  function removeZone(tz){ state.zones = state.zones.filter(z=>z!==tz); save(); render(); }
+
+  function render(){
+    // ensure UTC presence based on toggle
+    const hasUTC = state.zones.includes('UTC');
+    if (state.showUTC && !hasUTC) state.zones.unshift('UTC');
+    if (!state.showUTC && hasUTC) state.zones = state.zones.filter(z=>z!=='UTC');
+
+    // sort option
+    let zones = [...state.zones];
+    if (state.sortByOffset) zones.sort((a,b)=>{
+      const oa = new Date().toLocaleString('en-US', { timeZone: a });
+      const ob = new Date().toLocaleString('en-US', { timeZone: b });
+      return new Date(oa).getTimezoneOffset() - new Date(ob).getTimezoneOffset();
+    });
+
+    grid.innerHTML = '';
+    empty.style.display = zones.length? 'none':'block';
+
+    const now = new Date();
+    for (const tz of zones){
+      const card = document.createElement('div'); card.className='card';
+      const city = tz.includes('/') ? tz.split('/')[1].replace('_',' ') : tz;
+      const top = document.createElement('div'); top.className='row';
+      top.innerHTML = `<div class="city">${city}</div>
+        <div class="right">
+          <span class="pill">${utcOffsetLabel(tz)}</span>
+          <button class="ghostbtn" title="Remove">✖</button>
+        </div>`;
+      const mid = document.createElement('div'); mid.className='row';
+      mid.innerHTML = `<div class="time" data-tz="${tz}">${fmt(now, tz)}</div>`;
+      const bot = document.createElement('div'); bot.className='row';
+      const dstActive = isDST(tz);
+      bot.innerHTML = `<div class="date">${fmtDate(now, tz)}</div>
+        <div class="meta">DST: <span style="color:${dstActive?'#22c55e':'#94a3b8'}">${dstActive?'Yes':'No'}</span></div>`;
+
+      card.appendChild(top); card.appendChild(mid); card.appendChild(bot);
+      grid.appendChild(card);
+
+      // remove handler
+      top.querySelector('button').addEventListener('click', ()=> removeZone(tz));
+    }
+  }
+
+  // Live ticking
+  setInterval(()=>{
+    const nodes = grid.querySelectorAll('.time');
+    const now = new Date();
+    nodes.forEach(n=>{
+      const tz = n.getAttribute('data-tz');
+      n.textContent = fmt(now, tz);
+    });
+  }, 500);
+
+  // Handlers
+  addBtn.addEventListener('click', ()=>{ const tz = normalize(search.value); if (tz) { addZone(tz); search.value=''; } });
+  search.addEventListener('keydown', e=>{ if (e.key==='Enter') addBtn.click(); });
+  quick.addEventListener('change', ()=>{ if (quick.value) { addZone(quick.value); quick.value=''; } });
+  showSeconds.addEventListener('change', ()=>{ state.showSeconds = showSeconds.checked; save(); render(); });
+  is24h.addEventListener('change', ()=>{ state.is24h = is24h.checked; save(); render(); });
+  showUTC.addEventListener('change', ()=>{ state.showUTC = showUTC.checked; save(); render(); });
+  sortByOffset.addEventListener('change', ()=>{ state.sortByOffset = sortByOffset.checked; save(); render(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
