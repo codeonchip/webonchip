@@ -1,296 +1,328 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Concave (Hemispherical) Sundial — Hour Lines • Seasonal Lines • Horizontal Base</title>
-  <style>
-    :root{
-      --bg:#f7f7fb; --fg:#111; --muted:#6b7280; --accent:#0f766e; --rim:#1f2937;
-      --hour:#0b4f9c; --season:#b45309; --eq:#065f46; --summer:#9a3412; --winter:#1d4ed8;
-      --grid:#e5e7eb; --base:#d1d5db;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial;color:var(--fg);background:var(--bg)}
-    header{padding:16px 20px;border-bottom:1px solid var(--grid);background:white;position:sticky;top:0;z-index:1}
-    h1{font-size:20px;margin:0 0 6px}
-    .sub{color:var(--muted);font-size:13px}
-    main{display:grid;grid-template-columns:360px 1fr;gap:16px;max-width:1200px;margin:18px auto;padding:0 16px}
-    .card{background:white;border:1px solid var(--grid);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    .panel{padding:16px}
-    .controls label{display:block;margin:10px 0 4px;color:#374151;font-weight:600}
-    .row{display:flex;gap:10px;align-items:center}
-    input[type="range"]{width:100%}
-    .legend{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-    .legend .item{display:flex;align-items:center;gap:8px;font-size:13px;color:#374151}
-    .sw{width:14px;height:14px;border-radius:3px;border:1px solid #0002}
-    canvas{width:100%;height:auto;display:block}
-    .foot{padding:10px 16px;color:var(--muted);font-size:12px}
-    .btn{appearance:none;border:1px solid var(--grid);background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer}
-    .row.wrap{flex-wrap:wrap}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Angbu‑ilgu — Full Interactive Simulator</title>
+<style>
+  :root{
+    --bg:#fafafc; --fg:#0f172a; --muted:#6b7280; --grid:#e5e7eb; --card:#ffffff;
+    --rim:#111827; --base:#d1d5db; --hour:#0b4f9c; --si:#0b8355; --season:#b45309; --month:#334155; --shadow:#dc2626; --eq:#10b981; --summer:#9a3412; --winter:#2563eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.45 system-ui, Segoe UI, Roboto, Helvetica, Arial;color:var(--fg);background:var(--bg)}
+  header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--grid);padding:12px 16px;z-index:1}
+  h1{margin:0 0 4px;font-size:19px}
+  .sub{color:var(--muted);font-size:12.5px}
+  main{max-width:1200px;margin:14px auto;padding:0 14px;display:grid;grid-template-columns:380px 1fr;gap:14px}
+  .card{background:var(--card);border:1px solid var(--grid);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .panel{padding:14px}
+  label{display:block;margin:8px 0 4px;font-weight:600;color:#1f2937}
+  input[type="range"],input[type="datetime-local"],input[type="number"],select{width:100%}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .switch{display:flex;gap:8px;margin-top:6px}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:12px;color:#334155}
+  .legend .sw{width:12px;height:12px;border:1px solid #0002;border-radius:3px}
+  .btn{appearance:none;border:1px solid var(--grid);background:var(--card);border-radius:10px;padding:8px 10px;cursor:pointer}
+  canvas{width:100%;height:auto;display:block}
+  .note{color:var(--muted);font-size:12px;margin-top:8px}
+</style>
 </head>
 <body>
-  <header>
-    <h1>Concave (Hemispherical) Sundial</h1>
-    <div class="sub">Interactive bowl dial (à la <em>angbu-ilgu</em>): hour lines, seasonal lines (solstices & equinox), and a horizontal base. Change latitude & radius to explore.</div>
-  </header>
+<header>
+  <h1>Angbu‑ilgu (앙부일구) — Full Interactive Simulator</h1>
+  <div class="sub">Hemispherical bowl dial with civil hour lines, traditional 12‑<em>si</em> lines, seasonal curves, monthly date engravings, equation‑of‑time option, and a live shadow point.</div>
+</header>
+<main>
+  <section class="card panel">
+    <label>Latitude φ (°): <span id="latVal">37.57</span></label>
+    <input id="lat" type="range" min="-75" max="75" step="0.01" value="37.57">
 
-  <main>
-    <section class="card panel controls">
-      <label for="lat">Latitude (°): <span id="latVal">37.5</span></label>
-      <input id="lat" type="range" min="-75" max="75" step="0.1" value="37.5" />
+    <label>Longitude λ (° East + / West −): <span id="lonVal">126.98</span></label>
+    <input id="lon" type="range" min="-180" max="180" step="0.01" value="126.98">
 
-      <label for="radius">Bowl Radius (px): <span id="rVal">250</span></label>
-      <input id="radius" type="range" min="120" max="320" step="1" value="250" />
-
-      <div class="row wrap" style="margin-top:10px">
-        <label class="row" style="gap:8px"><input id="lblHours" type="checkbox" checked /> Show hour labels</label>
-        <label class="row" style="gap:8px"><input id="lblSeason" type="checkbox" checked /> Show season labels</label>
-        <label class="row" style="gap:8px"><input id="clipDay" type="checkbox" checked /> Clip to daytime (sun above horizon)</label>
+    <div class="row">
+      <div style="flex:1">
+        <label>Radius (px): <span id="rVal">260</span></label>
+        <input id="radius" type="range" min="160" max="340" step="1" value="260">
       </div>
-
-      <div class="legend">
-        <div class="item"><span class="sw" style="background:var(--rim)"></span> Bowl rim</div>
-        <div class="item"><span class="sw" style="background:var(--base)"></span> Horizontal base</div>
-        <div class="item"><span class="sw" style="background:var(--hour)"></span> Hour lines</div>
-        <div class="item"><span class="sw" style="background:var(--eq)"></span> Equinox (δ=0°)</div>
-        <div class="item"><span class="sw" style="background:var(--summer)"></span> Summer solstice (δ=+23.44°)</div>
-        <div class="item"><span class="sw" style="background:var(--winter)"></span> Winter solstice (δ=−23.44°)</div>
+      <div style="width:130px">
+        <label>Time zone (UTC±h)</label>
+        <input id="tz" type="number" step="0.25" value="9">
       </div>
+    </div>
 
-      <div class="row" style="margin-top:12px;gap:8px">
-        <button class="btn" id="export">Export PNG</button>
-        <button class="btn" id="reset">Reset</button>
-      </div>
+    <label>Simulation date/time (local clock)</label>
+    <input id="dt" type="datetime-local">
+    <div class="row">
+      <button class="btn" id="nowBtn">Now</button>
+      <button class="btn" id="playBtn">▶ Play</button>
+      <button class="btn" id="stopBtn">■ Stop</button>
+      <button class="btn" id="exportBtn">Export PNG</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
 
-      <div class="foot">Axes: x→East, y→North. We look straight down on the bowl (the lower hemisphere, z≤0). Lines are loci of shadow points on the inner surface.
-      </div>
-    </section>
+    <div class="switch">
+      <label class="row"><input id="showHours" type="checkbox" checked> Civil hour lines</label>
+      <label class="row"><input id="showSi" type="checkbox" checked> 12‑<em>si</em> lines (Korean double‑hours)</label>
+      <label class="row"><input id="showSeasons" type="checkbox" checked> Seasonal curves (solstice/equinox + monthly)</label>
+      <label class="row"><input id="clipDay" type="checkbox" checked> Clip to daytime</label>
+      <label class="row"><input id="useEoT" type="checkbox" checked> Apply Equation‑of‑Time</label>
+      <label class="row"><input id="labels" type="checkbox" checked> Labels</label>
+    </div>
 
-    <section class="card">
-      <canvas id="dial" width="900" height="700" aria-label="Hemispherical sundial drawing"></canvas>
-    </section>
-  </main>
+    <div class="legend">
+      <div class="row"><span class="sw" style="background:var(--rim)"></span> Rim / horizon</div>
+      <div class="row"><span class="sw" style="background:var(--base)"></span> Horizontal base</div>
+      <div class="row"><span class="sw" style="background:var(--hour)"></span> Hours (00–23)</div>
+      <div class="row"><span class="sw" style="background:var(--si)"></span> 12‑<em>si</em> lines</div>
+      <div class="row"><span class="sw" style="background:var(--season)"></span> Monthly date engravings</div>
+      <div class="row"><span class="sw" style="background:var(--eq)"></span> Equinox curve</div>
+      <div class="row"><span class="sw" style="background:var(--summer)"></span> Summer solstice</div>
+      <div class="row"><span class="sw" style="background:var(--winter)"></span> Winter solstice</div>
+      <div class="row"><span class="sw" style="background:var(--shadow)"></span> Shadow point</div>
+    </div>
+    <div class="note">Defaults set for Seoul (φ≈37.57°, λ≈126.98°, KST UTC+9). Traditional Angbu‑ilgu in Joseon typically engraved monthly date guides and the 12‑<em>si</em> scale alongside civil hours.</div>
+  </section>
 
-  <script>
-    // --- Math helpers ---
-    const DEG = Math.PI/180;
-    function sunVector(latDeg, decDeg, Hdeg){
-      const phi = latDeg*DEG, d = decDeg*DEG, H = Hdeg*DEG;
-      // Local topocentric components: x=East, y=North, z=Up
-      const x = Math.cos(d)*Math.sin(H);
-      const y = Math.cos(phi)*Math.sin(d) - Math.sin(phi)*Math.cos(d)*Math.cos(H);
-      const z = Math.sin(phi)*Math.sin(d) + Math.cos(phi)*Math.cos(d)*Math.cos(H);
-      return {x,y,z}; // unit vector
+  <section class="card">
+    <canvas id="dial" width="980" height="760"></canvas>
+  </section>
+</main>
+<script>
+// ===== Utilities and math =====
+const DEG=Math.PI/180, RAD=180/Math.PI;
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const css=(v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// Solar position (NOAA-like approximation, good to ~1 arcmin)
+function jdFromDate(date){ // UTC -> JD
+  let t=date.getTime();
+  return t/86400000+2440587.5; // Unix epoch to JD
+}
+function sunGeom(dateUTC){
+  const JD=jdFromDate(dateUTC), T=(JD-2451545.0)/36525; // Julian centuries J2000
+  const L0=(280.46646+36000.76983*T+0.0003032*T*T)%360; // mean longitude
+  const M=357.52911+35999.05029*T-0.0001537*T*T; // mean anomaly
+  const e=0.016708634-0.000042037*T-0.0000001267*T*T; // eccentricity
+  const C=(1.914602-0.004817*T-0.000014*T*T)*Math.sin(M*DEG)
+         +(0.019993-0.000101*T)*Math.sin(2*M*DEG)
+         +0.000289*Math.sin(3*M*DEG);
+  const trueLong=L0+C; // true longitude
+  const Omega=125.04-1934.136*T;
+  const lambda=trueLong-0.00569-0.00478*Math.sin(Omega*DEG); // apparent longitude
+  const eps0=23.439291-0.0130042*T-1.64e-7*T*T+5.04e-7*T*T*T; // mean obliquity
+  const eps=eps0+0.00256*Math.cos(Omega*DEG); // apparent obliquity
+  const sinDec=Math.sin(eps*DEG)*Math.sin(lambda*DEG);
+  const dec=Math.asin(sinDec)*RAD; // declination
+  // Equation of time (minutes)
+  const y=Math.tan((eps*DEG)/2); const y2=y*y;
+  const Etime=4*RAD*( y2*Math.sin(2*L0*DEG) - 2*e*Math.sin(M*DEG) + 4*e*y2*Math.sin(M*DEG)*Math.cos(2*L0*DEG)
+                 - 0.5*y2*y2*Math.sin(4*L0*DEG) - 1.25*e*e*Math.sin(2*M*DEG) );
+  return {dec, Etime};
+}
+function sunVectorTopo(lat, dec, Hdeg){ // local unit vector (x East, y North, z Up)
+  const phi=lat*DEG, d=dec*DEG, H=Hdeg*DEG;
+  const x=Math.cos(d)*Math.sin(H);
+  const y=Math.cos(phi)*Math.sin(d)-Math.sin(phi)*Math.cos(d)*Math.cos(H);
+  const z=Math.sin(phi)*Math.sin(d)+Math.cos(phi)*Math.cos(d)*Math.cos(H);
+  return {x,y,z};
+}
+
+// Convert civil local time -> Local Apparent Solar Time (LAST) hour angle H (deg)
+function hourAngleDeg(dateLocal, tzHours, lonDeg, useEoT){
+  // Convert local civil time to UTC
+  const utcMs=dateLocal.getTime()-tzHours*3600*1000;
+  const dateUTC=new Date(utcMs);
+  const {Etime}=sunGeom(dateUTC); // minutes
+  const offsetMin= useEoT ? (-Etime) : 0; // apparent solar time correction
+  // Solar time in minutes from midnight local clock
+  const mins=dateLocal.getHours()*60+dateLocal.getMinutes()+dateLocal.getSeconds()/60+offsetMin + (lonDeg*4); // 4 min per degree east
+  const H=15*((mins/60)-12); // hour angle deg
+  return {H, dateUTC};
+}
+
+// Bowl projection: point on inner hemisphere where the gnomon shadow hits
+function bowlShadowPoint(R, s){ // s is sun vector (x E, y N, z Up)
+  // The gnomon pin is at the bowl center; shadow on inner surface is -R*s normalized (already unit)
+  const p={x:-R*s.x,y:-R*s.y,z:-R*s.z};
+  return p; // for unit sun vector, |p|=R
+}
+
+// Month average declinations for engraving guides (approximate mid‑month solar declination)
+const monthDec=[-20.0,-13.0,-2.0,9.0,18.0,23.0,21.0,14.0,4.0,-8.0,-18.0,-23.0];
+
+// 12‑si labels
+const siLabels=['Ja','Chuk','In','Myu','Jin','Sa','O','Mi','Sin','Yu','Sul','Hae'];
+
+// ===== Drawing =====
+function drawAll(){
+  const lat=parseFloat(latEl.value), lon=parseFloat(lonEl.value), R=parseFloat(rEl.value);
+  latVal.textContent=lat.toFixed(2); lonVal.textContent=lon.toFixed(2); rVal.textContent=R.toFixed(0);
+  const tz=parseFloat(tzEl.value);
+  const dateLocal=readLocalDate();
+  const {H, dateUTC}=hourAngleDeg(dateLocal, tz, lon, useEoTEl.checked);
+  const {dec}=sunGeom(dateUTC);
+  const s=sunVectorTopo(lat, dec, H);
+
+  const w=canvas.width, h=canvas.height; const cx=w*0.52, cy=h*0.60;
+  const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,w,h);
+
+  // Base
+  ctx.fillStyle=css('--base'); ctx.fillRect(cx-R*1.4, cy+R+16, R*2.8, 16);
+
+  // Bowl rim
+  ctx.lineWidth=2; ctx.strokeStyle=css('--rim');
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
+
+  // Clip to bowl interior
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.clip();
+
+  // Subtle radial guides
+  ctx.strokeStyle='#00000012'; ctx.lineWidth=1;
+  for(let k=1;k<=3;k++){ ctx.beginPath(); ctx.arc(cx,cy,(R*k/3),0,Math.PI*2); ctx.stroke(); }
+
+  // Seasonal curves & monthly date engravings
+  if(showSeasonsEl.checked){
+    drawDeclinationCurve(ctx,cx,cy,R,lat, +23.44, css('--summer'));
+    drawDeclinationCurve(ctx,cx,cy,R,lat, 0.00,  css('--eq'));
+    drawDeclinationCurve(ctx,cx,cy,R,lat, -23.44,css('--winter'));
+    // Monthly guides (approx.)
+    for(let m=0;m<12;m++) drawDeclinationCurve(ctx,cx,cy,R,lat, monthDec[m], css('--season'), 60);
+  }
+
+  // Hour lines (civil hours 0..23)
+  if(showHoursEl.checked){
+    ctx.strokeStyle=css('--hour'); ctx.lineWidth=1.25;
+    for(let hr=0; hr<24; hr++){
+      drawHourCurve(ctx,cx,cy,R,lat,(hr-12)*15, clipDayEl.checked);
+      if(labelsEl.checked) placeHourLabel(ctx,cx,cy,R,lat,(hr-12)*15,hr);
     }
+  }
 
-    function draw(){
-      const lat = parseFloat(latInp.value);
-      const R = parseFloat(rInp.value);
-      latVal.textContent = lat.toFixed(1);
-      rVal.textContent = R.toFixed(0);
-
-      const w = canvas.width, h = canvas.height;
-      const cx = w*0.52, cy = h*0.58; // center on canvas
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0,0,w,h);
-
-      // Horizontal base (a soft shadow rectangle beneath the bowl)
-      ctx.save();
-      ctx.fillStyle = getCSS('--base');
-      const baseW = R*2.4, baseH = 16;
-      ctx.fillRect(cx-baseW/2, cy+R+14, baseW, baseH);
-      ctx.restore();
-
-      // Bowl rim
-      ctx.save();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = getCSS('--rim');
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, 0, Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-
-      // Clip to inside the bowl (circle) so curves don't spill out
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, 0, Math.PI*2);
-      ctx.clip();
-
-      // Subtle grid (latitude circles within bowl for visual aid)
-      ctx.strokeStyle = '#00000010';
-      ctx.lineWidth = 1;
-      for(let k=1;k<=3;k++){
-        ctx.beginPath();
-        ctx.arc(cx, cy, (R*k/3), 0, Math.PI*2);
-        ctx.stroke();
-      }
-
-      // Draw seasonal lines (declination curves)
-      const seasonSpecs = [
-        {dec: +23.44, color: getCSS('--summer'), label:'Summer solstice'},
-        {dec: 0.00,   color: getCSS('--eq'),     label:'Equinox'},
-        {dec: -23.44, color: getCSS('--winter'), label:'Winter solstice'}
-      ];
-
-      const clipDay = clipDayInp.checked;
-
-      for(const s of seasonSpecs){
-        drawSeasonCurve(ctx, cx, cy, R, lat, s.dec, s.color, clipDay);
-        if(lblSeasonInp.checked){ placeSeasonLabel(ctx, cx, cy, R, lat, s.dec, s.color, s.label); }
-      }
-
-      // Draw hour lines: H from -6h..+6h (i.e., -90°…+90° hour angle)
-      ctx.lineWidth = 1.5;
-      for(let hour=-6; hour<=6; hour++){
-        const Hdeg = hour*15; // degrees
-        drawHourCurve(ctx, cx, cy, R, lat, Hdeg, getCSS('--hour'), clipDay);
-        if(lblHoursInp.checked){
-          placeHourLabel(ctx, cx, cy, R, lat, Hdeg, hour);
-        }
-      }
-
-      ctx.restore(); // end clip
-
-      // Cardinal marks on the rim
-      drawCardinals(ctx, cx, cy, R);
-
-      // Title
-      ctx.save();
-      ctx.fillStyle = '#111';
-      ctx.font = '600 14px system-ui,Segoe UI,Roboto';
-      ctx.textAlign = 'center';
-      ctx.fillText(`Latitude ${lat.toFixed(1)}°`, cx, cy - R - 14);
-      ctx.restore();
-
-      // Utility: export
-      document.getElementById('export').onclick = () => {
-        const link = document.createElement('a');
-        link.download = `hemisphere_sundial_lat${lat.toFixed(1)}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      };
-
-      document.getElementById('reset').onclick = () => {
-        latInp.value = 37.5; rInp.value = 250;
-        lblHoursInp.checked = true; lblSeasonInp.checked = true; clipDayInp.checked = true;
-        draw();
-      };
-
-      // --- helpers
-      function drawSeasonCurve(ctx, cx, cy, R, lat, dec, color, clipDay){
-        ctx.save();
-        ctx.strokeStyle = color; ctx.lineWidth = 2;
-        ctx.beginPath();
-        let started=false;
-        for(let H=-180; H<=180; H+=0.5){
-          const s = sunVector(lat, dec, H);
-          const sunUp = s.z > 0; // sun above horizon
-          if(clipDay && !sunUp){ continue; }
-          const p = {x: -R*s.x, y: -R*s.y, z: -R*s.z}; // shadow point on bowl (lower hemisphere)
-          if(p.z>1e-6){ continue; } // keep lower hemisphere (z<=0)
-          const X = cx + p.x, Y = cy + p.y;
-          if(!started){ ctx.moveTo(X,Y); started=true; }
-          else{ ctx.lineTo(X,Y); }
-        }
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      function drawHourCurve(ctx, cx, cy, R, lat, Hdeg, color, clipDay){
-        ctx.save();
-        ctx.strokeStyle = color; ctx.setLineDash([]);
-        ctx.beginPath();
-        let started=false, lastKept=false;
-        for(let dec=-23.44; dec<=23.44; dec+=0.2){
-          const s = sunVector(lat, dec, Hdeg);
-          const sunUp = s.z>0;
-          if(clipDay && !sunUp){ lastKept=false; continue; }
-          const p = {x:-R*s.x, y:-R*s.y, z:-R*s.z};
-          if(p.z>1e-6){ lastKept=false; continue; }
-          const X = cx+p.x, Y = cy+p.y;
-          if(!started){ ctx.moveTo(X,Y); started=true; lastKept=true; }
-          else{
-            if(!lastKept){ ctx.moveTo(X,Y); lastKept=true; }
-            else ctx.lineTo(X,Y);
-          }
-        }
-        ctx.lineWidth = 1.25;
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      function placeHourLabel(ctx, cx, cy, R, lat, Hdeg, hour){
-        // Pick declination near 0 to estimate a readable label position on the curve
-        const s = sunVector(lat, 0, Hdeg);
-        const p = {x:-R*s.x, y:-R*s.y, z:-R*s.z};
-        if(p.z>0) return;
-        const X = cx+p.x, Y = cy+p.y;
-        ctx.save();
-        ctx.fillStyle = '#0b4f9c';
-        ctx.font = '600 12px system-ui,Segoe UI,Roboto';
-        ctx.textAlign = 'center';
-        const label = ((hour+24)%24).toString().padStart(2,'0')+':00';
-        ctx.fillText(label, X, Y-2);
-        ctx.restore();
-      }
-
-      function placeSeasonLabel(ctx, cx, cy, R, lat, dec, color, label){
-        // Place label near H = -90° (morning) where the curve is usually distinct
-        const s = sunVector(lat, dec, -90);
-        const p = {x:-R*s.x, y:-R*s.y, z:-R*s.z};
-        if(p.z>0) return;
-        const X = cx+p.x, Y = cy+p.y;
-        ctx.save();
-        ctx.fillStyle = color; ctx.font='600 12px system-ui,Segoe UI,Roboto';
-        ctx.textAlign='right';
-        ctx.fillText(label, X-6, Y-4);
-        ctx.restore();
-      }
-
-      function drawCardinals(ctx, cx, cy, R){
-        ctx.save();
-        ctx.strokeStyle = '#0008'; ctx.lineWidth = 1; ctx.setLineDash([5,6]);
-        // North-South
-        ctx.beginPath(); ctx.moveTo(cx, cy-R-8); ctx.lineTo(cx, cy+R+8); ctx.stroke();
-        // East-West
-        ctx.beginPath(); ctx.moveTo(cx-R-8, cy); ctx.lineTo(cx+R+8, cy); ctx.stroke();
-
-        // Rim ticks
-        const ticks = [
-          {ang:0, lbl:'E'}, {ang:90, lbl:'N'}, {ang:180, lbl:'W'}, {ang:270, lbl:'S'}
-        ];
-        ctx.fillStyle='#111'; ctx.font='700 12px system-ui,Segoe UI,Roboto'; ctx.textAlign='center';
-        for(const t of ticks){
-          const a = t.ang*DEG; const x = cx + (R+10)*Math.cos(a); const y = cy + (R+10)*Math.sin(a);
-          ctx.fillText(t.lbl, x, y+4);
-        }
-        ctx.restore();
-      }
-
-      function getCSS(varName){
-        return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-      }
+  // 12‑si lines (centered every 2 hours)
+  if(showSiEl.checked){
+    ctx.strokeStyle=css('--si'); ctx.lineWidth=1.25;
+    for(let i=0;i<12;i++){
+      const Hdeg=(i*30-180)+15; // map to same H convention, shift so noon aligned
+      drawHourCurve(ctx,cx,cy,R,lat,Hdeg, clipDayEl.checked);
+      if(labelsEl.checked) placeSiLabel(ctx,cx,cy,R,lat,Hdeg, siLabels[i]);
     }
+  }
 
-    // DOM wiring
-    const canvas = document.getElementById('dial');
-    const latInp = document.getElementById('lat');
-    const rInp = document.getElementById('radius');
-    const latVal = document.getElementById('latVal');
-    const rVal = document.getElementById('rVal');
-    const lblHoursInp = document.getElementById('lblHours');
-    const lblSeasonInp = document.getElementById('lblSeason');
-    const clipDayInp = document.getElementById('clipDay');
+  // Live shadow point
+  const sunUp=s.z>0; // above mathematical horizon
+  if(!clipDayEl.checked || sunUp){
+    const p=bowlShadowPoint(R,s);
+    const X=cx+p.x, Y=cy+p.y;
+    ctx.fillStyle=css('--shadow');
+    ctx.beginPath(); ctx.arc(X,Y,4.2,0,Math.PI*2); ctx.fill();
+  }
 
-    [latInp, rInp, lblHoursInp, lblSeasonInp, clipDayInp].forEach(el=>{
-      el.addEventListener('input', draw);
-      el.addEventListener('change', draw);
-    });
+  ctx.restore(); // end clip
 
-    // Initial render
-    draw();
-  </script>
+  // Cardinal rim ticks
+  drawCardinals(ctx,cx,cy,R);
+
+  // Header text
+  ctx.fillStyle='#111'; ctx.font='600 13px system-ui,Segoe UI'; ctx.textAlign='center';
+  const info=`φ ${lat.toFixed(2)}°, λ ${lon.toFixed(2)}°, tz ${tz>=0?'+':''}${tz}; Dec ${dec.toFixed(2)}°`;
+  ctx.fillText(info, cx, cy-R-14);
+}
+
+function drawDeclinationCurve(ctx,cx,cy,R,lat,dec,color, step=0.5){
+  ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+  let started=false; const clipDay=clipDayEl.checked;
+  for(let H=-180; H<=180; H+=step){
+    const s=sunVectorTopo(lat,dec,H); if(clipDay && s.z<=0) {continue;}
+    const p=bowlShadowPoint(R,s); if(p.z>1e-6) continue; // keep lower hemisphere
+    const X=cx+p.x, Y=cy+p.y;
+    if(!started){ctx.moveTo(X,Y); started=true;} else ctx.lineTo(X,Y);
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+function drawHourCurve(ctx,cx,cy,R,lat,Hdeg,clipDay){
+  ctx.save(); ctx.beginPath(); let started=false, last=false;
+  for(let dec=-23.44; dec<=23.44; dec+=0.2){
+    const s=sunVectorTopo(lat,dec,Hdeg); const ok=(!clipDay)||s.z>0; const p=bowlShadowPoint(R,s);
+    if(p.z>1e-6 || !ok){ last=false; continue; }
+    const X=cx+p.x, Y=cy+p.y;
+    if(!started){ctx.moveTo(X,Y); started=true; last=true;} else { if(!last){ctx.moveTo(X,Y); last=true;} else ctx.lineTo(X,Y); }
+  }
+  ctx.lineWidth=1.2; ctx.stroke(); ctx.restore();
+}
+
+function placeHourLabel(ctx,cx,cy,R,lat,Hdeg,hr){
+  const s=sunVectorTopo(lat,0,Hdeg); const p=bowlShadowPoint(R,s); if(p.z>0) return;
+  const X=cx+p.x, Y=cy+p.y; ctx.save(); ctx.fillStyle=css('--hour'); ctx.font='700 11px system-ui'; ctx.textAlign='center';
+  const label=String(hr).padStart(2,'0'); ctx.fillText(label,X,Y-2); ctx.restore();
+}
+function placeSiLabel(ctx,cx,cy,R,lat,Hdeg,label){
+  const s=sunVectorTopo(lat,0,Hdeg); const p=bowlShadowPoint(R,s); if(p.z>0) return;
+  const X=cx+p.x, Y=cy+p.y; ctx.save(); ctx.fillStyle=css('--si'); ctx.font='700 11px system-ui'; ctx.textAlign='center'; ctx.fillText(label,X,Y+11); ctx.restore();
+}
+
+function drawCardinals(ctx,cx,cy,R){
+  ctx.save(); ctx.strokeStyle='#0008'; ctx.setLineDash([5,6]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(cx,cy-R-8); ctx.lineTo(cx,cy+R+8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-R-8,cy); ctx.lineTo(cx+R+8,cy); ctx.stroke();
+  ctx.fillStyle='#111'; ctx.font='700 12px system-ui'; ctx.textAlign='center';
+  const ticks=[{a:0,l:'E'},{a:90,l:'N'},{a:180,l:'W'},{a:270,l:'S'}];
+  for(const t of ticks){ const x=cx+(R+10)*Math.cos(t.a*DEG); const y=cy+(R+10)*Math.sin(t.a*DEG); ctx.fillText(t.l,x,y+4); }
+  ctx.restore();
+}
+
+// ===== DOM and controls =====
+const canvas=document.getElementById('dial');
+const latEl=document.getElementById('lat');
+const lonEl=document.getElementById('lon');
+const tzEl=document.getElementById('tz');
+const rEl=document.getElementById('radius');
+const dtEl=document.getElementById('dt');
+const nowBtn=document.getElementById('nowBtn');
+const playBtn=document.getElementById('playBtn');
+const stopBtn=document.getElementById('stopBtn');
+const exportBtn=document.getElementById('exportBtn');
+const resetBtn=document.getElementById('resetBtn');
+const showHoursEl=document.getElementById('showHours');
+const showSiEl=document.getElementById('showSi');
+const showSeasonsEl=document.getElementById('showSeasons');
+const clipDayEl=document.getElementById('clipDay');
+const useEoTEl=document.getElementById('useEoT');
+const labelsEl=document.getElementById('labels');
+const latVal=document.getElementById('latVal');
+const lonVal=document.getElementById('lonVal');
+const rVal=document.getElementById('rVal');
+
+function readLocalDate(){
+  const v=dtEl.value; if(!v){return new Date();}
+  // datetime-local is local already
+  return new Date(v);
+}
+function setNow(){
+  const d=new Date(); const pad=(n)=>String(n).padStart(2,'0');
+  const s=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  dtEl.value=s;
+}
+
+let timer=null; let speed=60; // seconds per real second
+function tick(){
+  const d=readLocalDate(); d.setSeconds(d.getSeconds()+speed); dtEl.valueAsDate=d; drawAll();
+}
+
+[nowBtn,playBtn,stopBtn,exportBtn,resetBtn, latEl, lonEl, tzEl, rEl, dtEl, showHoursEl, showSiEl, showSeasonsEl, clipDayEl, useEoTEl, labelsEl]
+.forEach(el=>{
+  if(el===nowBtn) el.onclick=()=>{ setNow(); drawAll(); };
+  else if(el===playBtn) el.onclick=()=>{ if(timer) return; timer=setInterval(tick, 100); };
+  else if(el===stopBtn) el.onclick=()=>{ if(timer){ clearInterval(timer); timer=null; } };
+  else if(el===exportBtn) el.onclick=()=>{ const a=document.createElement('a'); a.download='angbu-ilgu.png'; a.href=canvas.toDataURL('image/png'); a.click(); };
+  else if(el===resetBtn) el.onclick=()=>{ latEl.value=37.57; lonEl.value=126.98; tzEl.value=9; rEl.value=260; setNow(); showHoursEl.checked=showSiEl.checked=showSeasonsEl.checked=clipDayEl.checked=useEoTEl.checked=labelsEl.checked=true; drawAll(); };
+  else { el.addEventListener('input', drawAll); el.addEventListener('change', drawAll); }
+});
+
+// Initialize
+setNow(); drawAll();
+</script>
 </body>
 </html>
