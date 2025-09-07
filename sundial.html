@@ -38,12 +38,39 @@
     <label for="city">Choose City:</label>
     <select id="city">
       <option value="37.57,126.98,9">Seoul</option>
+      <option value="36.99,127.93,9">Daejeon</option>
+      <option value="35.18,129.08,9">Busan</option>
+      <option value="33.50,126.53,9">Jeju</option>
       <option value="40.71,-74.01,-5">New York</option>
       <option value="34.05,-118.25,-8">Los Angeles</option>
-      <option value="35.68,139.76,9">Tokyo</option>
+      <option value="41.88,-87.63,-6">Chicago</option>
+      <option value="47.61,-122.33,-8">Seattle</option>
+      <option value="25.76,-80.19,-5">Miami</option>
       <option value="51.51,-0.13,0">London</option>
       <option value="48.86,2.35,1">Paris</option>
+      <option value="52.52,13.41,1">Berlin</option>
+      <option value="55.75,37.62,3">Moscow</option>
+      <option value="35.68,139.76,9">Tokyo</option>
+      <option value="22.28,114.16,8">Hong Kong</option>
+      <option value="1.35,103.82,8">Singapore</option>
+      <option value="-33.87,151.21,10">Sydney</option>
+      <option value="-37.81,144.96,10">Melbourne</option>
+      <option value="28.61,77.21,5.5">New Delhi</option>
+      <option value="31.23,121.47,8">Shanghai</option>
+      <option value="25.04,121.56,8">Taipei</option>
+      <option value="24.86,67.01,5">Karachi</option>
+      <option value="35.69,51.39,3.5">Tehran</option>
       <option value="30.60,114.30,8">Wuhan</option>
+      <option value="13.75,100.50,7">Bangkok</option>
+      <option value="-23.55,-46.63,-3">São Paulo</option>
+      <option value="19.43,-99.13,-6">Mexico City</option>
+      <option value="-34.60,-58.38,-3">Buenos Aires</option>
+      <option value="6.45,3.40,1">Lagos</option>
+      <option value="-1.29,36.82,3">Nairobi</option>
+      <option value="-26.20,28.04,2">Johannesburg</option>
+      <option value="25.20,55.27,4">Dubai</option>
+      <option value="21.39,39.86,3">Jeddah</option>
+      <option value="59.93,30.33,3">Saint Petersburg</option>
     </select>
 
     <label>Latitude φ (°): <span id="latVal">37.57</span></label>
@@ -93,7 +120,7 @@
       <div class="row"><span class="sw" style="background:var(--winter)"></span> Winter solstice</div>
       <div class="row"><span class="sw" style="background:var(--shadow)"></span> Shadow point</div>
     </div>
-    <div class="note">Defaults set for Seoul (φ≈37.57°, λ≈126.98°, KST UTC+9). Traditional Angbu‑ilgu in Joseon typically engraved monthly date guides and the 12‑<em>si</em> scale alongside civil hours.</div>
+    <div class="note">City time zones ignore DST for simplicity; adjust manually if needed. Defaults set for Seoul (φ≈37.57°, λ≈126.98°, KST UTC+9).</div>
   </section>
 
   <section class="card">
@@ -101,8 +128,172 @@
   </section>
 </main>
 <script>
-// Existing functions omitted for brevity (unchanged)
-// ... keep all previous code definitions here ...
+// ===== Utilities and math =====
+const DEG=Math.PI/180, RAD=180/Math.PI;
+const css=(v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function jdFromDate(date){ // UTC -> JD
+  return date.getTime()/86400000+2440587.5; // Unix epoch to JD
+}
+function sunGeom(dateUTC){
+  const JD=jdFromDate(dateUTC), T=(JD-2451545.0)/36525; // Julian centuries J2000
+  const L0=(280.46646+36000.76983*T+0.0003032*T*T)%360; // mean longitude
+  const M=357.52911+35999.05029*T-0.0001537*T*T; // mean anomaly
+  const e=0.016708634-0.000042037*T-0.0000001267*T*T; // eccentricity
+  const C=(1.914602-0.004817*T-0.000014*T*T)*Math.sin(M*DEG)
+         +(0.019993-0.000101*T)*Math.sin(2*M*DEG)
+         +0.000289*Math.sin(3*M*DEG);
+  const trueLong=L0+C; // true longitude
+  const Omega=125.04-1934.136*T;
+  const lambda=trueLong-0.00569-0.00478*Math.sin(Omega*DEG); // apparent longitude
+  const eps0=23.439291-0.0130042*T-1.64e-7*T*T+5.04e-7*T*T*T; // mean obliquity
+  const eps=eps0+0.00256*Math.cos(Omega*DEG); // apparent obliquity
+  const sinDec=Math.sin(eps*DEG)*Math.sin(lambda*DEG);
+  const dec=Math.asin(sinDec)*RAD; // declination
+  // Equation of time (minutes)
+  const y=Math.tan((eps*DEG)/2); const y2=y*y;
+  const Etime=4*RAD*( y2*Math.sin(2*L0*DEG) - 2*e*Math.sin(M*DEG) + 4*e*y2*Math.sin(M*DEG)*Math.cos(2*L0*DEG)
+                 - 0.5*y2*y2*Math.sin(4*L0*DEG) - 1.25*e*e*Math.sin(2*M*DEG) );
+  return {dec, Etime};
+}
+function sunVectorTopo(lat, dec, Hdeg){ // local unit vector (x East, y North, z Up)
+  const phi=lat*DEG, d=dec*DEG, H=Hdeg*DEG;
+  const x=Math.cos(d)*Math.sin(H);
+  const y=Math.cos(phi)*Math.sin(d)-Math.sin(phi)*Math.cos(d)*Math.cos(H);
+  const z=Math.sin(phi)*Math.sin(d)+Math.cos(phi)*Math.cos(d)*Math.cos(H);
+  return {x,y,z};
+}
+function hourAngleDeg(dateLocal, tzHours, lonDeg, useEoT){
+  const utcMs=dateLocal.getTime()-tzHours*3600*1000; // local -> UTC
+  const dateUTC=new Date(utcMs);
+  const {Etime}=sunGeom(dateUTC); // minutes
+  const offsetMin= useEoT ? (-Etime) : 0; // apparent solar time correction
+  const mins=dateLocal.getHours()*60+dateLocal.getMinutes()+dateLocal.getSeconds()/60 + offsetMin + (lonDeg*4); // 4 min/deg east
+  const H=15*((mins/60)-12); // hour angle deg
+  return {H, dateUTC};
+}
+function bowlShadowPoint(R, s){
+  return {x:-R*s.x,y:-R*s.y,z:-R*s.z}; // |s|=1 ⇒ |p|=R on inner hemisphere
+}
+const monthDec=[-20.0,-13.0,-2.0,9.0,18.0,23.0,21.0,14.0,4.0,-8.0,-18.0,-23.0];
+const siLabels=['Ja','Chuk','In','Myu','Jin','Sa','O','Mi','Sin','Yu','Sul','Hae'];
+
+// ===== Drawing =====
+function drawAll(){
+  const lat=parseFloat(latEl.value), lon=parseFloat(lonEl.value), R=parseFloat(rEl.value);
+  latVal.textContent=lat.toFixed(2); lonVal.textContent=lon.toFixed(2); rVal.textContent=R.toFixed(0);
+  const tz=parseFloat(tzEl.value);
+  const dateLocal=readLocalDate();
+  const {H, dateUTC}=hourAngleDeg(dateLocal, tz, lon, useEoTEl.checked);
+  const {dec}=sunGeom(dateUTC);
+  const s=sunVectorTopo(lat, dec, H);
+
+  const w=canvas.width, h=canvas.height; const cx=w*0.52, cy=h*0.60;
+  const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,w,h);
+
+  // Base
+  ctx.fillStyle=css('--base'); ctx.fillRect(cx-R*1.4, cy+R+16, R*2.8, 16);
+
+  // Bowl rim
+  ctx.lineWidth=2; ctx.strokeStyle=css('--rim');
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
+
+  // Clip to bowl interior
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.clip();
+
+  // Subtle radial guides
+  ctx.strokeStyle='#00000012'; ctx.lineWidth=1;
+  for(let k=1;k<=3;k++){ ctx.beginPath(); ctx.arc(cx,cy,(R*k/3),0,Math.PI*2); ctx.stroke(); }
+
+  // Seasonal curves & monthly date engravings
+  if(showSeasonsEl.checked){
+    drawDeclinationCurve(ctx,cx,cy,R,lat, +23.44, css('--summer'));
+    drawDeclinationCurve(ctx,cx,cy,R,lat, 0.00,  css('--eq'));
+    drawDeclinationCurve(ctx,cx,cy,R,lat, -23.44,css('--winter'));
+    for(let m=0;m<12;m++) drawDeclinationCurve(ctx,cx,cy,R,lat, monthDec[m], css('--season'), 60);
+  }
+
+  // Hour lines (civil hours 0..23)
+  if(showHoursEl.checked){
+    ctx.strokeStyle=css('--hour'); ctx.lineWidth=1.25;
+    for(let hr=0; hr<24; hr++){
+      drawHourCurve(ctx,cx,cy,R,lat,(hr-12)*15, clipDayEl.checked);
+      if(labelsEl.checked) placeHourLabel(ctx,cx,cy,R,lat,(hr-12)*15,hr);
+    }
+  }
+
+  // 12‑si lines (centered every 2 hours)
+  if(showSiEl.checked){
+    ctx.strokeStyle=css('--si'); ctx.lineWidth=1.25;
+    for(let i=0;i<12;i++){
+      const Hdeg=(i*30-180)+15; // align with noon
+      drawHourCurve(ctx,cx,cy,R,lat,Hdeg, clipDayEl.checked);
+      if(labelsEl.checked) placeSiLabel(ctx,cx,cy,R,lat,Hdeg, siLabels[i]);
+    }
+  }
+
+  // Live shadow point
+  const sunUp=s.z>0;
+  if(!clipDayEl.checked || sunUp){
+    const p=bowlShadowPoint(R,s);
+    const X=cx+p.x, Y=cy+p.y;
+    ctx.fillStyle=css('--shadow');
+    ctx.beginPath(); ctx.arc(X,Y,4.2,0,Math.PI*2); ctx.fill();
+  }
+
+  ctx.restore(); // end clip
+
+  // Cardinal rim ticks
+  drawCardinals(ctx,cx,cy,R);
+
+  // Header text
+  ctx.fillStyle='#111'; ctx.font='600 13px system-ui,Segoe UI'; ctx.textAlign='center';
+  const info=`φ ${lat.toFixed(2)}°, λ ${lon.toFixed(2)}°, tz ${tz>=0?'+':''}${tz}; Dec ${dec.toFixed(2)}°`;
+  ctx.fillText(info, cx, cy-R-14);
+}
+
+function drawDeclinationCurve(ctx,cx,cy,R,lat,dec,color, step=0.5){
+  ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+  let started=false; const clipDay=clipDayEl.checked;
+  for(let H=-180; H<=180; H+=step){
+    const s=sunVectorTopo(lat,dec,H); if(clipDay && s.z<=0) {continue;}
+    const p=bowlShadowPoint(R,s); if(p.z>1e-6) continue; // keep lower hemisphere
+    const X=cx+p.x, Y=cy+p.y;
+    if(!started){ctx.moveTo(X,Y); started=true;} else ctx.lineTo(X,Y);
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+function drawHourCurve(ctx,cx,cy,R,lat,Hdeg,clipDay){
+  ctx.save(); ctx.beginPath(); let started=false, last=false;
+  for(let dec=-23.44; dec<=23.44; dec+=0.2){
+    const s=sunVectorTopo(lat,dec,Hdeg); const ok=(!clipDay)||s.z>0; const p=bowlShadowPoint(R,s);
+    if(p.z>1e-6 || !ok){ last=false; continue; }
+    const X=cx+p.x, Y=cy+p.y;
+    if(!started){ctx.moveTo(X,Y); started=true; last=true;} else { if(!last){ctx.moveTo(X,Y); last=true;} else ctx.lineTo(X,Y); }
+  }
+  ctx.lineWidth=1.2; ctx.stroke(); ctx.restore();
+}
+
+function placeHourLabel(ctx,cx,cy,R,lat,Hdeg,hr){
+  const s=sunVectorTopo(lat,0,Hdeg); const p=bowlShadowPoint(R,s); if(p.z>0) return;
+  const X=cx+p.x, Y=cy+p.y; ctx.save(); ctx.fillStyle=css('--hour'); ctx.font='700 11px system-ui'; ctx.textAlign='center';
+  const label=String(hr).padStart(2,'0'); ctx.fillText(label,X,Y-2); ctx.restore();
+}
+function placeSiLabel(ctx,cx,cy,R,lat,Hdeg,label){
+  const s=sunVectorTopo(lat,0,Hdeg); const p=bowlShadowPoint(R,s); if(p.z>0) return;
+  const X=cx+p.x, Y=cy+p.y; ctx.save(); ctx.fillStyle=css('--si'); ctx.font='700 11px system-ui'; ctx.textAlign='center'; ctx.fillText(label,X,Y+11); ctx.restore();
+}
+
+function drawCardinals(ctx,cx,cy,R){
+  ctx.save(); ctx.strokeStyle='#0008'; ctx.setLineDash([5,6]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(cx,cy-R-8); ctx.lineTo(cx,cy+R+8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-R-8,cy); ctx.lineTo(cx+R+8,cy); ctx.stroke();
+  ctx.fillStyle='#111'; ctx.font='700 12px system-ui'; ctx.textAlign='center';
+  const ticks=[{a:0,l:'E'},{a:90,l:'N'},{a:180,l:'W'},{a:270,l:'S'}];
+  for(const t of ticks){ const x=cx+(R+10)*Math.cos(t.a*DEG); const y=cy+(R+10)*Math.sin(t.a*DEG); ctx.fillText(t.l,x,y+4); }
+  ctx.restore();
+}
 
 // ===== DOM and controls =====
 const canvas=document.getElementById('dial');
@@ -127,14 +318,39 @@ const latVal=document.getElementById('latVal');
 const lonVal=document.getElementById('lonVal');
 const rVal=document.getElementById('rVal');
 
+function readLocalDate(){
+  const v=dtEl.value; if(!v){return new Date();}
+  return new Date(v);
+}
+function setNow(){
+  const d=new Date(); const pad=(n)=>String(n).padStart(2,'0');
+  const s=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  dtEl.value=s;
+}
+
+let timer=null; let speed=60; // seconds per real second
+function tick(){
+  const d=readLocalDate(); d.setSeconds(d.getSeconds()+speed); dtEl.valueAsDate=d; drawAll();
+}
+
 // Update lat/lon/tz when city changes
 cityEl.addEventListener('change',()=>{
   const [lat,lon,tz]=cityEl.value.split(',').map(Number);
   latEl.value=lat; lonEl.value=lon; tzEl.value=tz; drawAll();
 });
 
-// keep rest of original event bindings
-// ... existing control bindings and drawAll() call ...
+[nowBtn,playBtn,stopBtn,exportBtn,resetBtn, latEl, lonEl, tzEl, rEl, dtEl, showHoursEl, showSiEl, showSeasonsEl, clipDayEl, useEoTEl, labelsEl]
+.forEach(el=>{
+  if(el===nowBtn) el.onclick=()=>{ setNow(); drawAll(); };
+  else if(el===playBtn) el.onclick=()=>{ if(timer) return; timer=setInterval(tick, 100); };
+  else if(el===stopBtn) el.onclick=()=>{ if(timer){ clearInterval(timer); timer=null; } };
+  else if(el===exportBtn) el.onclick=()=>{ const a=document.createElement('a'); a.download='angbu-ilgu.png'; a.href=canvas.toDataURL('image/png'); a.click(); };
+  else if(el===resetBtn) el.onclick=()=>{ const def=cityEl.querySelector('option[value="37.57,126.98,9"]'); cityEl.value=def.value; const [lat,lon,tz]=def.value.split(',').map(Number); latEl.value=lat; lonEl.value=lon; tzEl.value=tz; rEl.value=260; setNow(); showHoursEl.checked=showSiEl.checked=showSeasonsEl.checked=clipDayEl.checked=useEoTEl.checked=labelsEl.checked=true; drawAll(); };
+  else { el.addEventListener('input', drawAll); el.addEventListener('change', drawAll); }
+});
+
+// Initialize
+setNow(); drawAll();
 </script>
 </body>
 </html>
