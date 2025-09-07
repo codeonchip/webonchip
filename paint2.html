@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paint Editor – Shapes & Text</title>
+  <style>
+    :root { --bg:#f7f7fb; --panel:#fff; --border:#e6e6ef; --text:#1f2330; --muted:#697088; --accent:#2563eb; }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text);display:grid;grid-template-rows:auto 1fr}
+    header{background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:10px 14px;position:sticky;top:0;z-index:10}
+    .brand{font-weight:700;letter-spacing:.2px;margin-right:8px}
+    .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .group{display:inline-flex;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:6px;gap:6px}
+    .btn{appearance:none;border:1px solid var(--border);background:#fff;color:var(--text);border-radius:10px;padding:8px 10px;font-size:14px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+    .btn:hover{border-color:#cfd3e1}
+    .btn[aria-pressed="true"],.btn.primary{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+    .btn.icon{width:36px;height:36px;justify-content:center;padding:0}
+    input[type=color]{appearance:none;border:none;padding:0;width:36px;height:36px;border-radius:10px;overflow:hidden;cursor:pointer;border:1px solid var(--border)}
+    input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+    input[type=color]::-webkit-color-swatch{border:none}
+    .slider-wrap{display:inline-flex;align-items:center;gap:8px;padding:0 8px}
+    .slider-wrap input[type=range]{width:140px}
+    .meta{color:var(--muted);font-size:12px}
+    .stage{position:relative;width:100%;height:100%;overflow:hidden}
+    canvas{display:block;width:100%;height:100%;background:#fff;cursor:crosshair}
+    .cursor-preview{position:absolute;pointer-events:none;border:1px solid rgba(0,0,0,.35);border-radius:50%;transform:translate(-50%,-50%)}
+    .footer-hints{position:absolute;left:12px;bottom:12px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.8);border:1px solid var(--border);padding:6px 8px;border-radius:8px}
+    /* text input overlay */
+    #textOverlay{position:absolute;display:none;min-width:120px;padding:2px 6px;border:1px dashed var(--accent);background:#ffffffdd;color:var(--text);border-radius:6px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">🎨 Paint</div>
+    <div class="toolbar">
+      <div class="group" role="group" aria-label="Tools">
+        <button class="btn icon" id="tool-pen" title="Brush (B)" aria-pressed="true">✏️</button>
+        <button class="btn icon" id="tool-eraser" title="Eraser (E)" aria-pressed="false">🩹</button>
+        <button class="btn icon" id="tool-line" title="Line (L)">／</button>
+        <button class="btn icon" id="tool-rect" title="Rectangle (R)">▭</button>
+        <button class="btn icon" id="tool-ellipse" title="Ellipse (O)">◯</button>
+        <button class="btn icon" id="tool-text" title="Text (T)">T</button>
+        <button class="btn icon" id="tool-undo" title="Undo (Ctrl+Z)">↺</button>
+        <button class="btn icon" id="tool-redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)">↻</button>
+        <button class="btn" id="tool-clear" title="Clear Canvas">Clear</button>
+      </div>
+
+      <div class="group" aria-label="Color">
+        <input type="color" id="color" value="#1f2937" title="Stroke / Text color" />
+        <span class="meta" id="hex">#1F2937</span>
+      </div>
+
+      <div class="group" aria-label="Stroke/Brush size">
+        <div class="slider-wrap">
+          <label for="size" class="meta">Size</label>
+          <input type="range" id="size" min="1" max="120" value="10" />
+          <span id="sizeVal" class="meta">10 px</span>
+        </div>
+      </div>
+
+      <div class="group" aria-label="Fill">
+        <input type="color" id="fillColor" value="#000000" title="Fill color" />
+        <label class="meta" for="fillToggle">
+          <input type="checkbox" id="fillToggle" checked /> Fill
+        </label>
+      </div>
+
+      <div class="group" aria-label="Export">
+        <button class="btn" id="tool-save" title="Save as PNG">Save PNG</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div id="cursorPreview" class="cursor-preview" aria-hidden="true"></div>
+    <input id="textOverlay" type="text" placeholder="Type and press Enter" />
+    <div class="footer-hints">Shortcuts: <b>B</b>=Brush, <b>E</b>=Eraser, <b>L</b>=Line, <b>R</b>=Rect, <b>O</b>=Ellipse, <b>T</b>=Text, <b>[</b>/<b>]</b>=size, <b>Ctrl+Z</b>=Undo, <b>Ctrl+Y</b>=Redo</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const stage = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+    const toolPen = document.getElementById('tool-pen');
+    const toolEraser = document.getElementById('tool-eraser');
+    const toolLine = document.getElementById('tool-line');
+    const toolRect = document.getElementById('tool-rect');
+    const toolEllipse = document.getElementById('tool-ellipse');
+    const toolText = document.getElementById('tool-text');
+    const toolUndo = document.getElementById('tool-undo');
+    const toolRedo = document.getElementById('tool-redo');
+    const toolClear = document.getElementById('tool-clear');
+    const toolSave = document.getElementById('tool-save');
+    const colorInput = document.getElementById('color');
+    const hexLabel = document.getElementById('hex');
+    const sizeInput = document.getElementById('size');
+    const sizeVal = document.getElementById('sizeVal');
+    const cursorPreview = document.getElementById('cursorPreview');
+    const fillToggle = document.getElementById('fillToggle');
+    const fillColor = document.getElementById('fillColor');
+    const textOverlay = document.getElementById('textOverlay');
+
+    let drawing = false;
+    let tool = 'pen'; // 'pen' | 'eraser' | 'line' | 'rect' | 'ellipse' | 'text'
+    let startX = 0, startY = 0;
+    let lastX = 0, lastY = 0;
+
+    // High-DPI resize
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const { clientWidth: w, clientHeight: h } = stage;
+      const prev = history[history.length - 1];
+      canvas.width = Math.max(1, Math.floor(w * dpr));
+      canvas.height = Math.max(1, Math.floor(h * dpr));
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.scale(dpr, dpr);
+      if (!prev) {
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+        snapshot();
+      } else {
+        restoreFrom(prev);
+      }
+    }
+
+    // History for undo/redo
+    const history = [];
+    let redoStack = [];
+    const MAX_HISTORY = 80;
+
+    function snapshot() {
+      try {
+        const data = canvas.toDataURL('image/png');
+        history.push(data);
+        if (history.length > MAX_HISTORY) history.shift();
+        redoStack = [];
+      } catch(e){ console.warn('Snapshot failed', e); }
+    }
+
+    function restoreFrom(dataURL) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const { clientWidth: w, clientHeight: h } = stage;
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve();
+        };
+        img.src = dataURL;
+      });
+    }
+
+    function setTool(next) {
+      tool = next;
+      [toolPen, toolEraser, toolLine, toolRect, toolEllipse, toolText].forEach(b=>b.setAttribute('aria-pressed','false'));
+      ({pen:toolPen, eraser:toolEraser, line:toolLine, rect:toolRect, ellipse:toolEllipse, text:toolText}[tool]).setAttribute('aria-pressed','true');
+      canvas.style.cursor = tool==='text' ? 'text' : 'crosshair';
+      hideTextOverlay();
+    }
+
+    function updateCursorPreview(x, y) {
+      const r = parseInt(sizeInput.value, 10) / 2;
+      cursorPreview.style.width = (r*2) + 'px';
+      cursorPreview.style.height = (r*2) + 'px';
+      cursorPreview.style.left = x + 'px';
+      cursorPreview.style.top = y + 'px';
+      cursorPreview.style.borderColor = tool === 'eraser' ? 'rgba(220,38,38,.7)' : 'rgba(0,0,0,.35)';
+      cursorPreview.style.display = (tool==='text') ? 'none' : 'block';
+    }
+
+    function getPos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      if (evt.touches && evt.touches[0]) return { x: evt.touches[0].clientX - rect.left, y: evt.touches[0].clientY - rect.top };
+      return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+    }
+
+    function applyCommonStroke() {
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = parseInt(sizeInput.value, 10);
+      ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : colorInput.value;
+      ctx.fillStyle = fillColor.value;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // Freehand draw/erase
+    function startFreehand(x, y){
+      drawing = true; lastX = x; lastY = y; applyCommonStroke(); ctx.beginPath(); ctx.moveTo(x,y); }
+    function drawFreehand(x, y){ if(!drawing) return; ctx.lineTo(x,y); ctx.stroke(); lastX=x; lastY=y; }
+    function endFreehand(){ if(!drawing) return; drawing=false; ctx.closePath(); snapshot(); }
+
+    // Shape helpers (preview by restoring last snapshot and re-drawing temporary shape)
+    let previewBase = null; // dataURL before starting shape drag
+
+    function startShape(x, y){ drawing = true; startX=x; startY=y; previewBase = history[history.length-1]; }
+
+    function drawShapePreview(x, y){ if(!drawing) return; restoreFrom(previewBase).then(()=>{ applyCommonStroke(); drawOneShape(tool, startX, startY, x, y, true); }); }
+
+    function endShape(x, y){ if(!drawing) return; drawing=false; applyCommonStroke(); drawOneShape(tool, startX, startY, x, y, false); snapshot(); }
+
+    function drawOneShape(kind, x0, y0, x1, y1, preview){
+      const w = x1 - x0, h = y1 - y0;
+      ctx.beginPath();
+      if (kind === 'line') {
+        ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      } else if (kind === 'rect') {
+        const rx = Math.min(x0, x1), ry = Math.min(y0, y1), rw = Math.abs(w), rh = Math.abs(h);
+        if (fillToggle.checked) ctx.fillRect(rx, ry, rw, rh);
+        ctx.strokeRect(rx, ry, rw, rh);
+      } else if (kind === 'ellipse') {
+        const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; const rx = Math.abs(w) / 2, ry = Math.abs(h) / 2;
+        ctx.ellipse(cx, cy, Math.max(1,rx), Math.max(1,ry), 0, 0, Math.PI*2);
+        if (fillToggle.checked) ctx.fill();
+        ctx.stroke();
+      }
+      ctx.closePath();
+    }
+
+    // Text tool
+    function showTextOverlay(x, y){
+      textOverlay.style.left = x + 'px';
+      textOverlay.style.top = y + 'px';
+      textOverlay.style.display = 'block';
+      textOverlay.value = '';
+      textOverlay.focus();
+    }
+    function hideTextOverlay(){ textOverlay.style.display='none'; }
+    function commitText(x, y, text){
+      if (!text) return;
+      ctx.save();
+      const px = parseInt(sizeInput.value, 10) * 3; // map brush size to font size
+      ctx.font = `${px}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial`;
+      ctx.fillStyle = colorInput.value;
+      ctx.textBaseline = 'top';
+      ctx.fillText(text, x, y);
+      ctx.restore();
+      snapshot();
+    }
+
+    // Handlers
+    canvas.addEventListener('mousedown', e => {
+      const p = getPos(e);
+      if (tool === 'pen' || tool === 'eraser') startFreehand(p.x, p.y);
+      else if (tool === 'line' || tool === 'rect' || tool === 'ellipse') startShape(p.x, p.y);
+      else if (tool === 'text') showTextOverlay(p.x, p.y);
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      const p = getPos(e);
+      if (tool === 'pen' || tool === 'eraser') drawFreehand(p.x, p.y);
+      else if (tool === 'line' || tool === 'rect' || tool === 'ellipse') drawShapePreview(p.x, p.y);
+      updateCursorPreview(p.x, p.y);
+    });
+
+    window.addEventListener('mouseup', e => {
+      const p = getPos(e);
+      if (tool === 'pen' || tool === 'eraser') endFreehand();
+      else if (tool === 'line' || tool === 'rect' || tool === 'ellipse') endShape(p.x, p.y);
+    });
+
+    // Touch support
+    canvas.addEventListener('touchstart', e => { const p = getPos(e); if (tool==='text'){ showTextOverlay(p.x,p.y);} else if (tool==='pen'||tool==='eraser'){ startFreehand(p.x,p.y);} else { startShape(p.x,p.y);} e.preventDefault(); }, { passive:false });
+    canvas.addEventListener('touchmove', e => { const p = getPos(e); if (tool==='pen'||tool==='eraser'){ drawFreehand(p.x,p.y);} else if (tool==='line'||tool==='rect'||tool==='ellipse'){ drawShapePreview(p.x,p.y);} updateCursorPreview(p.x,p.y); e.preventDefault(); }, { passive:false });
+    canvas.addEventListener('touchend', e => { if (tool==='pen'||tool==='eraser'){ endFreehand(); } else if (tool==='line'||tool==='rect'||tool==='ellipse'){ const rect = canvas.getBoundingClientRect(); const x = (lastX||startX); const y = (lastY||startY); endShape(x,y);} });
+
+    // UI buttons
+    toolPen.addEventListener('click', () => setTool('pen'));
+    toolEraser.addEventListener('click', () => setTool('eraser'));
+    toolLine.addEventListener('click', () => setTool('line'));
+    toolRect.addEventListener('click', () => setTool('rect'));
+    toolEllipse.addEventListener('click', () => setTool('ellipse'));
+    toolText.addEventListener('click', () => setTool('text'));
+
+    colorInput.addEventListener('input', () => { hexLabel.textContent = colorInput.value.toUpperCase(); });
+    sizeInput.addEventListener('input', () => { sizeVal.textContent = sizeInput.value + ' px'; });
+
+    fillColor.addEventListener('input', () => {});
+
+    toolClear.addEventListener('click', () => {
+      const { clientWidth: w, clientHeight: h } = stage;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      snapshot();
+    });
+
+    toolUndo.addEventListener('click', async () => {
+      if (history.length > 1) {
+        const current = history.pop();
+        redoStack.push(current);
+        await restoreFrom(history[history.length - 1]);
+      }
+    });
+
+    toolRedo.addEventListener('click', async () => {
+      if (redoStack.length > 0) {
+        const state = redoStack.pop();
+        history.push(state);
+        await restoreFrom(state);
+      }
+    });
+
+    toolSave.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = `painting-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.target === textOverlay) return; // let typing pass through
+      if (e.target.matches('input, textarea')) return;
+      const k = e.key.toLowerCase();
+      if (k === 'b') setTool('pen');
+      if (k === 'e') setTool('eraser');
+      if (k === 'l') setTool('line');
+      if (k === 'r') setTool('rect');
+      if (k === 'o') setTool('ellipse');
+      if (k === 't') setTool('text');
+      if (e.key === '[') { sizeInput.value = Math.max(1, parseInt(sizeInput.value) - 1); sizeInput.dispatchEvent(new Event('input')); }
+      if (e.key === ']') { sizeInput.value = Math.min(120, parseInt(sizeInput.value) + 1); sizeInput.dispatchEvent(new Event('input')); }
+      if ((e.ctrlKey || e.metaKey) && k === 'z') { if (e.shiftKey) { toolRedo.click(); } else { toolUndo.click(); } e.preventDefault(); }
+      if ((e.ctrlKey || e.metaKey) && k === 'y') { toolRedo.click(); e.preventDefault(); }
+    });
+
+    // Text overlay commit
+    textOverlay.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter') {
+        const rect = canvas.getBoundingClientRect();
+        const x = parseFloat(textOverlay.style.left) - rect.left;
+        const y = parseFloat(textOverlay.style.top) - rect.top;
+        commitText(x, y, textOverlay.value);
+        hideTextOverlay();
+      } else if (e.key === 'Escape') {
+        hideTextOverlay();
+      }
+    });
+
+    // Resize observer keeps canvas crisp
+    const ro = new ResizeObserver(() => { resizeCanvas(); });
+    ro.observe(stage);
+
+    // Init
+    function init(){
+      resizeCanvas();
+      sizeInput.dispatchEvent(new Event('input'));
+      hexLabel.textContent = colorInput.value.toUpperCase();
+      setTool('pen');
+    }
+    init();
+  </script>
+</body>
+</html>
