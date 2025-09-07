@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>앙부일구 (Angbu Ilgu) — Simple Mimic</title>
+<style>
+  :root{--bg:#0f1220;--panel:#14182a;--border:#202643;--ink:#e8edff;--muted:#9aa5c5;--accent:#67a1ff;--sun:#ffd166;--shadow:#111827}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:radial-gradient(1200px 800px at 50% -20%, #161b2a, #0b0d18);color:var(--ink);display:grid;grid-template-rows:auto 1fr}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#0f1427ee,#0f1427cc 60%,transparent);border-bottom:1px solid var(--border)}
+  .bar{display:flex;align-items:center;gap:12px;padding:12px 16px;flex-wrap:wrap}
+  .brand{font-weight:800;letter-spacing:.3px}
+  .group{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:8px}
+  input[type="range"], input[type="number"], select{background:#0f1430;border:1px solid #2a3358;color:var(--ink);padding:8px 10px;border-radius:10px}
+  input[type="range"]{width:220px}
+  .meta{color:var(--muted);font-size:12px}
+  main{display:grid;place-items:center;padding:18px}
+  .wrap{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start;max-width:1100px;width:100%}
+  .stage{background:linear-gradient(180deg,#0d1225,#0a0e1c);border:1px solid var(--border);border-radius:16px;padding:12px;display:grid;place-items:center;box-shadow:0 12px 40px #0006}
+  canvas{background:#0b0f1c;border-radius:12px;max-width:100%;height:auto}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .big{font:700 28px/1 ui-sans-serif,system-ui}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid #2a3450;border-radius:999px;padding:4px 8px;background:#0f1527}
+  button{appearance:none;border:1px solid #33406d;background:#121a34;color:#dbe3ff;border-radius:10px;padding:8px 12px;cursor:pointer}
+  button:hover{filter:brightness(1.05)}
+  .hint{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">🕒 앙부일구 Mimic (학습용)</div>
+    <div class="group">
+      <label class="meta">위도(°): </label>
+      <input id="lat" type="number" value="37.57" step="0.01" min="-66" max="66" title="Latitude"/>
+      <span class="meta">* 단순화된 모델</span>
+    </div>
+    <div class="group">
+      <label class="meta">시간: </label>
+      <input id="time" type="range" min="0" max="1440" value="720"/>
+      <span id="timeLabel" class="pill">12:00</span>
+      <button id="nowBtn">지금</button>
+    </div>
+    <div class="group">
+      <label class="meta">날짜: </label>
+      <input id="date" type="date"/>
+      <span class="meta">계절선(간단)</span>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    <div class="stage">
+      <canvas id="dial" width="640" height="640" aria-label="앙부일구 시뮬레이션"></canvas>
+    </div>
+    <div class="panel">
+      <div class="row"><div>읽은 시각</div><div id="readTime" class="big">--:--</div></div>
+      <div class="row"><div>태양 고도/방위(간단)</div><div id="sunInfo" class="pill">alt --°, az --°</div></div>
+      <div class="row"><div>그림자 길이</div><div id="shadowLen" class="pill">-- px</div></div>
+      <div class="row"><div>표시 모드</div>
+        <div>
+          <label class="meta"><input type="checkbox" id="showHourLines" checked/> 시각선</label>
+          <label class="meta"><input type="checkbox" id="showSeason" checked/> 계절선</label>
+          <label class="meta"><input type="checkbox" id="realSun"/> 대략적 태양</label>
+        </div>
+      </div>
+      <div class="hint">※ 실제 앙부일구는 정밀한 곡면/보정이 있지만, 이 페이지는 이해를 돕기 위한 <b>단순화</b> 모델입니다.</div>
+      <div class="hint">단축키: ←/→ 시간 −/+5분, ↑/↓ 시간 −/+30분, N=지금</div>
+    </div>
+  </div>
+</main>
+<script>
+(function(){
+  const canvas = document.getElementById('dial');
+  const ctx = canvas.getContext('2d');
+  const R = 280;      // bowl radius (px)
+  const rim = {x: canvas.width/2, y: canvas.height/2};
+
+  const latInput = document.getElementById('lat');
+  const timeInput = document.getElementById('time');
+  const timeLabel = document.getElementById('timeLabel');
+  const nowBtn = document.getElementById('nowBtn');
+  const dateInput = document.getElementById('date');
+  const readTime = document.getElementById('readTime');
+  const sunInfo = document.getElementById('sunInfo');
+  const shadowLen = document.getElementById('shadowLen');
+  const showHourLines = document.getElementById('showHourLines');
+  const showSeason = document.getElementById('showSeason');
+  const realSun = document.getElementById('realSun');
+
+  // Initialize date
+  const todayISO = new Date().toISOString().slice(0,10);
+  dateInput.value = todayISO;
+
+  function fmtClock(m){
+    const h = Math.floor(m/60); const min = Math.floor(m%60);
+    const h12 = ((h+11)%12)+1; const ampm = h<12? 'AM':'PM';
+    return `${String(h12).padStart(2,'0')}:${String(min).padStart(2,'0')} ${ampm}`;
+  }
+  function deg(rad){return rad*180/Math.PI}
+  function rad(deg){return deg*Math.PI/180}
+
+  // Very light-weight solar position (rough):
+  // returns {alt, az} degrees for given date/time and latitude; assumes longitude at local noon (no TZ corr) — for demo only
+  function roughSun(latDeg, minutes){
+    // day of year
+    const d = new Date(dateInput.value+'T00:00:00');
+    const yearStart = new Date(d.getFullYear(),0,1);
+    const n = Math.round((d - yearStart)/86400000)+1;
+    // declination approx (Cooper)
+    const dec = 23.44*Math.sin(rad(360*(284+n)/365));
+    // hour angle: minutes from solar noon (we approximate solar noon at 12:00)
+    const H = (minutes-720)/4; // minutes -> degrees (15°/hr = 1°/4min)
+    const φ = latDeg;
+    const alt = deg(Math.asin( Math.sin(rad(φ))*Math.sin(rad(dec)) + Math.cos(rad(φ))*Math.cos(rad(dec))*Math.cos(rad(H)) ));
+    // azimuth from south clockwise
+    const cosAz = (Math.sin(rad(dec)) - Math.sin(rad(alt))*Math.sin(rad(φ))) / (Math.cos(rad(alt))*Math.cos(rad(φ)));
+    let az = deg(Math.acos(Math.min(1,Math.max(-1,cosAz))));
+    if (Math.sin(rad(H))>0) az = 360-az; // afternoon
+    // convert to from north clockwise if needed; we keep from south CW
+    return {alt, azFromSouthCW: az};
+  }
+
+  function draw(){
+    const lat = parseFloat(latInput.value)||37;
+    const m = parseInt(timeInput.value,10);
+    timeLabel.textContent = fmtClock(m);
+
+    // Clear
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Bowl shadow/background
+    const grd = ctx.createRadialGradient(rim.x, rim.y-R*0.4, R*0.2, rim.x, rim.y, R);
+    grd.addColorStop(0,'#10162a'); grd.addColorStop(1,'#060913');
+    ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(rim.x, rim.y, R+16, 0, Math.PI*2); ctx.fill();
+
+    // Rim
+    ctx.strokeStyle = '#2a3258'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(rim.x, rim.y, R, 0, Math.PI*2); ctx.stroke();
+
+    // Hour lines (simplified projection like equatorial)
+    if (showHourLines.checked){
+      for(let h=6; h<=18; h++){
+        const H = (h-12)*15; // degrees
+        const a = rad(H);
+        const x = rim.x + R*Math.sin(a);
+        const y = rim.y + R*Math.cos(a);
+        ctx.strokeStyle = h===12 ? '#5aa9ff' : '#3a487a';
+        ctx.lineWidth = h===12 ? 3 : 1.5;
+        ctx.beginPath(); ctx.moveTo(rim.x, rim.y); ctx.lineTo(x, y); ctx.stroke();
+        // label
+        ctx.fillStyle = '#9fb3ff'; ctx.font = '12px system-ui, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        const lx = rim.x + (R+18)*Math.sin(a); const ly = rim.y + (R+18)*Math.cos(a);
+        ctx.fillText(h.toString(), lx, ly);
+      }
+    }
+
+    // Season curves (very rough: three arcs representing winter/eq/summer)
+    if (showSeason.checked){
+      const bands = [ -23.5, 0, 23.5 ];
+      bands.forEach((dec,i)=>{
+        const k = (dec/30); // simple vertical offset factor
+        ctx.strokeStyle = i===1? '#76e4ca' : '#4b5a91';
+        ctx.setLineDash(i===1?[4,3]:[2,3]);
+        ctx.beginPath();
+        ctx.arc(rim.x, rim.y+R*0.25*k, R*0.85, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+    }
+
+    // Gnomon (pin) — short post casting shadow onto bowl
+    ctx.strokeStyle = '#e5e7ff'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(rim.x, rim.y+R*0.15); ctx.lineTo(rim.x, rim.y-R*0.15); ctx.stroke();
+    ctx.fillStyle = '#e5e7ff'; ctx.beginPath(); ctx.arc(rim.x, rim.y-R*0.15, 4, 0, Math.PI*2); ctx.fill();
+
+    // Sun & shadow
+    let alt=45, azS= (m>=720? 270:90); // placeholder
+    if (realSun.checked){ const s=roughSun(lat,m); alt=s.alt; azS=s.azFromSouthCW; }
+
+    // Map sun to sky indicator (top-left corner)
+    const skyX = canvas.width - 130, skyY = 100;
+    ctx.strokeStyle = '#2a3258'; ctx.fillStyle='#0b1020'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(skyX, skyY, 60, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // sun position (simple)
+    const sunR = 60; const sunA = rad((azS+180)%360); const sunH = Math.max(0.1, alt/90);
+    const sx = skyX + sunR*0.8*Math.sin(sunA)*sunH; const sy = skyY - sunR*0.8*Math.cos(sunA)*sunH;
+    ctx.fillStyle = 'rgba(255,209,102,0.9)'; ctx.beginPath(); ctx.arc(sx, sy, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#9aa5c5'; ctx.font='12px system-ui'; ctx.textAlign='center'; ctx.fillText('하늘', skyX, skyY+75);
+
+    // Shadow direction on bowl (very simplified): use hour angle from time if not realSun
+    let Hdeg = (m-720)/4; // -180..+180
+    let shadowAngle = -rad(Hdeg); // rotate so noon points up
+    if (realSun.checked){
+      // Convert solar azimuth-from-south CW to shadow line around bowl
+      shadowAngle = rad(azS-180); // crude mapping
+    }
+
+    const sdx = Math.sin(shadowAngle), sdy = Math.cos(shadowAngle);
+    const endX = rim.x + sdx*(R*0.85);
+    const endY = rim.y + sdy*(R*0.85);
+
+    // Draw shadow line
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(rim.x, rim.y); ctx.lineTo(endX, endY); ctx.stroke();
+    ctx.strokeStyle = '#222b46'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(rim.x, rim.y); ctx.lineTo(endX, endY); ctx.stroke();
+
+    // Shadow tip dot
+    ctx.fillStyle = '#0a0f1e'; ctx.beginPath(); ctx.arc(endX, endY, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1f2b4d'; ctx.beginPath(); ctx.arc(endX, endY, 3, 0, Math.PI*2); ctx.fill();
+
+    // Read time from angle by nearest hour mark
+    let ang = (Math.atan2(endX-rim.x, endY-rim.y)); // inverted axes due to drawing
+    let hr = 12 - Math.round(deg(ang)/15);
+    while(hr<0) hr+=24; while(hr>=24) hr-=24;
+    const hh = hr%24; const label = hh===0?12: (hh>12?hh-12:hh);
+    const ampm = hh<12?'AM':'PM';
+    readTime.textContent = `${String(label).padStart(2,'0')}:00 ${ampm}`;
+
+    sunInfo.textContent = `alt ${alt.toFixed(0)}°, az ${((azS%360)+360)%360|0}°`;
+    shadowLen.textContent = `${Math.hypot(endX-rim.x, endY-rim.y).toFixed(0)} px`;
+  }
+
+  function setNow(){
+    const now = new Date();
+    const mins = now.getHours()*60 + now.getMinutes();
+    timeInput.value = mins; draw();
+  }
+
+  // Events
+  latInput.addEventListener('input', draw);
+  timeInput.addEventListener('input', draw);
+  nowBtn.addEventListener('click', setNow);
+  dateInput.addEventListener('change', draw);
+  showHourLines.addEventListener('change', draw);
+  showSeason.addEventListener('change', draw);
+  realSun.addEventListener('change', draw);
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', (e)=>{
+    if (e.key==='ArrowLeft') { timeInput.value = Math.max(0, +timeInput.value-5); draw(); }
+    if (e.key==='ArrowRight'){ timeInput.value = Math.min(1440, +timeInput.value+5); draw(); }
+    if (e.key==='ArrowUp')   { timeInput.value = Math.min(1440, +timeInput.value+30); draw(); }
+    if (e.key==='ArrowDown') { timeInput.value = Math.max(0, +timeInput.value-30); draw(); }
+    if (e.key.toLowerCase()==='n') setNow();
+  });
+
+  // First paint
+  setNow();
+})();
+</script>
+</body>
+</html>
