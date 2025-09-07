@@ -120,8 +120,9 @@
       <button class="btn" id="nowBtn">Now</button>
       <button class="btn" id="playBtn">▶ Play</button>
       <button class="btn" id="stopBtn">■ Stop</button>
-      <button class="btn" id="exportBtn">Export PNG</button>
-      <button class="btn" id="resetBtn">Reset</button>
+      <button class=\"btn\" id=\"exportBtn\">Export PNG</button>
+      <button class=\"btn\" id=\"downloadBtn\">Download HTML</button>
+      <button class=\"btn\" id=\"resetBtn\">Reset</button>
     </div>
 
     <div class="switch">
@@ -325,6 +326,7 @@ const nowBtn=document.getElementById('nowBtn');
 const playBtn=document.getElementById('playBtn');
 const stopBtn=document.getElementById('stopBtn');
 const exportBtn=document.getElementById('exportBtn');
+const downloadBtn=document.getElementById('downloadBtn');
 const resetBtn=document.getElementById('resetBtn');
 const showHoursEl=document.getElementById('showHours');
 const showSiEl=document.getElementById('showSi');
@@ -354,6 +356,7 @@ cityEl.addEventListener('change',()=>{ const [lat,lon,tz]=cityEl.value.split(','
   else if(el===playBtn) el.onclick=()=>{ if(timer) return; timer=setInterval(tick, 100); };
   else if(el===stopBtn) el.onclick=()=>{ if(timer){ clearInterval(timer); timer=null; } };
   else if(el===exportBtn) el.onclick=()=>{ const a=document.createElement('a'); a.download='angbu-ilgu.png'; a.href=canvas.toDataURL('image/png'); a.click(); };
+  else if(el===downloadBtn) el.onclick=()=>{ const src='<!DOCTYPE html>'+document.documentElement.outerHTML; const blob=new Blob([src],{type:'text/html'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='angbu-ilgu_simulator.html'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); };
   else if(el===resetBtn) el.onclick=()=>{ const def='37.57,126.98,9'; cityEl.value=def; const [lat,lon,tz]=def.split(',').map(Number); latEl.value=lat; lonEl.value=lon; tzEl.value=tz; rEl.value=260; setNow(); showHoursEl.checked=showSiEl.checked=showSeasonsEl.checked=clipDayEl.checked=useEoTEl.checked=labelsEl.checked=true; themeToggle.checked=true; applyTheme(); };
   else { el.addEventListener('input', drawAll); el.addEventListener('change', drawAll); }
 });
