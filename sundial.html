@@ -1,37 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Angbu‑ilgu — Full Interactive Simulator</title>
 <style>
+  /* THEME */
   :root{
+    /* Light (fallback) */
     --bg:#fafafc; --fg:#0f172a; --muted:#6b7280; --grid:#e5e7eb; --card:#ffffff;
-    --rim:#111827; --base:#d1d5db; --hour:#0b4f9c; --si:#0b8355; --season:#b45309; --month:#334155; --shadow:#dc2626; --eq:#10b981; --summer:#9a3412; --winter:#2563eb;
+    --rim:#111827; --base:#d1d5db; --hour:#0b4f9c; --si:#0b8355; --season:#b45309; --shadow:#dc2626; --eq:#10b981; --summer:#9a3412; --winter:#2563eb;
+    --control-bg:#fff; --control-fg:#0f172a; --control-border:#cbd5e1; --control-focus:#60a5fa;
   }
+  /* Dark theme overrides */
+  [data-theme="dark"]{
+    --bg:#0b1220; --fg:#e5e7eb; --muted:#94a3b8; --grid:#1f2937; --card:#0f172a;
+    --rim:#e5e7eb; --base:#334155; --hour:#93c5fd; --si:#86efac; --season:#fbbf24; --shadow:#f87171; --eq:#34d399; --summer:#f59e0b; --winter:#60a5fa;
+    --control-bg:#111827; --control-fg:#e5e7eb; --control-border:#374151; --control-focus:#60a5fa;
+  }
+  /* Respect system preference unless explicitly toggled; initial is dark per user ask */
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) { color-scheme: dark; }
+  }
+
   *{box-sizing:border-box}
   body{margin:0;font:15px/1.45 system-ui, Segoe UI, Roboto, Helvetica, Arial;color:var(--fg);background:var(--bg)}
   header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--grid);padding:12px 16px;z-index:1}
   h1{margin:0 0 4px;font-size:19px}
   .sub{color:var(--muted);font-size:12.5px}
   main{max-width:1200px;margin:14px auto;padding:0 14px;display:grid;grid-template-columns:380px 1fr;gap:14px}
-  .card{background:var(--card);border:1px solid var(--grid);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card{background:var(--card);border:1px solid var(--grid);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.12)}
   .panel{padding:14px}
-  label{display:block;margin:8px 0 4px;font-weight:600;color:#1f2937}
-  input[type="range"],input[type="datetime-local"],input[type="number"],select{width:100%}
+  label{display:block;margin:8px 0 4px;font-weight:600;color:var(--fg)}
+  input[type="range"],input[type="datetime-local"],input[type="number"],select{width:100%;background:var(--control-bg);color:var(--control-fg);border:1px solid var(--control-border);border-radius:10px;padding:8px}
+  input[type="range"]{padding:0;background:transparent;border:none}
+  input:focus,select:focus{outline:2px solid var(--control-focus);outline-offset:2px}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .switch{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
-  .legend{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:12px;color:#334155}
-  .legend .sw{width:12px;height:12px;border:1px solid #0002;border-radius:3px}
-  .btn{appearance:none;border:1px solid var(--grid);background:var(--card);border-radius:10px;padding:8px 10px;cursor:pointer}
-  canvas{width:100%;height:auto;display:block}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:12px;color:var(--muted)}
+  .legend .sw{width:12px;height:12px;border:1px solid #0003;border-radius:3px}
+  .btn{appearance:none;border:1px solid var(--control-border);background:var(--control-bg);color:var(--control-fg);border-radius:10px;padding:8px 10px;cursor:pointer}
+  .btn:hover{filter:brightness(1.05)}
+  canvas{width:100%;height:auto;display:block;background:linear-gradient(#0000,#0001)}
   .note{color:var(--muted);font-size:12px;margin-top:8px}
+  .spacer{flex:1}
+  .toggle{display:inline-flex;align-items:center;gap:8px}
 </style>
 </head>
 <body>
 <header>
-  <h1>Angbu‑ilgu (앙부일구) — Full Interactive Simulator</h1>
-  <div class="sub">Hemispherical bowl dial with civil hour lines, traditional 12‑<em>si</em> lines, seasonal curves, monthly date engravings, equation‑of‑time option, and a live shadow point.</div>
+  <div class="row" style="justify-content:space-between">
+    <div>
+      <h1>Angbu‑ilgu (앙부일구) — Full Interactive Simulator</h1>
+      <div class="sub">Hemispherical bowl dial with civil hour lines, 12‑<em>si</em> lines, seasonal curves, monthly guides, Equation‑of‑Time, and a live shadow point.</div>
+    </div>
+    <label class="toggle"><input id="themeToggle" type="checkbox" checked> Dark mode</label>
+  </div>
 </header>
 <main>
   <section class="card panel">
@@ -41,9 +65,9 @@
       <option value="36.99,127.93,9">Daejeon</option>
       <option value="35.18,129.08,9">Busan</option>
       <option value="33.50,126.53,9">Jeju</option>
+      <option value="41.88,-87.63,-6">Chicago</option>
       <option value="40.71,-74.01,-5">New York</option>
       <option value="34.05,-118.25,-8">Los Angeles</option>
-      <option value="41.88,-87.63,-6">Chicago</option>
       <option value="47.61,-122.33,-8">Seattle</option>
       <option value="25.76,-80.19,-5">Miami</option>
       <option value="51.51,-0.13,0">London</option>
@@ -84,7 +108,7 @@
         <label>Radius (px): <span id="rVal">260</span></label>
         <input id="radius" type="range" min="160" max="340" step="1" value="260">
       </div>
-      <div style="width:130px">
+      <div style="width:160px">
         <label>Time zone (UTC±h)</label>
         <input id="tz" type="number" step="0.25" value="9">
       </div>
@@ -132,49 +156,41 @@
 const DEG=Math.PI/180, RAD=180/Math.PI;
 const css=(v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-function jdFromDate(date){ // UTC -> JD
-  return date.getTime()/86400000+2440587.5; // Unix epoch to JD
-}
+function jdFromDate(date){ return date.getTime()/86400000+2440587.5; }
 function sunGeom(dateUTC){
-  const JD=jdFromDate(dateUTC), T=(JD-2451545.0)/36525; // Julian centuries J2000
-  const L0=(280.46646+36000.76983*T+0.0003032*T*T)%360; // mean longitude
-  const M=357.52911+35999.05029*T-0.0001537*T*T; // mean anomaly
-  const e=0.016708634-0.000042037*T-0.0000001267*T*T; // eccentricity
+  const JD=jdFromDate(dateUTC), T=(JD-2451545.0)/36525;
+  const L0=(280.46646+36000.76983*T+0.0003032*T*T)%360;
+  const M=357.52911+35999.05029*T-0.0001537*T*T;
+  const e=0.016708634-0.000042037*T-0.0000001267*T*T;
   const C=(1.914602-0.004817*T-0.000014*T*T)*Math.sin(M*DEG)
-         +(0.019993-0.000101*T)*Math.sin(2*M*DEG)
-         +0.000289*Math.sin(3*M*DEG);
-  const trueLong=L0+C; // true longitude
-  const Omega=125.04-1934.136*T;
-  const lambda=trueLong-0.00569-0.00478*Math.sin(Omega*DEG); // apparent longitude
-  const eps0=23.439291-0.0130042*T-1.64e-7*T*T+5.04e-7*T*T*T; // mean obliquity
-  const eps=eps0+0.00256*Math.cos(Omega*DEG); // apparent obliquity
+        +(0.019993-0.000101*T)*Math.sin(2*M*DEG)
+        +0.000289*Math.sin(3*M*DEG);
+  const trueLong=L0+C; const Omega=125.04-1934.136*T;
+  const lambda=trueLong-0.00569-0.00478*Math.sin(Omega*DEG);
+  const eps0=23.439291-0.0130042*T-1.64e-7*T*T+5.04e-7*T*T*T;
+  const eps=eps0+0.00256*Math.cos(Omega*DEG);
   const sinDec=Math.sin(eps*DEG)*Math.sin(lambda*DEG);
-  const dec=Math.asin(sinDec)*RAD; // declination
-  // Equation of time (minutes)
+  const dec=Math.asin(sinDec)*RAD;
   const y=Math.tan((eps*DEG)/2); const y2=y*y;
   const Etime=4*RAD*( y2*Math.sin(2*L0*DEG) - 2*e*Math.sin(M*DEG) + 4*e*y2*Math.sin(M*DEG)*Math.cos(2*L0*DEG)
                  - 0.5*y2*y2*Math.sin(4*L0*DEG) - 1.25*e*e*Math.sin(2*M*DEG) );
   return {dec, Etime};
 }
-function sunVectorTopo(lat, dec, Hdeg){ // local unit vector (x East, y North, z Up)
+function sunVectorTopo(lat, dec, Hdeg){
   const phi=lat*DEG, d=dec*DEG, H=Hdeg*DEG;
-  const x=Math.cos(d)*Math.sin(H);
-  const y=Math.cos(phi)*Math.sin(d)-Math.sin(phi)*Math.cos(d)*Math.cos(H);
-  const z=Math.sin(phi)*Math.sin(d)+Math.cos(phi)*Math.cos(d)*Math.cos(H);
-  return {x,y,z};
+  return {
+    x: Math.cos(d)*Math.sin(H),
+    y: Math.cos(phi)*Math.sin(d)-Math.sin(phi)*Math.cos(d)*Math.cos(H),
+    z: Math.sin(phi)*Math.sin(d)+Math.cos(phi)*Math.cos(d)*Math.cos(H)
+  };
 }
 function hourAngleDeg(dateLocal, tzHours, lonDeg, useEoT){
-  const utcMs=dateLocal.getTime()-tzHours*3600*1000; // local -> UTC
-  const dateUTC=new Date(utcMs);
-  const {Etime}=sunGeom(dateUTC); // minutes
-  const offsetMin= useEoT ? (-Etime) : 0; // apparent solar time correction
-  const mins=dateLocal.getHours()*60+dateLocal.getMinutes()+dateLocal.getSeconds()/60 + offsetMin + (lonDeg*4); // 4 min/deg east
-  const H=15*((mins/60)-12); // hour angle deg
-  return {H, dateUTC};
+  const utcMs=dateLocal.getTime()-tzHours*3600*1000; const dateUTC=new Date(utcMs);
+  const {Etime}=sunGeom(dateUTC); const offsetMin= useEoT ? (-Etime) : 0;
+  const mins=dateLocal.getHours()*60+dateLocal.getMinutes()+dateLocal.getSeconds()/60 + offsetMin + (lonDeg*4);
+  const H=15*((mins/60)-12); return {H, dateUTC};
 }
-function bowlShadowPoint(R, s){
-  return {x:-R*s.x,y:-R*s.y,z:-R*s.z}; // |s|=1 ⇒ |p|=R on inner hemisphere
-}
+function bowlShadowPoint(R, s){ return {x:-R*s.x,y:-R*s.y,z:-R*s.z}; }
 const monthDec=[-20.0,-13.0,-2.0,9.0,18.0,23.0,21.0,14.0,4.0,-8.0,-18.0,-23.0];
 const siLabels=['Ja','Chuk','In','Myu','Jin','Sa','O','Mi','Sin','Yu','Sul','Hae'];
 
@@ -202,7 +218,7 @@ function drawAll(){
   ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.clip();
 
   // Subtle radial guides
-  ctx.strokeStyle='#00000012'; ctx.lineWidth=1;
+  ctx.strokeStyle='#ffffff14'; ctx.lineWidth=1;
   for(let k=1;k<=3;k++){ ctx.beginPath(); ctx.arc(cx,cy,(R*k/3),0,Math.PI*2); ctx.stroke(); }
 
   // Seasonal curves & monthly date engravings
@@ -226,7 +242,7 @@ function drawAll(){
   if(showSiEl.checked){
     ctx.strokeStyle=css('--si'); ctx.lineWidth=1.25;
     for(let i=0;i<12;i++){
-      const Hdeg=(i*30-180)+15; // align with noon
+      const Hdeg=(i*30-180)+15;
       drawHourCurve(ctx,cx,cy,R,lat,Hdeg, clipDayEl.checked);
       if(labelsEl.checked) placeSiLabel(ctx,cx,cy,R,lat,Hdeg, siLabels[i]);
     }
@@ -247,7 +263,7 @@ function drawAll(){
   drawCardinals(ctx,cx,cy,R);
 
   // Header text
-  ctx.fillStyle='#111'; ctx.font='600 13px system-ui,Segoe UI'; ctx.textAlign='center';
+  ctx.fillStyle=css('--fg'); ctx.font='600 13px system-ui,Segoe UI'; ctx.textAlign='center';
   const info=`φ ${lat.toFixed(2)}°, λ ${lon.toFixed(2)}°, tz ${tz>=0?'+':''}${tz}; Dec ${dec.toFixed(2)}°`;
   ctx.fillText(info, cx, cy-R-14);
 }
@@ -257,7 +273,7 @@ function drawDeclinationCurve(ctx,cx,cy,R,lat,dec,color, step=0.5){
   let started=false; const clipDay=clipDayEl.checked;
   for(let H=-180; H<=180; H+=step){
     const s=sunVectorTopo(lat,dec,H); if(clipDay && s.z<=0) {continue;}
-    const p=bowlShadowPoint(R,s); if(p.z>1e-6) continue; // keep lower hemisphere
+    const p=bowlShadowPoint(R,s); if(p.z>1e-6) continue;
     const X=cx+p.x, Y=cy+p.y;
     if(!started){ctx.moveTo(X,Y); started=true;} else ctx.lineTo(X,Y);
   }
@@ -286,17 +302,19 @@ function placeSiLabel(ctx,cx,cy,R,lat,Hdeg,label){
 }
 
 function drawCardinals(ctx,cx,cy,R){
-  ctx.save(); ctx.strokeStyle='#0008'; ctx.setLineDash([5,6]); ctx.lineWidth=1;
+  ctx.save(); ctx.strokeStyle:'#ffffff88'; ctx.setLineDash([5,6]); ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(cx,cy-R-8); ctx.lineTo(cx,cy+R+8); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(cx-R-8,cy); ctx.lineTo(cx+R+8,cy); ctx.stroke();
-  ctx.fillStyle='#111'; ctx.font='700 12px system-ui'; ctx.textAlign='center';
+  ctx.fillStyle=css('--fg'); ctx.font='700 12px system-ui'; ctx.textAlign='center';
   const ticks=[{a:0,l:'E'},{a:90,l:'N'},{a:180,l:'W'},{a:270,l:'S'}];
   for(const t of ticks){ const x=cx+(R+10)*Math.cos(t.a*DEG); const y=cy+(R+10)*Math.sin(t.a*DEG); ctx.fillText(t.l,x,y+4); }
   ctx.restore();
 }
 
 // ===== DOM and controls =====
+const root=document.documentElement;
 const canvas=document.getElementById('dial');
+const themeToggle=document.getElementById('themeToggle');
 const cityEl=document.getElementById('city');
 const latEl=document.getElementById('lat');
 const lonEl=document.getElementById('lon');
@@ -318,26 +336,17 @@ const latVal=document.getElementById('latVal');
 const lonVal=document.getElementById('lonVal');
 const rVal=document.getElementById('rVal');
 
-function readLocalDate(){
-  const v=dtEl.value; if(!v){return new Date();}
-  return new Date(v);
-}
-function setNow(){
-  const d=new Date(); const pad=(n)=>String(n).padStart(2,'0');
-  const s=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  dtEl.value=s;
-}
+function readLocalDate(){ const v=dtEl.value; return v? new Date(v) : new Date(); }
+function setNow(){ const d=new Date(); const pad=(n)=>String(n).padStart(2,'0'); dtEl.value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+let timer=null; let speed=60; function tick(){ const d=readLocalDate(); d.setSeconds(d.getSeconds()+speed); dtEl.valueAsDate=d; drawAll(); }
 
-let timer=null; let speed=60; // seconds per real second
-function tick(){
-  const d=readLocalDate(); d.setSeconds(d.getSeconds()+speed); dtEl.valueAsDate=d; drawAll();
-}
+// Theme toggle
+function applyTheme(){ if(themeToggle.checked){ root.setAttribute('data-theme','dark'); } else { root.setAttribute('data-theme','light'); } drawAll(); }
+// default dark
+root.setAttribute('data-theme','dark'); themeToggle.checked=true; themeToggle.addEventListener('change', applyTheme);
 
-// Update lat/lon/tz when city changes
-cityEl.addEventListener('change',()=>{
-  const [lat,lon,tz]=cityEl.value.split(',').map(Number);
-  latEl.value=lat; lonEl.value=lon; tzEl.value=tz; drawAll();
-});
+// City change
+cityEl.addEventListener('change',()=>{ const [lat,lon,tz]=cityEl.value.split(',').map(Number); latEl.value=lat; lonEl.value=lon; tzEl.value=tz; drawAll(); });
 
 [nowBtn,playBtn,stopBtn,exportBtn,resetBtn, latEl, lonEl, tzEl, rEl, dtEl, showHoursEl, showSiEl, showSeasonsEl, clipDayEl, useEoTEl, labelsEl]
 .forEach(el=>{
@@ -345,12 +354,12 @@ cityEl.addEventListener('change',()=>{
   else if(el===playBtn) el.onclick=()=>{ if(timer) return; timer=setInterval(tick, 100); };
   else if(el===stopBtn) el.onclick=()=>{ if(timer){ clearInterval(timer); timer=null; } };
   else if(el===exportBtn) el.onclick=()=>{ const a=document.createElement('a'); a.download='angbu-ilgu.png'; a.href=canvas.toDataURL('image/png'); a.click(); };
-  else if(el===resetBtn) el.onclick=()=>{ const def=cityEl.querySelector('option[value="37.57,126.98,9"]'); cityEl.value=def.value; const [lat,lon,tz]=def.value.split(',').map(Number); latEl.value=lat; lonEl.value=lon; tzEl.value=tz; rEl.value=260; setNow(); showHoursEl.checked=showSiEl.checked=showSeasonsEl.checked=clipDayEl.checked=useEoTEl.checked=labelsEl.checked=true; drawAll(); };
+  else if(el===resetBtn) el.onclick=()=>{ const def='37.57,126.98,9'; cityEl.value=def; const [lat,lon,tz]=def.split(',').map(Number); latEl.value=lat; lonEl.value=lon; tzEl.value=tz; rEl.value=260; setNow(); showHoursEl.checked=showSiEl.checked=showSeasonsEl.checked=clipDayEl.checked=useEoTEl.checked=labelsEl.checked=true; themeToggle.checked=true; applyTheme(); };
   else { el.addEventListener('input', drawAll); el.addEventListener('change', drawAll); }
 });
 
 // Initialize
-setNow(); drawAll();
+setNow(); applyTheme(); drawAll();
 </script>
 </body>
 </html>
