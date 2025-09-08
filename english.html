@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Product Development English – Memorizer</title>
+  <style>
+    :root{
+      --bg:#0f172a;/* slate-900 */
+      --fg:#e2e8f0;/* slate-200 */
+      --muted:#94a3b8;/* slate-400 */
+      --brand:#22c55e;/* green-500 */
+      --accent:#38bdf8;/* sky-400 */
+      --warn:#f59e0b;/* amber-500 */
+      --bad:#ef4444;/* red-500 */
+      --card:#111827ee;/* gray-900 */
+      --chip:#1f2937;/* gray-800 */
+      --ok:#10b981;/* emerald-500 */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:radial-gradient(1200px 600px at 10% -10%,#1f2937,transparent), radial-gradient(1000px 600px at 110% 10%,#0b1220,transparent), var(--bg);color:var(--fg)}
+    header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg, rgba(15,23,42,.95), rgba(15,23,42,.6));backdrop-filter:blur(8px);border-bottom:1px solid #1f2937}
+    .container{max-width:1100px;margin:0 auto;padding:16px}
+    .row{display:flex;flex-wrap:wrap;gap:12px}
+    .left{flex:1 1 300px}
+    .right{flex:2 1 520px}
+    h1{margin:0;font-size:clamp(20px,3vw,28px);display:flex;align-items:center;gap:10px}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border:1px solid #263244;border-radius:999px;padding:6px 10px;color:var(--fg);font-size:12px}
+    .chip input{accent-color:var(--brand)}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    button,.btn{background:#111827;border:1px solid #263244;color:var(--fg);padding:10px 14px;border-radius:12px;cursor:pointer}
+    button:hover{border-color:#2f3d51}
+    button.primary{background:linear-gradient(180deg,#16a34a,#15803d);border-color:#166534}
+    button.warn{background:linear-gradient(180deg,#f59e0b,#d97706);border-color:#b45309}
+    button.ghost{background:transparent}
+    select, input[type="text"], input[type="number"], textarea{width:100%;background:#0b1220;border:1px solid #263244;border-radius:12px;color:var(--fg);padding:10px}
+    textarea{min-height:80px}
+    .card{background:linear-gradient(180deg,#0b1220,#0a1221);border:1px solid #223046;border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .grid{display:grid;gap:12px}
+    .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .flash{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;cursor:default}
+    .term{font-size:28px;font-weight:700}
+    .example{color:var(--muted)}
+    .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .tag{background:#0a172b;border:1px solid #1f3352;border-radius:999px;padding:4px 8px;color:#a5b4fc;font-size:12px}
+    .progress{height:8px;background:#0b1220;border:1px solid #223046;border-radius:999px;overflow:hidden}
+    .progress>div{height:100%;background:linear-gradient(90deg,#22c55e,#84cc16)}
+    .sep{border-top:1px dashed #263244;margin:12px 0}
+    .muted{color:var(--muted)}
+    details{background:#0b1220;border:1px solid #263244;border-radius:12px;padding:10px}
+    summary{cursor:pointer;font-weight:600}
+    .small{font-size:12px}
+    .pill{display:inline-flex;gap:6px;background:#0b1220;border:1px solid #263244;padding:6px 10px;border-radius:999px}
+    .inline{display:flex;gap:10px;align-items:center}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,"Liberation Mono","Courier New",monospace;background:#0b1220;border:1px solid #263244;border-radius:6px;padding:2px 6px}
+    .footer{color:#94a3b8;font-size:12px;margin-top:10px}
+    .hidden{display:none !important}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container row">
+      <div class="left">
+        <h1>Product Development English – Memorizer <span class="pill small"><span id="deckCount">0</span> terms</span></h1>
+        <div class="toolbar">
+          <button id="modeFlash" class="primary">Flashcards</button>
+          <button id="modeCloze">Cloze</button>
+          <button id="modeMCQ">Multiple Choice</button>
+          <button id="modeListen">Listening</button>
+          <button id="btnReview" class="ghost">Due (<span id="dueCount">0</span>)</button>
+        </div>
+      </div>
+      <div class="right inline" style="justify-content:flex-end;gap:8px">
+        <label class="chip"><input type="checkbox" id="toggleKR"> Show Korean hints</label>
+        <label class="chip"><input type="checkbox" id="toggleAutoSpeech" checked> Auto‑speak (US)</label>
+        <button id="btnImport" class="ghost">Import</button>
+        <button id="btnExport" class="ghost">Export</button>
+        <button id="btnReset" class="warn">Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container row" style="margin-top:12px">
+    <!-- Left: Filters & Add -->
+    <section class="left grid">
+      <div class="card">
+        <div class="grid">
+          <label>
+            <div class="muted small">Category</div>
+            <select id="filterCat"></select>
+          </label>
+          <label>
+            <div class="muted small">Search</div>
+            <input id="filterSearch" type="text" placeholder="e.g., acceptance criteria"/>
+          </label>
+        </div>
+        <div class="sep"></div>
+        <div class="grid">
+          <label>
+            <div class="muted small">Add a new term</div>
+            <input id="newTerm" type="text" placeholder="Term or phrase (e.g., acceptance criteria)"/>
+          </label>
+          <label>
+            <input id="newDef" type="text" placeholder="Definition (plain English)"/>
+          </label>
+          <label>
+            <input id="newEx" type="text" placeholder="Example sentence"/>
+          </label>
+          <div class="grid cols-2">
+            <label><input id="newTags" type="text" placeholder="comma tags (optional)"/></label>
+            <label>
+              <select id="newCat"></select>
+            </label>
+          </div>
+          <label>
+            <input id="newKR" type="text" placeholder="Korean hint (optional)"/>
+          </label>
+          <div class="inline" style="justify-content:space-between">
+            <button id="btnAdd" class="primary">Add Term</button>
+            <span class="muted small">Tip: press <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <details>
+          <summary>How to study effectively</summary>
+          <ul>
+            <li>Use <b>Flashcards</b> daily. Mark <i>Good</i> or <i>Easy</i> only if you truly remember.</li>
+            <li>Switch to <b>Cloze</b> to practice writing. Fill the blank from memory.</li>
+            <li>Try <b>Listening</b>: hear the term and recall the meaning without reading.</li>
+            <li>Use <b>Multiple Choice</b> for quick reviews when you are tired.</li>
+            <li>Add terms you meet at work (PR reviews, specs, test plans). Make it <i>yours</i>.</li>
+          </ul>
+        </details>
+      </div>
+
+      <div class="card">
+        <div class="muted small">Your progress</div>
+        <div class="progress" title="Mastery"><div id="progressBar" style="width:0%"></div></div>
+        <div class="inline" style="justify-content:space-between;margin-top:6px">
+          <div class="small">Mastered: <span id="statMastered">0</span></div>
+          <div class="small">Learning: <span id="statLearning">0</span></div>
+          <div class="small">New: <span id="statNew">0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: Study area -->
+    <section class="right">
+      <div class="card flash" id="cardArea">
+        <div class="term" id="cardFront">Loading deck…</div>
+        <div class="example" id="cardExample"></div>
+        <div class="tags" id="cardTags"></div>
+        <div id="krHint" class="muted hidden"></div>
+        <div id="cardBack" class="muted hidden" style="margin-top:8px"></div>
+        <div class="sep" style="width:100%"></div>
+        <div class="toolbar">
+          <button id="btnReveal">Reveal</button>
+          <button id="btnSpeak">🔊 Speak</button>
+          <div class="inline">
+            <button id="btnAgain" class="bad">Again</button>
+            <button id="btnHard" class="warn">Hard</button>
+            <button id="btnGood" class="primary">Good</button>
+            <button id="btnEasy" class="primary">Easy</button>
+          </div>
+        </div>
+        <div class="small muted">Shortcuts: <span class="kbd">Space</span> reveal • <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span>/<span class="kbd">4</span> grade • <span class="kbd">S</span> speak</div>
+      </div>
+
+      <div id="modePanels" class="grid" style="margin-top:12px">
+        <div id="panelCloze" class="card hidden">
+          <div class="muted small">Cloze test (fill the blank)</div>
+          <div id="clozeText" style="margin:8px 0"></div>
+          <input id="clozeInput" type="text" placeholder="Type the missing word/phrase"/>
+          <div class="toolbar" style="margin-top:8px">
+            <button id="btnClozeCheck" class="primary">Check</button>
+            <span id="clozeResult" class="small"></span>
+          </div>
+        </div>
+        <div id="panelMCQ" class="card hidden">
+          <div class="muted small">Multiple Choice</div>
+          <div id="mcqQ" style="margin:8px 0"></div>
+          <div id="mcqOpts" class="grid"></div>
+        </div>
+        <div id="panelListen" class="card hidden">
+          <div class="muted small">Listening Mode</div>
+          <p class="small muted">We say the term. You say the definition (out loud or in your head), then click reveal to check.</p>
+          <div class="inline" style="gap:8px">
+            <button id="btnListenPlay" class="primary">Play Now</button>
+            <label class="chip"><input type="checkbox" id="listenLoop"> Auto‑repeat</label>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container footer">
+    Pro tip: Focus on <i>collocations</i> (common word pairs) like <b>meet requirements</b>, <b>raise a blocker</b>, <b>de‑risk a design</b>, <b>backward compatible</b>. These are what native speakers use daily in product development.
+  </footer>
+
+<script>
+// --- Data Structures -------------------------------------------------------
+/** Card schema
+ * { id, term, def, ex, cat, tags:[], kr:"", box:0, next:0, seen:0, correct:0 }
+ */
+const CATS = [
+  "Planning & Requirements",
+  "Design & Architecture",
+  "Implementation",
+  "Code Review",
+  "Testing & QA",
+  "Release & Operations",
+  "Project & Stakeholders",
+  "Manufacturing & Supply"
+];
+
+const NOW = () => Date.now();
+const DAY = 24*60*60*1000;
+
+// Leitner intervals (days) for Again/Hard/Good/Easy
+const INTERVALS = {
+  again: 0.01, // ~15 min
+  hard: 1,     // 1 day
+  good: 3,     // 3 days
+  easy: 7      // 1 week
+};
+
+const STORE_KEY = 'pde_mem_deck_v1';
+
+function defaultDeck(){
+  const base = [
+    // Planning & Requirements
+    ["acceptance criteria","The specific conditions a feature must meet to be considered done.","Please write acceptance criteria so QA knows what to verify.","Planning & Requirements","criteria,definition","수용 기준"],
+    ["scope creep","Uncontrolled growth in the project scope after work has begun.","We need to prevent scope creep before the schedule slips.","Planning & Requirements","risk,pm","스코프가 점점 커짐"],
+    ["trade‑off","A compromise between two desirable but incompatible features.","We made a performance vs. cost trade‑off.","Planning & Requirements","decision","트레이드오프"],
+    ["single source of truth (SSOT)","The authoritative reference for information.","The API spec is our single source of truth.","Planning & Requirements","process,docs","공식 기준 문서"],
+
+    // Design & Architecture
+    ["backward compatible","Works with older versions or systems.","The new firmware is backward compatible with existing hardware.","Design & Architecture","compatibility","하위 호환"],
+    ["de‑risk","Reduce the likelihood or impact of a risk.","We should prototype to de‑risk the algorithm.","Design & Architecture","risk","리스크 줄이다"],
+    ["fault tolerance","The ability to continue operating when parts fail.","Add redundancy to improve fault tolerance.","Design & Architecture","safety,reliability","내결함성"],
+    ["interface contract","A clear, testable agreement on how components interact.","Let's document the interface contract for the driver.","Design & Architecture","API","인터페이스 규약"],
+
+    // Implementation
+    ["happy path","The standard scenario where everything works as intended.","Cover the happy path first, then edge cases.","Implementation","testing","정상 시나리오"],
+    ["edge case","A rare or extreme condition that may break assumptions.","We found a timing edge case on startup.","Implementation","corner case","극단적 경우"],
+    ["non‑functional requirements (NFRs)","Qualities like performance, reliability, or usability.","What are the latency NFRs for the API?","Implementation","quality","비기능 요구사항"],
+    ["staging environment","A pre‑production system for final testing.","Deploy to staging before production.","Implementation","devops","스테이징 환경"],
+
+    // Code Review
+    ["linting","Automatic checks for code style or simple errors.","Enable linting to catch common mistakes.","Code Review","quality","린트 검사"],
+    ["actionable feedback","Specific, clear suggestions that can be applied.","Please leave actionable feedback in the PR.","Code Review","review","실행 가능한 피드백"],
+    ["regression","A bug where something that used to work now fails.","This change may cause a regression in CAN parsing.","Code Review","bug","회귀 버그"],
+
+    // Testing & QA
+    ["test coverage","How much of the code is exercised by tests.","Let's raise unit test coverage above 80%.","Testing & QA","metrics","테스트 커버리지"],
+    ["acceptance test","A high‑level test that verifies business requirements.","We passed the customer acceptance test.","Testing & QA","qa","인수 테스트"],
+    ["repro steps","The exact steps to reproduce a bug.","Please add repro steps to the ticket.","Testing & QA","bug","재현 절차"],
+    ["flake","A test that sometimes passes and sometimes fails.","The CI is red due to a flake.","Testing & QA","ci","불안정 테스트"],
+
+    // Release & Ops
+    ["rollback","Revert to the previous version after a bad release.","Have a plan to rollback if KPIs drop.","Release & Operations","devops","롤백"],
+    ["observability","Ability to understand system state via logs/metrics/traces.","We need better observability for field issues.","Release & Operations","monitoring","관측 가능성"],
+    ["postmortem","An analysis after an incident to learn and improve.","Run a blameless postmortem after the outage.","Release & Operations","retrospective","사후 분석"],
+
+    // Project & Stakeholders
+    ["blocker","Anything that prevents work from moving forward.","Legal approval is a blocker for shipment.","Project & Stakeholders","risk","진행을 막는 요소"],
+    ["alignment","Shared understanding and agreement among stakeholders.","Let's confirm alignment before we commit.","Project & Stakeholders","communication","의견 일치"],
+    ["stakeholder","Anyone with an interest or investment in the project.","Notify key stakeholders of the schedule change.","Project & Stakeholders","people","이해 관계자"],
+    ["escalate","Raise an issue to a higher level for faster resolution.","We'll escalate to management if parts are late.","Project & Stakeholders","process","상부 보고"],
+
+    // Manufacturing & Supply
+    ["lead time","Time between ordering and receiving components.","The MCU has a 20‑week lead time.","Manufacturing & Supply","supply chain","리드 타임"],
+    ["DFM (Design for Manufacturability)","Design choices that simplify manufacturing.","Review the PCB for DFM issues.","Manufacturing & Supply","manufacturing","제조 용이성"],
+    ["EOL (End of Life)","When a component is no longer produced or supported.","The regulator is EOL next year.","Manufacturing & Supply","lifecycle","단종"],
+    ["RMA (Return Merchandise Authorization)","Process for returning defective products.","Open an RMA for the failed unit.","Manufacturing & Supply","ops","반품 승인"],
+  ];
+  let id=1;
+  return base.map(x=>({
+    id:id++, term:x[0], def:x[1], ex:x[2], cat:x[3], tags:x[4]?x[4].split(',').map(s=>s.trim()).filter(Boolean):[], kr:x[5]||"",
+    box:0, next:0, seen:0, correct:0
+  }));
+}
+
+function loadDeck(){
+  const raw = localStorage.getItem(STORE_KEY);
+  if(!raw) return defaultDeck();
+  try{ return JSON.parse(raw); }catch{ return defaultDeck(); }
+}
+function saveDeck(deck){ localStorage.setItem(STORE_KEY, JSON.stringify(deck)); }
+
+let deck = loadDeck();
+
+// --- UI State --------------------------------------------------------------
+const el = id=>document.getElementById(id);
+const filter = {cat:"All", search:""};
+let mode = 'flash';
+let current = null; // current card
+let showBack = false;
+let autoSpeech = true;
+let showKR = false;
+let listenTimer = null;
+
+// --- Helpers ----------------------------------------------------------------
+function uniq(arr){ return Array.from(new Set(arr)); }
+function speak(text){
+  try{
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    u.rate = 1;
+    u.pitch = 1;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  }catch(e){ console.warn('speech failed', e); }
+}
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function filtered(){
+  return deck.filter(c=>
+    (filter.cat==='All' || c.cat===filter.cat) &&
+    (!filter.search || (c.term+" "+c.def+" "+c.ex).toLowerCase().includes(filter.search.toLowerCase()))
+  );
+}
+
+function dueCards(){
+  const now = NOW();
+  return filtered().filter(c=> c.next<=now);
+}
+
+function pickNextCard(){
+  // Prefer due cards, else a new or random card
+  const due = dueCards();
+  if(due.length>0) return pick(due);
+  const pool = filtered();
+  // bias to unseen cards
+  const unseen = pool.filter(c=>c.seen===0);
+  if(unseen.length) return pick(unseen);
+  return pick(pool);
+}
+
+function updateStats(){
+  const all = filtered();
+  el('deckCount').textContent = all.length;
+  const mastered = all.filter(c=>c.box>=4).length;
+  const learning = all.filter(c=>c.box>0 && c.box<4).length;
+  const fresh = all.filter(c=>c.box===0 && c.seen===0).length;
+  el('statMastered').textContent = mastered;
+  el('statLearning').textContent = learning;
+  el('statNew').textContent = fresh;
+  const pct = all.length? Math.round(100*mastered/all.length):0;
+  el('progressBar').style.width = pct+'%';
+  el('dueCount').textContent = dueCards().length;
+}
+
+function renderFilters(){
+  // Categories
+  const cats = ['All', ...uniq(deck.map(c=>c.cat)).sort((a,b)=>CATS.indexOf(a)-CATS.indexOf(b))];
+  el('filterCat').innerHTML = cats.map(c=>`<option ${c===filter.cat? 'selected':''}>${c}</option>`).join('');
+  el('newCat').innerHTML = CATS.map(c=>`<option ${c===filter.cat? 'selected':''}>${c}</option>`).join('');
+}
+
+function renderCard(){
+  if(!current){
+    current = pickNextCard();
+    showBack=false;
+  }
+  if(!current){
+    el('cardFront').textContent = 'No cards match your filter. Add some!';
+    el('cardBack').classList.add('hidden');
+    el('cardExample').textContent='';
+    el('cardTags').innerHTML='';
+    el('krHint').classList.add('hidden');
+    return;
+  }
+  el('cardFront').textContent = current.term;
+  el('cardBack').textContent = current.def;
+  el('cardBack').classList.toggle('hidden', !showBack);
+  el('cardExample').textContent = current.ex || '';
+  el('cardTags').innerHTML = (current.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('');
+  el('krHint').textContent = current.kr||'';
+  el('krHint').classList.toggle('hidden', !(showKR && current.kr));
+  if(autoSpeech && !showBack) speak(current.term);
+}
+
+function setMode(m){
+  mode = m;
+  ['modeFlash','modeCloze','modeMCQ','modeListen'].forEach(id=>el(id).classList.remove('primary'));
+  if(m==='flash') el('modeFlash').classList.add('primary');
+  if(m==='cloze') el('modeCloze').classList.add('primary');
+  if(m==='mcq') el('modeMCQ').classList.add('primary');
+  if(m==='listen') el('modeListen').classList.add('primary');
+  // panels
+  el('panelCloze').classList.toggle('hidden', m!=='cloze');
+  el('panelMCQ').classList.toggle('hidden', m!=='mcq');
+  el('panelListen').classList.toggle('hidden', m!=='listen');
+  if(m==='cloze') setupCloze();
+  if(m==='mcq') setupMCQ();
+}
+
+function gradeCard(result){
+  // Update Leitner box and schedule
+  const now = NOW();
+  current.seen++;
+  const move = {again:-1, hard:0, good:1, easy:2}[result]||0;
+  current.box = Math.max(0, Math.min(5, (current.box||0) + move));
+  const days = INTERVALS[result]||1;
+  current.next = now + days*DAY;
+  if(result==='again') current.next = now + INTERVALS.again*DAY;
+  if(result==='good' || result==='easy') current.correct++;
+  saveDeck(deck);
+  current = null; // pick another
+  updateStats();
+  renderCard();
+  if(mode==='cloze') setupCloze();
+  if(mode==='mcq') setupMCQ();
+}
+
+// --- Modes -----------------------------------------------------------------
+function setupCloze(){
+  const txt = current.ex || (`${current.term} — ${current.def}`);
+  const hole = current.term.split(' ')[0];
+  const masked = txt.replace(new RegExp(current.term,'ig'), '____');
+  el('clozeText').innerHTML = masked;
+  el('clozeInput').value = '';
+  el('clozeResult').textContent='';
+}
+
+function setupMCQ(){
+  const options = uniq([current.def, ...pickN(deck.filter(d=>d.id!==current.id).map(d=>d.def),3)]).slice(0,4);
+  shuffle(options);
+  el('mcqQ').innerHTML = `<b>${current.term}</b> means:`;
+  el('mcqOpts').innerHTML = '';
+  options.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.textContent = opt;
+    btn.onclick = ()=>{
+      if(opt===current.def){ btn.classList.add('primary'); gradeCard('good'); }
+      else{ btn.style.borderColor = 'var(--bad)'; gradeCard('hard'); }
+    };
+    el('mcqOpts').appendChild(btn);
+  });
+}
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function pickN(arr,n){ const copy=[...arr]; shuffle(copy); return copy.slice(0,n); }
+
+// --- Import/Export/Reset ---------------------------------------------------
+function exportJSON(){
+  const data = JSON.stringify(deck,null,2);
+  const blob = new Blob([data],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'),{href:url,download:'product-dev-english.json'});
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function importJSON(){
+  const input = document.createElement('input');
+  input.type='file'; input.accept='application/json';
+  input.onchange = () => {
+    const f = input.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const data = JSON.parse(reader.result);
+        if(Array.isArray(data)){
+          deck = data.map((c,i)=>({
+            id: c.id ?? (i+1), term: c.term||'', def: c.def||'', ex: c.ex||'', cat: c.cat||'Planning & Requirements',
+            tags: c.tags||[], kr: c.kr||'', box: c.box||0, next: c.next||0, seen: c.seen||0, correct: c.correct||0
+          }));
+          saveDeck(deck);
+          renderFilters(); updateStats(); current=null; renderCard(); setMode('flash');
+          alert('Imported '+deck.length+' cards.');
+        } else alert('Invalid deck format.');
+      }catch(e){ alert('Failed to import: '+e.message); }
+    };
+    reader.readAsText(f);
+  };
+  input.click();
+}
+
+function resetAll(){
+  if(confirm('Reset your progress and restore the default deck?')){
+    deck = defaultDeck(); saveDeck(deck); renderFilters(); updateStats(); current=null; renderCard(); setMode('flash');
+  }
+}
+
+// --- Add term --------------------------------------------------------------
+function addTerm(){
+  const term = el('newTerm').value.trim();
+  const def = el('newDef').value.trim();
+  if(!term || !def){ alert('Please provide at least term and definition.'); return; }
+  const ex = el('newEx').value.trim();
+  const cat = el('newCat').value;
+  const tags = el('newTags').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const kr = el('newKR').value.trim();
+  const id = deck.reduce((m,c)=>Math.max(m,c.id),0)+1;
+  deck.push({id, term, def, ex, cat, tags, kr, box:0, next:0, seen:0, correct:0});
+  saveDeck(deck);
+  el('newTerm').value=''; el('newDef').value=''; el('newEx').value=''; el('newTags').value=''; el('newKR').value='';
+  renderFilters(); updateStats();
+  filter.cat = 'All'; el('filterCat').value='All';
+  current = deck.find(c=>c.id===id); showBack=false; renderCard();
+}
+
+// --- Events ----------------------------------------------------------------
+window.addEventListener('DOMContentLoaded', ()=>{
+  renderFilters(); updateStats(); renderCard(); setMode('flash');
+  // header toggles
+  el('toggleKR').onchange = e=>{ showKR = e.target.checked; renderCard(); };
+  el('toggleAutoSpeech').onchange = e=>{ autoSpeech = e.target.checked; };
+  el('btnImport').onclick = importJSON;
+  el('btnExport').onclick = exportJSON;
+  el('btnReset').onclick = resetAll;
+
+  // filters
+  el('filterCat').onchange = e=>{ filter.cat = e.target.value; current=null; updateStats(); renderCard(); };
+  el('filterSearch').oninput = e=>{ filter.search = e.target.value; current=null; renderCard(); updateStats(); };
+
+  // add term
+  el('btnAdd').onclick = addTerm;
+  document.addEventListener('keydown', (e)=>{
+    if(e.ctrlKey && e.key==='Enter') addTerm();
+    if(e.key===' '){ e.preventDefault(); reveal(); }
+    if(['1','2','3','4'].includes(e.key)){
+      const map={1:'again',2:'hard',3:'good',4:'easy'}; gradeCard(map[e.key]);
+    }
+    if(e.key.toLowerCase()==='s') speak(current?.term||'');
+  });
+
+  // mode buttons
+  el('modeFlash').onclick = ()=>setMode('flash');
+  el('modeCloze').onclick = ()=>setMode('cloze');
+  el('modeMCQ').onclick = ()=>setMode('mcq');
+  el('modeListen').onclick = ()=>setMode('listen');
+
+  // card actions
+  el('btnReveal').onclick = reveal;
+  el('btnSpeak').onclick = ()=>speak(current?.term||'');
+  el('btnAgain').onclick = ()=>gradeCard('again');
+  el('btnHard').onclick = ()=>gradeCard('hard');
+  el('btnGood').onclick = ()=>gradeCard('good');
+  el('btnEasy').onclick = ()=>gradeCard('easy');
+
+  // cloze
+  el('btnClozeCheck').onclick = ()=>{
+    const ans = el('clozeInput').value.trim().toLowerCase();
+    const ok = ans && current.term.toLowerCase().includes(ans);
+    el('clozeResult').textContent = ok? '✅ Correct' : '❌ Try again';
+    gradeCard(ok? 'good':'hard');
+  };
+
+  // listen
+  el('btnListenPlay').onclick = ()=>{ if(current) speak(current.term); };
+  el('listenLoop').onchange = e=>{
+    if(e.target.checked){
+      if(listenTimer) clearInterval(listenTimer);
+      listenTimer = setInterval(()=>{ if(mode==='listen' && current) speak(current.term); }, 4000);
+    } else { if(listenTimer) clearInterval(listenTimer); }
+  };
+
+  // review due only
+  el('btnReview').onclick = ()=>{
+    const due = dueCards();
+    if(due.length){ current = pick(due); showBack=false; renderCard(); }
+    else alert('Nothing due now. Great job!');
+  };
+});
+
+function reveal(){ showBack = !showBack; el('cardBack').classList.toggle('hidden', !showBack); if(showBack) el('cardBack').scrollIntoView({behavior:'smooth', block:'center'}); }
+
+</script>
+</body>
+</html>
