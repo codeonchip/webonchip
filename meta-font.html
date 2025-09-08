@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meta‑Font Demo (Parametric SVG Letters)</title>
+  <style>
+    :root{
+      --bg:#0b0e14; --ink:#e6e6e6; --sub:#9aa4b2; --accent:#7cd1ff; --panel:#121722; --card:#0f1420; --muted:#5b6472;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background:var(--bg); color:var(--ink)}
+    header{position:sticky; top:0; z-index:3; background:linear-gradient(180deg, rgba(15,20,32,.98), rgba(15,20,32,.92)); border-bottom:1px solid #1e2533}
+    .wrap{max-width:1100px; margin:0 auto; padding:16px}
+    h1{margin:0 0 6px; font-size:20px}
+    .sub{color:var(--sub)}
+    .panel{display:grid; gap:14px; grid-template-columns: 320px 1fr; align-items:start}
+    .card{background:var(--card); border:1px solid #1b2230; border-radius:16px; padding:14px}
+    .row{display:flex; align-items:center; gap:10px; margin:8px 0}
+    label{display:block; font-size:12px; color:var(--muted)}
+    input[type="range"]{width:100%}
+    input[type="text"]{width:100%; padding:10px 12px; border-radius:12px; background:#0b0f1a; border:1px solid #1b2230; color:var(--ink)}
+    .kicker{display:flex; gap:10px; flex-wrap:wrap}
+    .btn{appearance:none; border:1px solid #273043; background:#121a2a; color:#dfe8ff; padding:8px 10px; border-radius:12px; cursor:pointer}
+    .btn:hover{border-color:#35507a}
+    .grid-toggle{display:flex; gap:8px; align-items:center; margin-top:8px}
+    .out{min-height:300px; background:radial-gradient(1200px 1200px at 10% -30%,rgba(124,209,255,.06),transparent 45%), #0b0e14; border:1px solid #1b2230; border-radius:16px; padding:16px; overflow:auto}
+    .legend{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:10px}
+    .legend .cell{background:#0b0f1a; border:1px solid #1b2230; border-radius:12px; padding:10px}
+    .svg-wrap{position:relative;}
+    .watermark{position:absolute; right:8px; bottom:6px; color:#6c7789; font-size:11px; opacity:.75}
+    footer{color:#7f8aa0; padding:20px 0 32px}
+    code{background:#0b0f1a; padding:2px 6px; border-radius:6px; border:1px solid #1b2230}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Meta‑Font Demo</h1>
+      <div class="sub">Play with a simple parametric font: weight, contrast, width, slant, serifs, and roundness. Everything is generated in SVG — no external fonts used.</div>
+    </div>
+  </header>
+
+  <main class="wrap" style="margin-top:14px">
+    <div class="panel">
+      <section class="card">
+        <div class="row">
+          <label>Sample text</label>
+          <input id="text" type="text" value="META FONT 123"/>
+        </div>
+        <div class="row">
+          <label>Weight</label>
+          <input id="weight" type="range" min="2" max="40" step="1" value="14">
+          <output id="ow"></output>
+        </div>
+        <div class="row">
+          <label>Contrast (V vs H)</label>
+          <input id="contrast" type="range" min="0" max="0.9" step="0.05" value="0.25">
+          <output id="oc"></output>
+        </div>
+        <div class="row">
+          <label>Width</label>
+          <input id="width" type="range" min="60" max="160" step="2" value="100">
+          <output id="owd"></output>
+        </div>
+        <div class="row">
+          <label>Slant (italic)</label>
+          <input id="slant" type="range" min="-18" max="18" step="1" value="6">
+          <output id="os"></output>
+        </div>
+        <div class="row">
+          <label>Roundness</label>
+          <input id="round" type="range" min="0" max="1" step="1" value="1">
+          <output id="or"></output>
+        </div>
+        <div class="row">
+          <label>Serif size</label>
+          <input id="serif" type="range" min="0" max="24" step="1" value="8">
+          <output id="ose"></output>
+        </div>
+        <div class="row">
+          <label>Letter spacing</label>
+          <input id="spacing" type="range" min="-20" max="50" step="1" value="6">
+          <output id="ol"></output>
+        </div>
+        <div class="kicker">
+          <button class="btn" id="presetSans">Preset: Neo Sans</button>
+          <button class="btn" id="presetSerif">Preset: Book Serif</button>
+          <button class="btn" id="presetSlab">Preset: Slab</button>
+          <button class="btn" id="presetDidone">Preset: Didone</button>
+        </div>
+        <div class="grid-toggle">
+          <input type="checkbox" id="showGrid" checked>
+          <label for="showGrid">Show baseline & grid</label>
+        </div>
+        <div class="kicker" style="margin-top:8px">
+          <button class="btn" id="downloadSvg">Download SVG</button>
+          <button class="btn" id="randomize">Randomize</button>
+          <button class="btn" id="alphabet">Alphabet</button>
+        </div>
+        <div class="legend">
+          <div class="cell">Tip: Contrast fattens verticals and thins horizontals — like Bodoni/Didot.</div>
+          <div class="cell">Serif size adds small terminal strokes to ends of main stems.</div>
+        </div>
+      </section>
+
+      <section class="card out">
+        <div class="svg-wrap">
+          <svg id="board" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 400" width="100%" height="100%"></svg>
+          <div class="watermark">SVG generated on the fly</div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      Built with plain <code>SVG</code> + <code>JavaScript</code>. This is a teaching demo, not a full type system — letter shapes are simplified.
+    </footer>
+  </main>
+
+<script>
+(function(){
+  const $ = sel => document.querySelector(sel);
+  const board = $('#board');
+  const controls = {
+    text: $('#text'), weight: $('#weight'), contrast: $('#contrast'), width: $('#width'), slant: $('#slant'), round: $('#round'), serif: $('#serif'), spacing: $('#spacing'), showGrid: $('#showGrid')
+  };
+  const outs = {ow:$('#ow'), oc:$('#oc'), owd:$('#owd'), os:$('#os'), or:$('#or'), ose:$('#ose'), ol:$('#ol')};
+
+  // Basic metrics for our meta-font design space
+  const EM = 100; // design grid per glyph
+  const ASC = 72, XH = 50, DESC = 20; // ascender, x-height, descender
+
+  function setOutputs(){
+    outs.ow.textContent = controls.weight.value;
+    outs.oc.textContent = controls.contrast.value;
+    outs.owd.textContent = controls.width.value + '%';
+    outs.os.textContent = controls.slant.value + '°';
+    outs.or.textContent = (controls.round.value==='1'? 'round' : 'square');
+    outs.ose.textContent = controls.serif.value;
+    outs.ol.textContent = controls.spacing.value;
+  }
+
+  // Build one glyph group at (x,y)
+  function drawGlyph(letter, x, y, params){
+    const g = svgEl('g', {transform:`translate(${x},${y}) skewX(${params.slant}) scale(${params.width},1)`});
+    // grid guides per glyph
+    if(params.debug){
+      g.appendChild(hLine(0, 0, EM, '#263046')); // baseline
+      g.appendChild(hLine(0, -XH, EM, '#1d273a')); // x-height
+      g.appendChild(hLine(0, -ASC, EM, '#1d273a')); // ascender
+      g.appendChild(hLine(0, DESC, EM, '#1d273a')); // descender
+    }
+
+    const cap = params.round? 'round':'butt';
+    const join = params.round? 'round':'miter';
+    const Wv = Math.max(1, params.weight * (1 + params.contrast));
+    const Wh = Math.max(1, params.weight * (1 - params.contrast));
+    const Wd = Math.max(1, (Wv+Wh)/2);
+
+    // helper stroke
+    function S(x1,y1,x2,y2, ori){
+      const w = ori==='v'? Wv : ori==='h'? Wh : Wd;
+      const p = svgEl('line', {x1,y1,x2,y2, 'stroke-width':w, stroke:'#e8edf7', 'stroke-linecap':cap, 'stroke-linejoin':join});
+      g.appendChild(p);
+      // apply serifs at terminals for main orthogonal strokes
+      if(params.serif>0){
+        addSerif(x1,y1,x2,y2, ori, w);
+      }
+    }
+    function addSerif(x1,y1,x2,y2, ori, w){
+      const s = params.serif;
+      const color = '#e8edf7';
+      if(ori==='v'){
+        // bottom serif
+        g.appendChild(svgEl('line',{x1:x1-s, y1:y2, x2:x1+s, y2:y2, stroke:color, 'stroke-width':Math.max(1, w*0.7), 'stroke-linecap':cap}));
+        // top serif
+        g.appendChild(svgEl('line',{x1:x1-s, y1:y1, x2:x1+s, y2:y1, stroke:color, 'stroke-width':Math.max(1, w*0.7), 'stroke-linecap':cap}));
+      }else if(ori==='h'){
+        // left serif
+        g.appendChild(svgEl('line',{x1:x1, y1:y1-s, x2:x1, y2:y1+s, stroke:color, 'stroke-width':Math.max(1, w*0.7), 'stroke-linecap':cap}));
+        // right serif
+        g.appendChild(svgEl('line',{x1:x2, y1:y1-s, x2:x2, y2:y1+s, stroke:color, 'stroke-width':Math.max(1, w*0.7), 'stroke-linecap':cap}));
+      }
+    }
+
+    // circular/oval outline utility
+    function oval(cx, cy, rx, ry, w){
+      const p = svgEl('ellipse',{cx, cy, rx, ry, fill:'none', stroke:'#e8edf7', 'stroke-width':w, 'stroke-linecap':cap, 'stroke-linejoin':join});
+      g.appendChild(p);
+    }
+
+    const up = (ch)=> ch.toUpperCase();
+
+    switch(up(letter)){
+      case 'A':
+        S(20,-ASC, 50,0,'d'); S(80,-ASC, 50,0,'d'); S(35,-40, 65,-40,'h'); break;
+      case 'B':
+        S(20,-ASC, 20,0,'v'); oval(40,-55, 25, 22, Wd); oval(40,-15, 25, 20, Wd); S(20,-ASC, 55,-78,'h'); break;
+      case 'C':
+        // open O
+        const wc = Math.max(Wd, Wv*0.9);
+        const c = svgEl('path',{d:`M 80,-55 A 35,35 0 1 0 80,-55`, fill:'none', stroke:'#e8edf7', 'stroke-width':wc});
+        g.appendChild(c);
+        // erase right chunk by overlay (hacky mask look)
+        g.appendChild(svgEl('line',{x1:75,y1:-90,x2:75,y2:-20,stroke:varColor('--card'), 'stroke-width':wc*1.2}));
+        break;
+      case 'D':
+        S(20,-ASC,20,0,'v'); oval(35,-55, 35, 55, Wd); break;
+      case 'E':
+        S(20,-ASC, 20,0,'v'); S(20,-ASC, 80,-ASC,'h'); S(20,-40, 70,-40,'h'); S(20,0, 80,0,'h'); break;
+      case 'F':
+        S(20,-ASC, 20,0,'v'); S(20,-ASC, 80,-ASC,'h'); S(20,-40, 70,-40,'h'); break;
+      case 'G':
+        oval(50,-55, 35, 55, Wd); S(50,-5, 85,-5,'h'); S(85,-5, 85,-30,'v'); break;
+      case 'H':
+        S(20,-ASC,20,0,'v'); S(80,-ASC,80,0,'v'); S(20,-40,80,-40,'h'); break;
+      case 'I':
+        S(50,-ASC,50,0,'v'); break;
+      case 'J':
+        S(70,-ASC,70,-5,'v'); const j=svgEl('path',{d:`M 70,-5 Q 70,10 55,10 Q 35,10 35,-5`, fill:'none', stroke:'#e8edf7','stroke-width':Wv,'stroke-linecap':cap}); g.appendChild(j); break;
+      case 'K':
+        S(20,-ASC,20,0,'v'); S(20,-40,80,-ASC,'d'); S(20,-40,80,0,'d'); break;
+      case 'L':
+        S(20,-ASC, 20,0,'v'); S(20,0, 85,0,'h'); break;
+      case 'M':
+        S(20,0,20,-ASC,'v'); S(80,0,80,-ASC,'v'); S(20,-ASC,50,-10,'d'); S(80,-ASC,50,-10,'d'); break;
+      case 'N':
+        S(20,0,20,-ASC,'v'); S(80,0,80,-ASC,'v'); S(20,-ASC,80,0,'d'); break;
+      case 'O':
+        oval(50,-55, 35, 55, Wd); break;
+      case 'P':
+        S(20,-ASC,20,0,'v'); oval(40,-75, 25, 20, Wd); break;
+      case 'Q':
+        oval(50,-55, 35, 55, Wd); S(60,-10, 85,15,'d'); break;
+      case 'R':
+        S(20,-ASC,20,0,'v'); oval(40,-75, 25, 20, Wd); S(20,-40,80,0,'d'); break;
+      case 'S':
+        const s1 = svgEl('path',{d:`M 78,-85 Q 40,-100 40,-70 Q 40,-55 65,-50 Q 90,-45 90,-20 Q 90,5 55,5 Q 25,5 22,-5`, fill:'none', stroke:'#e8edf7', 'stroke-width':Wd, 'stroke-linecap':cap}); g.appendChild(s1); break;
+      case 'T':
+        S(20,-ASC, 80,-ASC,'h'); S(50,-ASC, 50,0,'v'); break;
+      case 'U':
+        S(20,-ASC,20,-10,'v'); S(80,-ASC,80,-10,'v'); const u = svgEl('path',{d:`M 20,-10 Q 20,10 50,10 Q 80,10 80,-10`, fill:'none', stroke:'#e8edf7','stroke-width':Wd,'stroke-linecap':cap}); g.appendChild(u); break;
+      case 'V':
+        S(20,-ASC,50,0,'d'); S(80,-ASC,50,0,'d'); break;
+      case 'W':
+        S(15,-ASC,35,0,'d'); S(35,0,50,-60,'d'); S(50,-60,65,0,'d'); S(65,0,85,-ASC,'d'); break;
+      case 'X':
+        S(20,-ASC,80,0,'d'); S(80,-ASC,20,0,'d'); break;
+      case 'Y':
+        S(20,-ASC,50,-50,'d'); S(80,-ASC,50,-50,'d'); S(50,-50,50,0,'v'); break;
+      case 'Z':
+        S(20,-ASC,80,-ASC,'h'); S(80,-ASC,20,0,'d'); S(20,0,80,0,'h'); break;
+      case '0': case 'O': oval(50,-55, 35, 55, Wd); break;
+      case '1': S(50,-ASC,50,0,'v'); S(35,-ASC+10,50,-ASC,'d'); break;
+      case '2': S(20,-80, 80,-80,'h'); S(80,-80,20,0,'d'); S(20,0,80,0,'h'); break;
+      case '3': S(25,-80,75,-80,'h'); S(75,-80,45,-55,'d'); S(45,-55,75,-30,'d'); S(25,-30,75,-30,'h'); break;
+      case '4': S(70,-ASC,70,0,'v'); S(20,-40,80,-40,'h'); S(20,-40,70,-ASC,'d'); break;
+      case '5': S(20,-ASC,80,-ASC,'h'); S(20,-ASC,20,-50,'v'); S(20,-50,80,-50,'h'); S(80,-50,80,0,'v'); S(20,0,80,0,'h'); break;
+      case '6': oval(50,-35,30,25,Wd); S(80,-80,40,-60,'d'); S(40,-60,20,-40,'d'); break;
+      case '7': S(20,-ASC,80,-ASC,'h'); S(80,-ASC,30,0,'d'); break;
+      case '8': oval(50,-75,22,18,Wd); oval(50,-20,28,22,Wd); break;
+      case '9': oval(50,-75,28,25,Wd); S(80,-20,40,-40,'d'); S(40,-40,20,-60,'d'); break;
+      default:
+        // space or unsupported -> advance only
+        break;
+    }
+    return g;
+  }
+
+  function varColor(cssvar){
+    return getComputedStyle(document.documentElement).getPropertyValue(cssvar) || '#0f1420';
+  }
+
+  function hLine(x1,y, x2, color){
+    return svgEl('line',{x1,y1:y,x2,y2:y, stroke:color, 'stroke-width':1});
+  }
+
+  function svgEl(name, attrs){
+    const e = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for(const k in attrs){ e.setAttribute(k, attrs[k]); }
+    return e;
+  }
+
+  function layoutAndRender(){
+    setOutputs();
+    const text = controls.text.value.toString();
+    const params = {
+      weight: +controls.weight.value,
+      contrast: +controls.contrast.value,
+      width: +controls.width.value / 100,
+      slant: +controls.slant.value,
+      round: +controls.round.value === 1,
+      serif: +controls.serif.value,
+      spacing: +controls.spacing.value,
+      debug: controls.showGrid.checked
+    };
+
+    // clear
+    while(board.firstChild) board.removeChild(board.firstChild);
+
+    // background grid across full area
+    const W = 1500, H = 320;
+    board.setAttribute('viewBox', `0 -${ASC+10} ${W} ${ASC+DESC+40}`);
+
+    if(params.debug){
+      // vertical ticks
+      for(let x=0;x<W;x+=50){
+        board.appendChild(svgEl('line',{x1:x,y1:-ASC-10,x2:x,y2:DESC+20, stroke:'#101725','stroke-width':1}));
+      }
+      // main baselines
+      board.appendChild(svgEl('line',{x1:0,y1:0,x2:W,y2:0, stroke:'#2a3347','stroke-width':1}));
+      board.appendChild(svgEl('line',{x1:0,y1:-XH,x2:W,y2:-XH, stroke:'#1e283c','stroke-width':1}));
+      board.appendChild(svgEl('line',{x1:0,y1:-ASC,x2:W,y2:-ASC, stroke:'#1e283c','stroke-width':1}));
+    }
+
+    // layout text left to right
+    let penX = 24;
+    const advance = 84 + params.spacing; // base advance
+
+    for(const ch of text){
+      if(ch==='\n') { penX = 24; continue; }
+      if(ch===' ') { penX += advance*0.6; continue; }
+      const g = drawGlyph(ch, penX, 0, params);
+      board.appendChild(g);
+      penX += advance * (ch==='I'?0.55: ch==='W'?1.35: ch==='M'?1.25: 1);
+    }
+  }
+
+  // Presets
+  $('#presetSans').addEventListener('click', ()=>{
+    controls.weight.value=12; controls.contrast.value=0.05; controls.width.value=98; controls.slant.value=0; controls.round.value=1; controls.serif.value=0; controls.spacing.value=4; layoutAndRender();
+  });
+  $('#presetSerif').addEventListener('click', ()=>{
+    controls.weight.value=14; controls.contrast.value=0.25; controls.width.value=98; controls.slant.value=0; controls.round.value=0; controls.serif.value=8; controls.spacing.value=6; layoutAndRender();
+  });
+  $('#presetSlab').addEventListener('click', ()=>{
+    controls.weight.value=18; controls.contrast.value=0.05; controls.width.value=100; controls.slant.value=0; controls.round.value=0; controls.serif.value=14; controls.spacing.value=4; layoutAndRender();
+  });
+  $('#presetDidone').addEventListener('click', ()=>{
+    controls.weight.value=16; controls.contrast.value=0.6; controls.width.value=102; controls.slant.value=0; controls.round.value=0; controls.serif.value=10; controls.spacing.value=6; layoutAndRender();
+  });
+
+  // Buttons
+  $('#downloadSvg').addEventListener('click', ()=>{
+    const xml = new XMLSerializer().serializeToString(board);
+    const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n`+xml], {type:'image/svg+xml'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'meta-font.svg';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  $('#randomize').addEventListener('click', ()=>{
+    const rnd=(a,b,step=1)=> Math.round((a+Math.random()*(b-a))/step)*step;
+    controls.weight.value = rnd(6,26,1);
+    controls.contrast.value = (Math.random()*0.75).toFixed(2);
+    controls.width.value = rnd(80,140,2);
+    controls.slant.value = rnd(-14,14,1);
+    controls.round.value = Math.random()>0.5?1:0;
+    controls.serif.value = rnd(0,18,1);
+    controls.spacing.value = rnd(-6,18,1);
+    layoutAndRender();
+  });
+  $('#alphabet').addEventListener('click',()=>{
+    controls.text.value = 'THE QUICK BROWN FOX JUMPS OVER 0123456789';
+    layoutAndRender();
+  });
+
+  // Bind inputs
+  for(const k in controls){
+    const el = controls[k];
+    if(el.tagName==='INPUT'){
+      el.addEventListener('input', layoutAndRender);
+      el.addEventListener('change', layoutAndRender);
+    }
+  }
+
+  // initial paint
+  layoutAndRender();
+})();
+</script>
+</body>
+</html>
