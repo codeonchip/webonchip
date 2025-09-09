@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>USA Trip Map — Visited & Planned</title>
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    :root{
+      --bg:#0f172a; /* slate-900 */
+      --panel:#111827ee; /* gray-900 */
+      --text:#e5e7eb; /* gray-200 */
+      --muted:#9ca3af; /* gray-400 */
+      --accent:#22d3ee; /* cyan-400 */
+      --ok:#22c55e; /* green-500 */
+      --plan:#f59e0b; /* amber-500 */
+      --danger:#ef4444; /* red-500 */
+      --card:#111827; /* panel solid */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .app{display:grid;grid-template-columns:340px 1fr;height:100%}
+    .sidebar{padding:14px;border-right:1px solid #1f2937;background:linear-gradient(180deg, #0b1220 0%, #0d1323 100%)}
+    h1{margin:0 0 10px;font-size:18px;letter-spacing:.3px}
+    .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+    .panel{background:var(--card);border:1px solid #1f2937;border-radius:14px;padding:12px;margin-bottom:12px}
+    label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+    input,select,textarea,button{width:100%;border-radius:10px;border:1px solid #1f2937;background:#0b1020;color:var(--text);padding:10px}
+    input::placeholder{color:#6b7280}
+    button{cursor:pointer;border:1px solid #263244}
+    button.primary{background:linear-gradient(180deg,#0ea5e9,#0284c7); border-color:#0ea5e9}
+    button.ghost{background:#0b1020}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .legend{display:flex;gap:10px;align-items:center;font-size:12px;color:#cbd5e1}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .dot.v{background:var(--ok)}
+    .dot.p{background:var(--plan)}
+    #map{height:100%; width:100%}
+    .list{max-height:220px;overflow:auto;border-top:1px dashed #223046;margin-top:8px;padding-top:6px}
+    .item{display:flex;justify-content:space-between;align-items:center;padding:6px;border-bottom:1px dashed #1f2937}
+    .item .meta{font-size:12px;color:#9ca3af}
+    .tag{padding:2px 8px;border-radius:999px;font-size:11px}
+    .tag.v{background:rgba(34,197,94,.15); color:#34d399}
+    .tag.p{background:rgba(245,158,11,.15); color:#fbbf24}
+    .actions{display:flex;gap:6px}
+    .small{font-size:12px}
+    .footer{position:absolute;left:10px;bottom:10px;background:#0b1020cc;border:1px solid #1f2937;color:#9ca3af;padding:6px 8px;border-radius:10px}
+    .kbd{border:1px solid #334155;padding:1px 6px;border-radius:6px;background:#0b1020;color:#cbd5e1}
+    .pill{display:inline-block;padding:4px 8px;border:1px solid #1f2937;border-radius:999px;color:#cbd5e1}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .notice{font-size:11px;color:#93c5fd}
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <h1>USA Trip Map</h1>
+    <div class="sub">Drop pins for places you <span class="pill">visited</span> or <span class="pill">will visit</span>. Click the map to add a place.</div>
+
+    <div class="panel">
+      <div class="legend" style="margin-bottom:8px">
+        <div class="dot v"></div> <span>Visited</span>
+        <div style="width:14px"></div>
+        <div class="dot p"></div> <span>Planned</span>
+      </div>
+      <div class="row">
+        <div>
+          <label for="name">Place name</label>
+          <input id="name" placeholder="e.g., Chicago Art Institute" />
+        </div>
+        <div>
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="visited">Visited</option>
+            <option value="planned">Planned</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="lat">Latitude</label>
+          <input id="lat" placeholder="e.g., 41.8796" />
+        </div>
+        <div>
+          <label for="lng">Longitude</label>
+          <input id="lng" placeholder="e.g., -87.6237" />
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:8px">
+        <button class="ghost" id="use-click">Use last map click</button>
+        <button class="primary" id="add">Add marker</button>
+      </div>
+      <div class="small notice" style="margin-top:8px">Tip: Click anywhere on the map, then “Use last map click.”</div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <strong>Your places</strong>
+        <div>
+          <button class="ghost small" id="fit">Fit to markers</button>
+        </div>
+      </div>
+      <div class="list" id="list"></div>
+    </div>
+
+    <div class="panel">
+      <strong>Import / Export</strong>
+      <label for="json">JSON</label>
+      <textarea id="json" rows="6" placeholder='[{"name":"Dallas, TX","lat":32.7767,"lng":-96.7970,"status":"visited"}]'></textarea>
+      <div class="grid-2" style="margin-top:8px">
+        <button class="ghost" id="load">Load JSON</button>
+        <button class="primary" id="save">Copy JSON</button>
+      </div>
+    </div>
+
+    <div class="sub">Made with <span style="color:var(--accent)">Leaflet</span> and OpenStreetMap. No account needed.</div>
+  </aside>
+
+  <!-- Map -->
+  <main>
+    <div id="map"></div>
+    <div class="footer small">Click map to capture <span class="kbd">lat</span>, <span class="kbd">lng</span>. Scroll to zoom, drag to pan.</div>
+  </main>
+</div>
+
+<!-- Leaflet JS -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+<script>
+  // =========================
+  // Utility & State
+  // =========================
+  const $ = (s) => document.querySelector(s);
+  const listEl = $('#list');
+  const nameEl = $('#name');
+  const latEl = $('#lat');
+  const lngEl = $('#lng');
+  const statusEl = $('#status');
+  const jsonEl = $('#json');
+
+  let lastClickLatLng = null;
+  let markersLayer = L.layerGroup();
+  let data = [
+    // Starter examples — edit/remove as you like
+    { name: 'Columbia, MO', lat: 38.9517, lng: -92.3341, status: 'visited' },
+    { name: 'Dallas, TX', lat: 32.7767, lng: -96.7970, status: 'visited' },
+    { name: 'Chicago, IL (Art Museums)', lat: 41.8796, lng: -87.6237, status: 'planned' },
+  ];
+
+  // =========================
+  // Map
+  // =========================
+  const map = L.map('map', {
+    minZoom: 3,
+    worldCopyJump: true,
+    attributionControl: true,
+  }).setView([39.5, -98.35], 4); // USA-ish center
+
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  markersLayer.addTo(map);
+
+  map.on('click', (e) => {
+    lastClickLatLng = e.latlng;
+    latEl.value = e.latlng.lat.toFixed(6);
+    lngEl.value = e.latlng.lng.toFixed(6);
+    $('#use-click').textContent = 'Location captured ✔';
+    setTimeout(() => ($('#use-click').textContent = 'Use last map click'), 1400);
+  });
+
+  function colorFor(status){
+    return status === 'visited' ? '#22c55e' : '#f59e0b';
+  }
+
+  function addMarker(item){
+    const marker = L.circleMarker([item.lat, item.lng], {
+      radius: 7,
+      weight: 2,
+      color: colorFor(item.status),
+      fillColor: colorFor(item.status),
+      fillOpacity: 0.25,
+    }).bindPopup(`<strong>${item.name}</strong><br>${item.status === 'visited' ? 'Visited' : 'Planned'}<br><span style="color:#94a3b8">${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}</span>`);
+    marker.addTo(markersLayer);
+    return marker;
+  }
+
+  function refreshMarkers(){
+    markersLayer.clearLayers();
+    data.forEach(addMarker);
+  }
+
+  function renderList(){
+    listEl.innerHTML = '';
+    data.forEach((d, i) => {
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.innerHTML = `
+        <div>
+          <div><strong>${d.name}</strong></div>
+          <div class="meta">${d.lat.toFixed(4)}, ${d.lng.toFixed(4)}</div>
+        </div>
+        <div class="actions">
+          <span class="tag ${d.status === 'visited' ? 'v' : 'p'}">${d.status}</span>
+          <button class="ghost small" data-action="fly" data-i="${i}">Fly</button>
+          <button class="ghost small" data-action="toggle" data-i="${i}">${d.status==='visited'?'Mark planned':'Mark visited'}</button>
+          <button class="ghost small" data-action="del" data-i="${i}" style="color:var(--danger)">Delete</button>
+        </div>`;
+      listEl.appendChild(row);
+    });
+  }
+
+  function fitToMarkers(){
+    if(data.length === 0){ map.setView([39.5,-98.35], 4); return; }
+    const bounds = L.latLngBounds(data.map(d => [d.lat, d.lng]));
+    map.fitBounds(bounds.pad(0.2));
+  }
+
+  function syncJSON(){
+    jsonEl.value = JSON.stringify(data, null, 2);
+  }
+
+  // Initial render
+  refreshMarkers();
+  renderList();
+  syncJSON();
+  fitToMarkers();
+
+  // =========================
+  // UI Handlers
+  // =========================
+  $('#use-click').addEventListener('click', () => {
+    if(!lastClickLatLng){
+      alert('Click on the map first to capture a location.');
+      return;
+    }
+    latEl.value = lastClickLatLng.lat.toFixed(6);
+    lngEl.value = lastClickLatLng.lng.toFixed(6);
+  });
+
+  $('#add').addEventListener('click', () => {
+    const name = (nameEl.value || '').trim();
+    const lat = parseFloat(latEl.value);
+    const lng = parseFloat(lngEl.value);
+    const status = statusEl.value;
+    if(!name){ return alert('Please enter a place name.'); }
+    if(Number.isNaN(lat) || Number.isNaN(lng)){ return alert('Please enter valid latitude & longitude.'); }
+
+    data.push({ name, lat, lng, status });
+    nameEl.value = ''; latEl.value = ''; lngEl.value='';
+    refreshMarkers();
+    renderList();
+    syncJSON();
+    fitToMarkers();
+  });
+
+  listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const i = +btn.dataset.i;
+    const action = btn.dataset.action;
+    if(action === 'del'){
+      data.splice(i,1);
+      refreshMarkers(); renderList(); syncJSON();
+    } else if(action === 'toggle'){
+      data[i].status = data[i].status === 'visited' ? 'planned' : 'visited';
+      refreshMarkers(); renderList(); syncJSON();
+    } else if(action === 'fly'){
+      const d = data[i];
+      map.flyTo([d.lat, d.lng], 11, { duration: 0.8 });
+    }
+  });
+
+  $('#fit').addEventListener('click', fitToMarkers);
+
+  $('#save').addEventListener('click', async () => {
+    syncJSON();
+    try{
+      await navigator.clipboard.writeText(jsonEl.value);
+      const btn = $('#save');
+      const old = btn.textContent; btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = old, 1000);
+    }catch(err){
+      alert('Copied JSON to the textbox. Select and copy manually if needed.');
+    }
+  });
+
+  $('#load').addEventListener('click', () => {
+    try{
+      const arr = JSON.parse(jsonEl.value);
+      if(!Array.isArray(arr)) throw new Error('Must be an array of objects');
+      data = arr.map(d => ({
+        name: String(d.name || 'Untitled'),
+        lat: Number(d.lat),
+        lng: Number(d.lng),
+        status: d.status === 'visited' ? 'visited' : 'planned'
+      }));
+      refreshMarkers(); renderList(); fitToMarkers();
+    }catch(err){
+      alert('Invalid JSON. Example: [{"name":"Dallas, TX","lat":32.7767,"lng":-96.7970,"status":"visited"}]');
+    }
+  });
+</script>
+</body>
+</html>
