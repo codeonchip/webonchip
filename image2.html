@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Free Photo Demo — Next + Objects List</title>
+  <meta name="description" content="A minimal web page that displays one free Unsplash photo with Next/Prev and a button to list objects for the current photo." />
+  <style>
+    :root { --ink:#111827; --muted:#6b7280; --bg:#f6f7f9; --card:#ffffff; --ring: rgba(17,24,39,.08); }
+    *{ box-sizing:border-box; }
+    body{ margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+    .card{ max-width:940px; width:clamp(320px, 94vw, 940px); margin:24px; background:var(--card); border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 6px 16px rgba(0,0,0,.06); padding:18px; }
+    h1{ margin:0 0 10px; font-size:24px; }
+    .toolbar{ display:flex; gap:8px; align-items:center; justify-content:space-between; margin:8px 0 12px; flex-wrap:wrap; }
+    .btn{ appearance:none; cursor:pointer; padding:10px 14px; border-radius:10px; border:1px solid #111827; background:#111827; color:#fff; box-shadow: 0 1px 0 var(--ring); }
+    .btn.secondary{ background:#fff; color:#111827; }
+    .btn:active{ transform: translateY(1px); }
+    figure{ margin:0; }
+    img{ display:block; width:100%; height:auto; border-radius:12px; }
+    figcaption{ margin-top:8px; font-size:14px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .muted{ color:var(--muted); }
+
+    /* Objects list panel */
+    .list-card{ margin-top:14px; padding-top:12px; border-top:1px solid #e5e7eb; }
+    .obj-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+    .obj-list{ list-style:none; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:8px; }
+    .chip{ padding:6px 10px; border-radius:999px; border:1px solid #e5e7eb; background:#fff; box-shadow:0 1px 0 var(--ring); font-size:14px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Free Photo Showcase</h1>
+
+    <div class="toolbar">
+      <div style="display:flex; gap:8px;">
+        <button id="prevBtn" class="btn secondary" aria-label="Previous photo">◀ Prev</button>
+        <button id="nextBtn" class="btn" aria-label="Next photo">Next ▶</button>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button id="listBtn" class="btn secondary" aria-label="List objects in this photo">List objects</button>
+      </div>
+    </div>
+
+    <figure>
+      <img id="photo" alt="Sunlit developer desk with laptop, headphones and coffee mug." loading="lazy" decoding="async" width="1600" height="1067" />
+      <figcaption>
+        <span id="caption">Photo via <a href="https://unsplash.com/" target="_blank" rel="noopener">Unsplash</a> — free to use. Attribution appreciated.</span>
+        <span class="muted" id="counter">1 / 20</span>
+      </figcaption>
+    </figure>
+
+    <div class="list-card" role="region" aria-live="polite" aria-label="Objects in this photo">
+      <div class="obj-header">
+        <strong>Objects in this photo</strong>
+        <span class="muted" id="objCount">0</span>
+      </div>
+      <ul id="objList" class="obj-list"></ul>
+    </div>
+
+    <p class="muted" style="margin-top:10px;">Tip: press <kbd>→</kbd> for next, <kbd>←</kbd> for previous. Click <strong>List objects</strong> to refresh the list for the current photo.</p>
+  </main>
+
+  <script>
+    // Curated set of free Unsplash photos with lightweight object lists
+    const photos = [
+      { base:'https://images.unsplash.com/photo-1515879218367-8466d910aaa4', alt:'Sunlit developer desk with laptop, headphones and coffee mug.', credit:'Unsplash — Workspace', objects:['Laptop','Headphones','Coffee mug','Desk','Keyboard'] },
+      { base:'https://images.unsplash.com/photo-1529078155058-5d716f45d604', alt:'Cozy study with books, clock and a vintage camera.', credit:'Unsplash — Cozy study', objects:['Books','Clock','Camera','Glasses','Mug'] },
+      { base:'https://images.unsplash.com/photo-1441974231531-c6227db76b6e', alt:'Sunlit forest with tall trees and warm light.', credit:'Unsplash — Forest', objects:['Trees','Sunlight','Forest','Nature','Path'] },
+      { base:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e', alt:'Crashing ocean wave at golden hour.', credit:'Unsplash — Ocean wave', objects:['Wave','Ocean','Sea','Surf','Water'] },
+      { base:'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee', alt:'Milky Way over desert rock formations at night.', credit:'Unsplash — Milky Way', objects:['Milky Way','Stars','Night sky','Galaxy','Desert'] },
+      { base:'https://images.unsplash.com/photo-1506744038136-46273834b3fb', alt:'Mirrorlike alpine lake with mountains in the background.', credit:'Unsplash — Mountain lake', objects:['Lake','Mountains','Reflection','Water','Clouds'] },
+      { base:'https://images.unsplash.com/photo-1470770841072-f978cf4d019e', alt:'Rocky coastline and turquoise sea from above.', credit:'Unsplash — Coastline', objects:['Coast','Rocks','Sea','Cliffs','Turquoise'] },
+      { base:'https://images.unsplash.com/photo-1469474968028-56623f02e42e', alt:'Sunrise over jagged snow-capped mountains.', credit:'Unsplash — Mountains', objects:['Mountains','Sunrise','Snow','Peaks','Sky'] },
+      { base:'https://images.unsplash.com/photo-1491553895911-0055eca6402d', alt:'Colorful city skyline at dusk.', credit:'Unsplash — City skyline', objects:['City','Skyscrapers','Skyline','Buildings','Sunset'] },
+      { base:'https://images.unsplash.com/photo-1519681393784-d120267933ba', alt:'Aerial drone shot of a winding road through forest.', credit:'Unsplash — Aerial', objects:['Road','Forest','Trees','Aerial','Curve'] },
+      { base:'https://images.unsplash.com/photo-1494790108377-be9c29b29330', alt:'Vintage camera on wooden table.', credit:'Unsplash — Camera', objects:['Camera','Lens','Wood','Vintage','Strap'] },
+      { base:'https://images.unsplash.com/photo-1482192596544-9eb780fc7f66', alt:'Cup of coffee on a table with notebook.', credit:'Unsplash — Coffee', objects:['Coffee','Notebook','Table','Cup','Pen'] },
+      { base:'https://images.unsplash.com/photo-1501785888041-af3ef285b470', alt:'Dog looking out of a car window with mountains beyond.', credit:'Unsplash — Dog & mountains', objects:['Dog','Car window','Mountains','Travel','Sky'] },
+      { base:'https://images.unsplash.com/photo-1517816428104-797a7f7d7b96', alt:'Aurora borealis over snowy landscape.', credit:'Unsplash — Northern lights', objects:['Aurora','Snow','Night','Sky','Landscape'] },
+      { base:'https://images.unsplash.com/photo-1472214103451-9374bd1c798e', alt:'Suspension bridge disappearing into fog.', credit:'Unsplash — Bridge in fog', objects:['Bridge','Fog','Cables','Suspension','Mist'] },
+      { base:'https://images.unsplash.com/photo-1506765515384-028b60a970df', alt:'Road through dense green forest from above.', credit:'Unsplash — Forest road', objects:['Road','Forest','Green','Trees','Aerial'] },
+      { base:'https://images.unsplash.com/photo-1503023345310-bd7c1de61c7d', alt:'Blue sports car parked on city street.', credit:'Unsplash — Car', objects:['Car','Sports car','Street','City','Headlights'] },
+      { base:'https://images.unsplash.com/photo-1499084732479-de2c02d45fc4', alt:'Roasted coffee beans close-up.', credit:'Unsplash — Coffee beans', objects:['Coffee beans','Roasted','Texture','Brown','Food'] },
+      { base:'https://images.unsplash.com/photo-1445905595283-21f8ae8a33d2', alt:'Canal with boats and historic buildings.', credit:'Unsplash — Canal', objects:['Canal','Boats','Buildings','Water','City'] },
+      { base:'https://images.unsplash.com/photo-1481277542470-605612bd2d61', alt:'Neon-lit street at night in a city.', credit:'Unsplash — Night street', objects:['Neon','Street','Night','City','Lights'] }
+    ];
+
+    const img = document.getElementById('photo');
+    const caption = document.getElementById('caption');
+    const counter = document.getElementById('counter');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const listBtn = document.getElementById('listBtn');
+    const objList = document.getElementById('objList');
+    const objCount = document.getElementById('objCount');
+
+    let index = 0;
+
+    function buildSrc(base, w){ return `${base}?q=80&w=${w}&auto=format&fit=crop`; }
+    function srcsetFor(base){ return [600, 1200, 1600].map(w => `${buildSrc(base, w)} ${w}w`).join(', '); }
+
+    function render(i){
+      const total = photos.length;
+      index = (i + total) % total;
+      const p = photos[index];
+      img.src = buildSrc(p.base, 1600);
+      img.srcset = srcsetFor(p.base);
+      img.sizes = '(max-width: 800px) 100vw, 800px';
+      img.alt = p.alt;
+      caption.innerHTML = `Photo via <a href="https://unsplash.com/" target="_blank" rel="noopener">Unsplash</a> — free to use. <span class="muted">${p.credit}</span>`;
+      counter.textContent = `${index + 1} / ${total}`;
+    }
+
+    function updateObjectList(){
+      const p = photos[index];
+      const items = (p.objects && p.objects.length) ? p.objects : [];
+      objList.innerHTML = '';
+      if (!items.length){
+        objCount.textContent = '0';
+        return;
+      }
+      items.forEach(name => {
+        const li = document.createElement('li');
+        li.className = 'chip';
+        li.textContent = name;
+        objList.appendChild(li);
+      });
+      objCount.textContent = String(items.length);
+    }
+
+    function next(){ render(index + 1); }
+    function prev(){ render(index - 1); }
+
+    nextBtn.addEventListener('click', next);
+    prevBtn.addEventListener('click', prev);
+    listBtn.addEventListener('click', updateObjectList);
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft') prev();
+      if (e.key.toLowerCase() === 'l') updateObjectList();
+    });
+
+    // Initial render
+    render(0);
+  </script>
+</body>
+</html>
