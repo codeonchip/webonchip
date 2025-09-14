@@ -5,54 +5,48 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Hidden Object — Web Edition (with Voice)</title>
 <style>
-  :root {
-    --bg: #f6f7f9; --card: #ffffff; --ink: #121417; --muted: #6b7280;
-    --accent: #111827; --good: #059669; --warn: #d97706;
-    --ring: rgba(17, 24, 39, .12); --ring-strong: rgba(17, 24, 39, .24);
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { margin: 0; background: radial-gradient(1200px 600px at 30% -10%, #ffffff, var(--bg));
-         color: var(--ink); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-  .container { max-width: 1180px; margin: 0 auto; padding: 16px; }
-  .topbar { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.75); backdrop-filter: blur(6px); border-bottom: 1px solid #e5e7eb; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 0; }
-  .title { font-size: 22px; font-weight: 800; display:flex; align-items:center; gap:8px;}
-  .badge { background: var(--accent); color:#fff; padding: 4px 8px; border-radius: 999px; font-size: 12px; }
-  .btn { appearance: none; border: 1px solid #e5e7eb; background: #fff; padding: 8px 10px; border-radius: 12px; cursor: pointer; box-shadow: 0 1px 0 0 var(--ring); }
-  .btn:active { transform: translateY(1px); }
-  .btn.primary { background: var(--accent); color:#fff; border-color: transparent; }
-  .btn.ghost { background: #f3f4f6; }
-  .btn[aria-pressed="true"] { outline: 2px solid var(--ring-strong); }
-  .seg { padding: 6px 10px; background:#f3f4f6; border-radius: 10px; font-variant-numeric: tabular-nums; min-width:52px; text-align:center; }
-  .seg.small { min-width: auto; padding: 4px 8px; font-size: 12px; color: var(--muted); }
-  .select, .input, .range { border:1px solid #e5e7eb; background:#fff; border-radius: 12px; padding:8px 10px; box-shadow: 0 1px 0 0 var(--ring); }
-  .range { height: 32px; padding: 0 8px; }
-  .grid { display:grid; grid-template-columns: 1fr; gap: 12px; }
-  @media (min-width: 1024px){ .grid { grid-template-columns: 3fr 1fr; } }
-  .card { background: var(--card); border:1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 4px 12px var(--ring); }
-  .card .content { padding: 12px; }
-  .mini-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  .target-chip { display:inline-block; padding:5px 8px; border-radius:999px; font-size:12px; color:#fff; background:#374151; margin:4px 6px 0 0; }
-  .target-chip.found { background: var(--good); }
-  .scene-wrap { position: relative; height: 70vh; min-height: 480px; border-radius: 18px; overflow: hidden; background: #fff; border:1px solid #e5e7eb; box-shadow: inset 0 1px 0 var(--ring); }
-  .scroller { position: absolute; inset: 0; overflow: auto; cursor: grab; }
-  .scroller.dragging { cursor: grabbing; }
-  .canvas { position: relative; user-select: none; }
-  .scene-img { display:block; width: 100%; height: auto; pointer-events: none; }
-  .box { position:absolute; border-radius: 10px; pointer-events: none; }
-  .box.outline { outline: 2px solid rgba(251, 191, 36, .8); }
-  .box.found { outline: 2px solid rgba(16, 185, 129, .9); }
-  .box.hint { animation: pulse 800ms ease-in-out infinite alternate; outline: 3px solid rgba(251, 191, 36, .95); }
-  @keyframes pulse { from{ transform:scale(1); } to{ transform: scale(1.02); } }
-  .floating-tag { position:absolute; transform: translate(-50%, -8px); background: var(--good); color:#fff; font-size: 11px; padding: 3px 6px; border-radius: 999px; box-shadow: 0 2px 8px var(--ring-strong); }
-  .progress { height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden; }
-  .progress > div { height:100%; background: var(--accent); width:0%; }
-  .modal { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:50; background: rgba(0,0,0,.4); backdrop-filter: blur(3px); }
-  .modal-card { background:#fff; padding:20px; width:min(520px, 92vw); border-radius: 16px; box-shadow: 0 12px 24px rgba(0,0,0,.25); text-align:center;}
-  .voice-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
-  .voice-controls .row { padding: 0; }
+  :root { --bg:#f6f7f9; --card:#ffffff; --ink:#121417; --muted:#6b7280; --accent:#111827; --good:#059669; --warn:#d97706; --ring:rgba(17,24,39,.12); --ring-strong:rgba(17,24,39,.24); }
+  * { box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{ margin:0; background: radial-gradient(1200px 600px at 30% -10%, #ffffff, var(--bg)); color:var(--ink); font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  .container{ max-width:1180px; margin:0 auto; padding:16px; }
+  .topbar{ position:sticky; top:0; z-index:10; background:rgba(255,255,255,.75); backdrop-filter:blur(6px); border-bottom:1px solid #e5e7eb; }
+  .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:10px 0; }
+  .title{ font-size:22px; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .badge{ background:var(--accent); color:#fff; padding:4px 8px; border-radius:999px; font-size:12px; }
+  .btn{ appearance:none; border:1px solid #e5e7eb; background:#fff; padding:8px 10px; border-radius:12px; cursor:pointer; box-shadow:0 1px 0 0 var(--ring); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.primary{ background:var(--accent); color:#fff; border-color:transparent; }
+  .btn.ghost{ background:#f3f4f6; }
+  .btn[aria-pressed="true"]{ outline:2px solid var(--ring-strong); }
+  .seg{ padding:6px 10px; background:#f3f4f6; border-radius:10px; font-variant-numeric:tabular-nums; min-width:52px; text-align:center; }
+  .seg.small{ min-width:auto; padding:4px 8px; font-size:12px; color:var(--muted); }
+  .select,.input,.range{ border:1px solid #e5e7eb; background:#fff; border-radius:12px; padding:8px 10px; box-shadow:0 1px 0 0 var(--ring); }
+  .range{ height:32px; padding:0 8px; }
+  .grid{ display:grid; grid-template-columns:1fr; gap:12px; }
+  @media (min-width:1024px){ .grid{ grid-template-columns:3fr 1fr; } }
+  .card{ background:var(--card); border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 4px 12px var(--ring); }
+  .card .content{ padding:12px; }
+  .mini-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .label{ font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .target-chip{ display:inline-block; padding:5px 8px; border-radius:999px; font-size:12px; color:#fff; background:#374151; margin:4px 6px 0 0; }
+  .target-chip.found{ background:var(--good); }
+  .scene-wrap{ position:relative; height:70vh; min-height:480px; border-radius:18px; overflow:hidden; background:#fff; border:1px solid #e5e7eb; box-shadow: inset 0 1px 0 var(--ring); }
+  .scroller{ position:absolute; inset:0; overflow:auto; cursor:grab; }
+  .scroller.dragging{ cursor:grabbing; }
+  .canvas{ position:relative; user-select:none; }
+  .scene-img{ display:block; width:100%; height:auto; pointer-events:none; }
+  .box{ position:absolute; border-radius:10px; pointer-events:none; }
+  .box.outline{ outline:2px solid rgba(251,191,36,.8); }
+  .box.found{ outline:2px solid rgba(16,185,129,.9); }
+  .box.hint{ animation:pulse 800ms ease-in-out infinite alternate; outline:3px solid rgba(251,191,36,.95); }
+  @keyframes pulse{ from{ transform:scale(1); } to{ transform:scale(1.02);} }
+  .floating-tag{ position:absolute; transform:translate(-50%,-8px); background:var(--good); color:#fff; font-size:11px; padding:3px 6px; border-radius:999px; box-shadow:0 2px 8px var(--ring-strong); }
+  .progress{ height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden; }
+  .progress>div{ height:100%; background:var(--accent); width:0%; }
+  .modal{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:50; background:rgba(0,0,0,.4); backdrop-filter:blur(3px); }
+  .modal-card{ background:#fff; padding:20px; width:min(520px,92vw); border-radius:16px; box-shadow:0 12px 24px rgba(0,0,0,.25); text-align:center; }
+  .voice-controls{ display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -61,12 +55,10 @@
   <div class="container">
     <div class="row">
       <div class="title">🔎 Hidden Objects <span id="level-badge" class="badge">Level</span></div>
-
       <div class="row" style="margin-left:auto;">
         <button id="zoom-out" class="btn" aria-label="Zoom out">−</button>
         <div id="zoom-readout" class="seg">100%</div>
         <button id="zoom-in" class="btn" aria-label="Zoom in">+</button>
-
         <button id="hint-btn" class="btn">Hint</button>
         <button id="reset-btn" class="btn">Reset</button>
         <button id="next-btn" class="btn">Next</button>
@@ -78,28 +70,14 @@
 </div>
 
 <div class="container grid">
-  <!-- Left: Scene -->
   <div class="card">
     <div class="content">
       <div class="mini-grid">
-        <div>
-          <div class="label">Time</div>
-          <div id="time" class="seg">00:00</div>
-        </div>
-        <div>
-          <div class="label">Found</div>
-          <div class="seg"><span id="found-count">0</span>/<span id="target-total">0</span></div>
-        </div>
-        <div>
-          <div class="label">Accuracy</div>
-          <div id="accuracy" class="seg">100%</div>
-        </div>
-        <div>
-          <div class="label">Progress</div>
-          <div class="progress"><div id="progress-bar"></div></div>
-        </div>
+        <div><div class="label">Time</div><div id="time" class="seg">00:00</div></div>
+        <div><div class="label">Found</div><div class="seg"><span id="found-count">0</span>/<span id="target-total">0</span></div></div>
+        <div><div class="label">Accuracy</div><div id="accuracy" class="seg">100%</div></div>
+        <div><div class="label">Progress</div><div class="progress"><div id="progress-bar"></div></div></div>
       </div>
-
       <div class="scene-wrap" style="margin-top:10px;">
         <div id="scroller" class="scroller" aria-label="Hidden object scene" role="application">
           <div id="canvas" class="canvas">
@@ -107,36 +85,33 @@
           </div>
         </div>
       </div>
-
-      <div style="margin-top:8px; color: var(--muted); font-size: 12px;">
+      <div style="margin-top:8px; color:var(--muted); font-size:12px;">
         Shortcuts: +/- zoom, H hint, R reset, N next, B boxes, Space pause
         <span id="credit" style="margin-left:10px;"></span>
       </div>
     </div>
   </div>
 
-  <!-- Right: Sidebar -->
   <div class="card">
     <div class="content">
       <div class="label">Level</div>
       <select id="level-select" class="select" style="width:100%; margin-bottom:8px;"></select>
-
       <div class="label">Targets</div>
       <div id="targets"></div>
 
       <hr style="border:none; border-top:1px solid #e5e7eb; margin:12px 0;" />
 
       <div class="label">Speech (American accent)</div>
-      <div class="row" style="gap:6px;">
+      <div class="row" style="gap:6px; padding:0;">
         <button id="speak-toggle" class="btn ghost" aria-pressed="true">🔊 Speak hits: On</button>
         <select id="voice-select" class="select" title="Voice"></select>
       </div>
       <div class="voice-controls">
-        <div class="row" style="gap:6px;">
+        <div class="row" style="gap:6px; padding:0;">
           <span class="seg small">Rate</span>
           <input id="rate" class="range" type="range" min="0.5" max="1.4" step="0.05" value="1.05" />
         </div>
-        <div class="row" style="gap:6px;">
+        <div class="row" style="gap:6px; padding:0;">
           <span class="seg small">Pitch</span>
           <input id="pitch" class="range" type="range" min="0.8" max="1.2" step="0.05" value="1.0" />
         </div>
@@ -158,7 +133,6 @@
   </div>
 </div>
 
-<!-- Win modal -->
 <div id="win-modal" class="modal" style="display:none;">
   <div class="modal-card">
     <div style="font-size:28px; font-weight:800; margin-bottom:8px;">🎉 Case Closed!</div>
@@ -171,437 +145,104 @@
 </div>
 
 <script>
-/* ---------------- Level Data ---------------- */
 const LEVELS = [
-  {
-    id: "cozy-study",
-    title: "Cozy Study",
-    credit: "Photo: Unsplash",
-    imgUrl: "https://images.unsplash.com/photo-1529078155058-5d716f45d604?q=80&w=2000&auto=format&fit=crop",
-    intrinsic: { width: 2000, height: 1333 },
-    boxes: [
-      { name: "Glasses", x: 36.1, y: 62.8, w: 7.4, h: 5.2 },
-      { name: "Green Book", x: 51.9, y: 57.0, w: 7.8, h: 6.0 },
-      { name: "Mug", x: 65.4, y: 70.8, w: 5.3, h: 8.2 },
-      { name: "Clock", x: 13.2, y: 23.7, w: 7.6, h: 12.0 },
-      { name: "Camera", x: 74.8, y: 54.0, w: 7.5, h: 6.8 },
-    ],
-  },
-  {
-    id: "sunny-desk",
-    title: "Sunny Desk",
-    credit: "Photo: Unsplash",
-    imgUrl: "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?q=80&w=2000&auto=format&fit=crop",
-    intrinsic: { width: 2000, height: 1333 },
-    boxes: [
-      { name: "Headphones", x: 13.0, y: 35.0, w: 14.0, h: 13.0 },
-      { name: "Notebook", x: 55.5, y: 60.4, w: 16.0, h: 19.0 },
-      { name: "Mouse", x: 77.0, y: 54.0, w: 7.0, h: 10.0 },
-      { name: "Pen", x: 30.0, y: 66.0, w: 8.0, h: 3.0 },
-    ],
-  },
+  { id:"cozy-study", title:"Cozy Study", credit:"Photo: Unsplash", imgUrl:"https://images.unsplash.com/photo-1529078155058-5d716f45d604?q=80&w=2000&auto=format&fit=crop", intrinsic:{width:2000,height:1333}, boxes:[
+    { name:"Glasses", x:36.1, y:62.8, w:7.4, h:5.2 },
+    { name:"Green Book", x:51.9, y:57.0, w:7.8, h:6.0 },
+    { name:"Mug", x:65.4, y:70.8, w:5.3, h:8.2 },
+    { name:"Clock", x:13.2, y:23.7, w:7.6, h:12.0 },
+    { name:"Camera", x:74.8, y:54.0, w:7.5, h:6.8 },
+  ]},
+  { id:"sunny-desk", title:"Sunny Desk", credit:"Photo: Unsplash", imgUrl:"https://images.unsplash.com/photo-1515879218367-8466d910aaa4?q=80&w=2000&auto=format&fit=crop", intrinsic:{width:2000,height:1333}, boxes:[
+    { name:"Headphones", x:13.0, y:35.0, w:14.0, h:13.0 },
+    { name:"Notebook", x:55.5, y:60.4, w:16.0, h:19.0 },
+    { name:"Mouse", x:77.0, y:54.0, w:7.0, h:10.0 },
+    { name:"Pen", x:30.0, y:66.0, w:8.0, h:3.0 },
+  ]}
 ];
-
 function deepClone(v){ return JSON.parse(JSON.stringify(v)); }
-
-/* ---------------- State ---------------- */
-let state = {
-  levels: deepClone(LEVELS),
-  levelIdx: 0,
-  found: new Set(),
-  attempts: 0,
-  hits: 0,
-  seconds: 0,
-  running: true,
-  scale: 1.0,
-  showBoxes: false,
-  hintName: null,
-  speakHits: true,
-  voiceName: null,
-  rate: 1.05,
-  pitch: 1.0,
-};
-
+let state = { levels:deepClone(LEVELS), levelIdx:0, found:new Set(), attempts:0, hits:0, seconds:0, running:true, scale:1.0, showBoxes:false, hintName:null, speakHits:true, voiceName:null, rate:1.05, pitch:1.0 };
 const baseWidth = 1100;
-
-/* ---------------- Elements ---------------- */
-const levelBadge   = document.getElementById("level-badge");
-const timeEl       = document.getElementById("time");
-const foundCountEl = document.getElementById("found-count");
-const targetTotalEl= document.getElementById("target-total");
-const accuracyEl   = document.getElementById("accuracy");
-const progressBar  = document.getElementById("progress-bar");
-const creditEl     = document.getElementById("credit");
-
-const scroller     = document.getElementById("scroller");
-const canvas       = document.getElementById("canvas");
-const imgEl        = document.getElementById("scene-img");
-const targetsEl    = document.getElementById("targets");
-const levelSelect  = document.getElementById("level-select");
-
-const btnZoomIn    = document.getElementById("zoom-in");
-const btnZoomOut   = document.getElementById("zoom-out");
-const zoomReadout  = document.getElementById("zoom-readout");
-const btnHint      = document.getElementById("hint-btn");
-const btnReset     = document.getElementById("reset-btn");
-const btnNext      = document.getElementById("next-btn");
-const btnBoxes     = document.getElementById("toggle-boxes");
-const btnPause     = document.getElementById("pause-btn");
-
-const winModal     = document.getElementById("win-modal");
-const winStats     = document.getElementById("win-stats");
-const btnReplay    = document.getElementById("replay-btn");
-const btnModalNext = document.getElementById("modal-next-btn");
-
-const addTitle     = document.getElementById("lvl-title");
-const addImg       = document.getElementById("lvl-img");
-const addCredit    = document.getElementById("lvl-credit");
-const btnAddLevel  = document.getElementById("add-level");
-
-/* Speech controls */
-const speakToggle  = document.getElementById("speak-toggle");
-const voiceSelect  = document.getElementById("voice-select");
-const rateInput    = document.getElementById("rate");
-const pitchInput   = document.getElementById("pitch");
-
-/* ---------------- Utilities ---------------- */
-const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
-const pctFmt = (n)=>`${Math.round(n)}%`;
-function formatTime(sec) {
-  const m = String(Math.floor(sec / 60)).padStart(2,"0");
-  const s = String(sec % 60).padStart(2,"0");
-  return `${m}:${s}`;
-}
+const levelBadge=document.getElementById("level-badge");
+const timeEl=document.getElementById("time");
+const foundCountEl=document.getElementById("found-count");
+const targetTotalEl=document.getElementById("target-total");
+const accuracyEl=document.getElementById("accuracy");
+const progressBar=document.getElementById("progress-bar");
+const creditEl=document.getElementById("credit");
+const scroller=document.getElementById("scroller");
+const canvas=document.getElementById("canvas");
+const imgEl=document.getElementById("scene-img");
+const targetsEl=document.getElementById("targets");
+const levelSelect=document.getElementById("level-select");
+const btnZoomIn=document.getElementById("zoom-in");
+const btnZoomOut=document.getElementById("zoom-out");
+const zoomReadout=document.getElementById("zoom-readout");
+const btnHint=document.getElementById("hint-btn");
+const btnReset=document.getElementById("reset-btn");
+const btnNext=document.getElementById("next-btn");
+const btnBoxes=document.getElementById("toggle-boxes");
+const btnPause=document.getElementById("pause-btn");
+const winModal=document.getElementById("win-modal");
+const winStats=document.getElementById("win-stats");
+const btnReplay=document.getElementById("replay-btn");
+const btnModalNext=document.getElementById("modal-next-btn");
+const addTitle=document.getElementById("lvl-title");
+const addImg=document.getElementById("lvl-img");
+const addCredit=document.getElementById("lvl-credit");
+const btnAddLevel=document.getElementById("add-level");
+const speakToggle=document.getElementById("speak-toggle");
+const voiceSelect=document.getElementById("voice-select");
+const rateInput=document.getElementById("rate");
+const pitchInput=document.getElementById("pitch");
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const pctFmt=(n)=>`${Math.round(n)}%`;
+function formatTime(sec){ const m=String(Math.floor(sec/60)).padStart(2,"0"); const s=String(sec%60).padStart(2,"0"); return `${m}:${s}`; }
 function currentLevel(){ return state.levels[state.levelIdx]; }
-
-function setScale(newScale){
-  state.scale = clamp(newScale, 0.5, 3.0);
-  const w = baseWidth * state.scale;
-  canvas.style.width = `${w}px`;
-  imgEl.style.width = "100%";
-  zoomReadout.textContent = pctFmt(state.scale*100);
-}
-
-function resetLevel(){
-  state.found = new Set();
-  state.attempts = 0;
-  state.hits = 0;
-  state.seconds = 0;
-  state.running = true;
-  state.hintName = null;
-  winModal.style.display = "none";
-  renderAll();
-}
-
-function nextLevel(){
-  state.levelIdx = (state.levelIdx + 1) % state.levels.length;
-  loadLevel(state.levelIdx);
-}
-
-/* ---------------- Rendering ---------------- */
-function renderStats(){
-  const lvl = currentLevel();
-  foundCountEl.textContent = state.found.size;
-  targetTotalEl.textContent = lvl.boxes.length;
-  const acc = state.attempts ? Math.round((state.hits / state.attempts) * 100) : 100;
-  accuracyEl.textContent = `${acc}%`;
-  const prog = lvl.boxes.length ? Math.round((state.found.size / lvl.boxes.length) * 100) : 0;
-  progressBar.style.width = `${prog}%`;
-  timeEl.textContent = formatTime(state.seconds);
-}
-
-function renderTargets(){
-  const lvl = currentLevel();
-  targetsEl.innerHTML = "";
-  lvl.boxes.forEach(b=>{
-    const chip = document.createElement("span");
-    chip.className = "target-chip" + (state.found.has(b.name) ? " found" : "");
-    chip.textContent = b.name;
-    targetsEl.appendChild(chip);
-  });
-}
-
-function renderBoxes(){
-  // clear old boxes (keep img)
-  const old = canvas.querySelectorAll(".box, .floating-tag");
-  old.forEach(el=>el.remove());
-
-  const lvl = currentLevel();
-  lvl.boxes.forEach(b=>{
-    const isFound = state.found.has(b.name);
-    const div = document.createElement("div");
-    div.className = "box " + (isFound ? "found" : state.showBoxes ? "outline" : "");
-    if (state.hintName === b.name && !isFound) div.classList.add("hint");
-
-    div.style.left = `${b.x}%`;
-    div.style.top = `${b.y}%`;
-    div.style.width = `${b.w}%`;
-    div.style.height = `${b.h}%`;
-
-    if (isFound) {
-      const tag = document.createElement("div");
-      tag.className = "floating-tag";
-      tag.style.left = `${b.x + b.w/2}%`;
-      tag.style.top = `${b.y}%`;
-      tag.textContent = `${b.name} ✓`;
-      canvas.appendChild(tag);
-    }
-    canvas.appendChild(div);
-  });
-}
-
-function renderTop(){
-  const lvl = currentLevel();
-  levelBadge.textContent = lvl.title;
-  creditEl.textContent = lvl.credit ? "• " + lvl.credit : "";
-}
-
-function renderLevelPicker(){
-  levelSelect.innerHTML = "";
-  state.levels.forEach((lv, idx)=>{
-    const opt = document.createElement("option");
-    opt.value = String(idx);
-    opt.textContent = lv.title;
-    if (idx === state.levelIdx) opt.selected = true;
-    levelSelect.appendChild(opt);
-  });
-}
-
-function renderAll(){
-  renderStats();
-  renderTargets();
-  renderBoxes();
-  renderTop();
-  renderLevelPicker();
-}
-
-/* ---------------- Timer ---------------- */
-setInterval(()=>{ if(state.running){ state.seconds++; timeEl.textContent = formatTime(state.seconds);} }, 1000);
-
-/* ---------------- Scene interactions ---------------- */
-function onSceneClick(ev){
-  const rect = imgEl.getBoundingClientRect();
-  const clickX = ((ev.clientX - rect.left) / rect.width) * 100;
-  const clickY = ((ev.clientY - rect.top) / rect.height) * 100;
-
-  // Drag threshold protection
-  if (scroller.__draggingMoved) { scroller.__draggingMoved = false; return; }
-
-  state.attempts++;
-  const lvl = currentLevel();
-  const hitIdx = lvl.boxes.findIndex(b => !state.found.has(b.name)
-    && clickX >= b.x && clickX <= b.x + b.w
-    && clickY >= b.y && clickY <= b.y + b.h);
-
-  if (hitIdx >= 0){
-    const nm = lvl.boxes[hitIdx].name;
-    state.found.add(nm);
-    state.hits++;
-    state.hintName = null;
-    renderAll();
-    speakHit(nm); // <-- say it out loud
-
-    // Win?
-    if (state.found.size === lvl.boxes.length && lvl.boxes.length > 0){
-      state.running = false;
-      const acc = state.attempts ? Math.round((state.hits/state.attempts)*100) : 100;
-      winStats.textContent = `You found all items in ${formatTime(state.seconds)} with ${acc}% accuracy.`;
-      winModal.style.display = "flex";
-      // celebratory line
-      speakHit("Case closed!");
-    }
-  } else {
-    renderStats();
-  }
-}
-// Important: attach click to scroller, not the img (img has pointer-events:none)
+function setScale(newScale){ state.scale=clamp(newScale,0.5,3.0); const w=baseWidth*state.scale; canvas.style.width=`${w}px`; imgEl.style.width="100%"; zoomReadout.textContent=pctFmt(state.scale*100); }
+function resetLevel(){ state.found=new Set(); state.attempts=0; state.hits=0; state.seconds=0; state.running=true; state.hintName=null; winModal.style.display="none"; renderAll(); }
+function nextLevel(){ state.levelIdx=(state.levelIdx+1)%state.levels.length; loadLevel(state.levelIdx); }
+function renderStats(){ const lvl=currentLevel(); foundCountEl.textContent=state.found.size; targetTotalEl.textContent=lvl.boxes.length; const acc=state.attempts?Math.round((state.hits/state.attempts)*100):100; accuracyEl.textContent=`${acc}%`; const prog=lvl.boxes.length?Math.round((state.found.size/lvl.boxes.length)*100):0; progressBar.style.width=`${prog}%`; timeEl.textContent=formatTime(state.seconds); }
+function renderTargets(){ const lvl=currentLevel(); targetsEl.innerHTML=""; lvl.boxes.forEach(b=>{ const chip=document.createElement("span"); chip.className="target-chip"+(state.found.has(b.name)?" found":""); chip.textContent=b.name; targetsEl.appendChild(chip); }); }
+function renderBoxes(){ canvas.querySelectorAll(".box,.floating-tag").forEach(el=>el.remove()); const lvl=currentLevel(); lvl.boxes.forEach(b=>{ const isFound=state.found.has(b.name); const div=document.createElement("div"); div.className="box "+(isFound?"found":state.showBoxes?"outline":""); if(state.hintName===b.name && !isFound) div.classList.add("hint"); div.style.left=`${b.x}%`; div.style.top=`${b.y}%`; div.style.width=`${b.w}%`; div.style.height=`${b.h}%`; if(isFound){ const tag=document.createElement("div"); tag.className="floating-tag"; tag.style.left=`${b.x + b.w/2}%`; tag.style.top=`${b.y}%`; tag.textContent=`${b.name} ✓`; canvas.appendChild(tag);} canvas.appendChild(div); }); }
+function renderTop(){ const lvl=currentLevel(); levelBadge.textContent=lvl.title; creditEl.textContent=lvl.credit?"• "+lvl.credit:""; }
+function renderLevelPicker(){ levelSelect.innerHTML=""; state.levels.forEach((lv,idx)=>{ const opt=document.createElement("option"); opt.value=String(idx); opt.textContent=lv.title; if(idx===state.levelIdx) opt.selected=true; levelSelect.appendChild(opt); }); }
+function renderAll(){ renderStats(); renderTargets(); renderBoxes(); renderTop(); renderLevelPicker(); }
+setInterval(()=>{ if(state.running){ state.seconds++; timeEl.textContent=formatTime(state.seconds);} },1000);
+function onSceneClick(ev){ const rect=imgEl.getBoundingClientRect(); const clickX=((ev.clientX-rect.left)/rect.width)*100; const clickY=((ev.clientY-rect.top)/rect.height)*100; if(scroller.__draggingMoved){ scroller.__draggingMoved=false; return;} state.attempts++; const lvl=currentLevel(); const hitIdx=lvl.boxes.findIndex(b=>!state.found.has(b.name) && clickX>=b.x && clickX<=b.x+b.w && clickY>=b.y && clickY<=b.y+b.h); if(hitIdx>=0){ const nm=lvl.boxes[hitIdx].name; state.found.add(nm); state.hits++; state.hintName=null; renderAll(); speakHit(nm); if(state.found.size===lvl.boxes.length && lvl.boxes.length>0){ state.running=false; const acc=state.attempts?Math.round((state.hits/state.attempts)*100):100; winStats.textContent=`You found all items in ${formatTime(state.seconds)} with ${acc}% accuracy.`; winModal.style.display="flex"; speakHit("Case closed!"); } } else { renderStats(); } }
 scroller.addEventListener("click", onSceneClick);
-
-/* Drag-to-pan (mouse) */
-let drag = { active:false, x:0, y:0, left:0, top:0 };
-scroller.addEventListener("mousedown",(e)=>{
-  drag.active = true;
-  scroller.classList.add("dragging");
-  drag.x = e.clientX; drag.y = e.clientY;
-  drag.left = scroller.scrollLeft; drag.top = scroller.scrollTop;
-});
-window.addEventListener("mousemove",(e)=>{
-  if(!drag.active) return;
-  const dx = e.clientX - drag.x;
-  const dy = e.clientY - drag.y;
-  scroller.scrollLeft = drag.left - dx;
-  scroller.scrollTop  = drag.top  - dy;
-  if (Math.abs(dx) + Math.abs(dy) > 4) scroller.__draggingMoved = true;
-});
-window.addEventListener("mouseup",()=>{
-  drag.active = false;
-  scroller.classList.remove("dragging");
-});
-
-/* Touch panning */
+let drag={active:false,x:0,y:0,left:0,top:0};
+scroller.addEventListener("mousedown",(e)=>{ drag.active=true; scroller.classList.add("dragging"); drag.x=e.clientX; drag.y=e.clientY; drag.left=scroller.scrollLeft; drag.top=scroller.scrollTop; });
+window.addEventListener("mousemove",(e)=>{ if(!drag.active) return; const dx=e.clientX-drag.x; const dy=e.clientY-drag.y; scroller.scrollLeft=drag.left-dx; scroller.scrollTop=drag.top-dy; if(Math.abs(dx)+Math.abs(dy)>4) scroller.__draggingMoved=true; });
+window.addEventListener("mouseup",()=>{ drag.active=false; scroller.classList.remove("dragging"); });
 let touchStart=null;
-scroller.addEventListener("touchstart",(e)=>{
-  if (e.touches.length !== 1) return;
-  const t = e.touches[0];
-  touchStart = { x:t.clientX, y:t.clientY, left:scroller.scrollLeft, top:scroller.scrollTop };
-},{passive:true});
-scroller.addEventListener("touchmove",(e)=>{
-  if (!touchStart || e.touches.length!==1) return;
-  const t = e.touches[0];
-  const dx = t.clientX - touchStart.x;
-  const dy = t.clientY - touchStart.y;
-  scroller.scrollLeft = touchStart.left - dx;
-  scroller.scrollTop  = touchStart.top  - dy;
-},{passive:true});
+scroller.addEventListener("touchstart",(e)=>{ if(e.touches.length!==1) return; const t=e.touches[0]; touchStart={x:t.clientX,y:t.clientY,left:scroller.scrollLeft,top:scroller.scrollTop}; },{passive:true});
+scroller.addEventListener("touchmove",(e)=>{ if(!touchStart||e.touches.length!==1) return; const t=e.touches[0]; const dx=t.clientX-touchStart.x; const dy=t.clientY-touchStart.y; scroller.scrollLeft=touchStart.left-dx; scroller.scrollTop=touchStart.top-dy; },{passive:true});
 scroller.addEventListener("touchend",()=>{ touchStart=null; });
-
-/* ---------------- Controls ---------------- */
-btnZoomIn.addEventListener("click", ()=>{ setScale(state.scale + 0.1); });
-btnZoomOut.addEventListener("click", ()=>{ setScale(state.scale - 0.1); });
-btnHint.addEventListener("click", giveHint);
-btnReset.addEventListener("click", resetLevel);
-btnNext.addEventListener("click", nextLevel);
-btnBoxes.addEventListener("click", ()=>{
-  state.showBoxes = !state.showBoxes;
-  btnBoxes.setAttribute("aria-pressed", String(state.showBoxes));
-  btnBoxes.textContent = state.showBoxes ? "Hide Boxes" : "Show Boxes";
-  renderBoxes();
-});
-btnPause.addEventListener("click", ()=>{
-  state.running = !state.running;
-  btnPause.textContent = state.running ? "Pause" : "Resume";
-});
+btnZoomIn.addEventListener("click",()=>setScale(state.scale+0.1));
+btnZoomOut.addEventListener("click",()=>setScale(state.scale-0.1));
+btnHint.addEventListener("click",giveHint);
+btnReset.addEventListener("click",resetLevel);
+btnNext.addEventListener("click",nextLevel);
+btnBoxes.addEventListener("click",()=>{ state.showBoxes=!state.showBoxes; btnBoxes.setAttribute("aria-pressed", String(state.showBoxes)); btnBoxes.textContent=state.showBoxes?"Hide Boxes":"Show Boxes"; renderBoxes(); });
+btnPause.addEventListener("click",()=>{ state.running=!state.running; btnPause.textContent=state.running?"Pause":"Resume"; });
 btnReplay.addEventListener("click", resetLevel);
 btnModalNext.addEventListener("click", ()=>{ winModal.style.display="none"; nextLevel(); });
-
-levelSelect.addEventListener("change",(e)=>{
-  state.levelIdx = parseInt(e.target.value,10) || 0;
-  loadLevel(state.levelIdx);
-});
-
-/* Keyboard shortcuts */
-window.addEventListener("keydown",(e)=>{
-  const k = e.key.toLowerCase();
-  if (k === "+" || k === "=") setScale(state.scale + 0.1);
-  else if (k === "-") setScale(state.scale - 0.1);
-  else if (k === "h") giveHint();
-  else if (k === "r") resetLevel();
-  else if (k === "n") nextLevel();
-  else if (k === "b") { btnBoxes.click(); }
-  else if (k === " ") { e.preventDefault(); btnPause.click(); }
-});
-
-/* Hint */
-function giveHint(){
-  const remaining = currentLevel().boxes.filter(b=>!state.found.has(b.name));
-  if (!remaining.length) return;
-  const choice = remaining[Math.floor(Math.random()*remaining.length)].name;
-  state.hintName = choice;
-  renderBoxes();
-  setTimeout(()=>{ if (state.hintName === choice) { state.hintName = null; renderBoxes(); } }, 4000);
-}
-
-/* ---------------- Speech (American accent) ---------------- */
-let cachedVoices = [];
-function loadVoices(){
-  cachedVoices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-  // Fill select with en-US voices first, else any en-*
-  const usVoices = cachedVoices.filter(v => v.lang && v.lang.toLowerCase().startsWith("en-us"));
-  const enVoices = cachedVoices.filter(v => v.lang && v.lang.toLowerCase().startsWith("en"));
-  const preferred = usVoices.length ? usVoices : enVoices;
-
-  voiceSelect.innerHTML = "";
-  preferred.forEach(v => {
-    const opt = document.createElement("option");
-    opt.value = v.name;
-    opt.textContent = `${v.name} (${v.lang})`;
-    voiceSelect.appendChild(opt);
-  });
-
-  // Choose a default US voice if available
-  if (preferred.length) {
-    state.voiceName = preferred[0].name;
-    voiceSelect.value = state.voiceName;
-  }
-}
-
-// Some browsers load voices asynchronously
-if ("speechSynthesis" in window) {
-  loadVoices();
-  window.speechSynthesis.onvoiceschanged = loadVoices;
-}
-
-function speak(text){
-  if (!state.speakHits || !("speechSynthesis" in window)) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = state.rate;
-  u.pitch = state.pitch;
-  // Pick a voice
-  if (state.voiceName) {
-    const v = cachedVoices.find(v => v.name === state.voiceName);
-    if (v) u.voice = v;
-  } else {
-    // fallback: any en-US / en
-    const v = cachedVoices.find(v => v.lang && v.lang.toLowerCase().startsWith("en-us"))
-          || cachedVoices.find(v => v.lang && v.lang.toLowerCase().startsWith("en"));
-    if (v) u.voice = v;
-  }
-  window.speechSynthesis.cancel(); // interrupt prior speech so hits feel snappy
-  window.speechSynthesis.speak(u);
-}
-
-function speakHit(name){
-  // Keep phrasing short/snappy for game feel
-  speak(`${name}, found!`);
-}
-
-/* Speech UI handlers */
-speakToggle.addEventListener("click", ()=>{
-  state.speakHits = !state.speakHits;
-  speakToggle.setAttribute("aria-pressed", String(state.speakHits));
-  speakToggle.textContent = state.speakHits ? "🔊 Speak hits: On" : "🔇 Speak hits: Off";
-});
-voiceSelect.addEventListener("change", (e)=>{
-  state.voiceName = e.target.value || null;
-  // quick test ping (optional): speak("Voice set");
-});
-rateInput.addEventListener("input", ()=>{ state.rate = parseFloat(rateInput.value) || 1.0; });
-pitchInput.addEventListener("input", ()=>{ state.pitch = parseFloat(pitchInput.value) || 1.0; });
-
-/* ---------------- Load Level ---------------- */
-function loadLevel(idx){
-  const lvl = state.levels[idx];
-  imgEl.src = lvl.imgUrl;
-  imgEl.alt = lvl.title;
-  setScale(1.0);
-  imgEl.onload = ()=>{
-    scroller.scrollLeft = 0;
-    scroller.scrollTop = 0;
-  };
-  resetLevel();
-}
-
-/* Add custom level (empty boxes) */
-const addTitle  = document.getElementById("lvl-title");
-const addImg    = document.getElementById("lvl-img");
-const addCredit = document.getElementById("lvl-credit");
-document.getElementById("add-level").addEventListener("click", ()=>{
-  const title = (addTitle.value || "").trim();
-  const img = (addImg.value || "").trim();
-  if (!title || !img) { alert("Please provide a title and an image URL."); return; }
-  const credit = (addCredit.value || "").trim();
-  const id = title.toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
-  state.levels.push({ id, title, credit: credit || undefined, imgUrl: img, boxes: [] });
-  state.levelIdx = state.levels.length - 1;
-  addTitle.value = addImg.value = addCredit.value = "";
-  loadLevel(state.levelIdx);
-});
-
-/* ---------------- Init ---------------- */
-(function init(){
-  renderLevelPicker();
-  loadLevel(0);
-})();
+levelSelect.addEventListener("change",(e)=>{ state.levelIdx=parseInt(e.target.value,10)||0; loadLevel(state.levelIdx); });
+window.addEventListener("keydown",(e)=>{ const k=e.key.toLowerCase(); if(k==="+"||k==="=") setScale(state.scale+0.1); else if(k==="-") setScale(state.scale-0.1); else if(k==="h") giveHint(); else if(k==="r") resetLevel(); else if(k==="n") nextLevel(); else if(k==="b") btnBoxes.click(); else if(k===" ") { e.preventDefault(); btnPause.click(); } });
+function giveHint(){ const remaining=currentLevel().boxes.filter(b=>!state.found.has(b.name)); if(!remaining.length) return; const choice=remaining[Math.floor(Math.random()*remaining.length)].name; state.hintName=choice; renderBoxes(); setTimeout(()=>{ if(state.hintName===choice){ state.hintName=null; renderBoxes(); } },4000); }
+let cachedVoices=[];
+function loadVoices(){ cachedVoices = window.speechSynthesis ? window.speechSynthesis.getVoices() : []; const us=cachedVoices.filter(v=>v.lang&&v.lang.toLowerCase().startsWith("en-us")); const en=cachedVoices.filter(v=>v.lang&&v.lang.toLowerCase().startsWith("en")); const preferred=us.length?us:en; voiceSelect.innerHTML=""; preferred.forEach(v=>{ const opt=document.createElement("option"); opt.value=v.name; opt.textContent=`${v.name} (${v.lang})`; voiceSelect.appendChild(opt); }); if(preferred.length){ state.voiceName=preferred[0].name; voiceSelect.value=state.voiceName; } }
+if("speechSynthesis" in window){ loadVoices(); window.speechSynthesis.onvoiceschanged=loadVoices; }
+function speak(text){ if(!state.speakHits||!("speechSynthesis" in window)) return; const u=new SpeechSynthesisUtterance(text); u.rate=state.rate; u.pitch=state.pitch; if(state.voiceName){ const v=cachedVoices.find(v=>v.name===state.voiceName); if(v) u.voice=v; } else { const v=cachedVoices.find(v=>v.lang&&v.lang.toLowerCase().startsWith("en-us")) || cachedVoices.find(v=>v.lang&&v.lang.toLowerCase().startsWith("en")); if(v) u.voice=v; } window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }
+function speakHit(name){ speak(`${name}, found!`); }
+speakToggle.addEventListener("click",()=>{ state.speakHits=!state.speakHits; speakToggle.setAttribute("aria-pressed", String(state.speakHits)); speakToggle.textContent=state.speakHits?"🔊 Speak hits: On":"🔇 Speak hits: Off"; });
+voiceSelect.addEventListener("change",(e)=>{ state.voiceName=e.target.value||null; });
+rateInput.addEventListener("input",()=>{ state.rate=parseFloat(rateInput.value)||1.0; });
+pitchInput.addEventListener("input",()=>{ state.pitch=parseFloat(pitchInput.value)||1.0; });
+function loadLevel(idx){ const lvl=state.levels[idx]; imgEl.src=lvl.imgUrl; imgEl.alt=lvl.title; setScale(1.0); imgEl.onload=()=>{ scroller.scrollLeft=0; scroller.scrollTop=0; }; resetLevel(); }
+btnAddLevel.addEventListener("click",()=>{ const title=(addTitle.value||"").trim(); const img=(addImg.value||"").trim(); if(!title||!img){ alert("Please provide a title and an image URL."); return;} const credit=(addCredit.value||"").trim(); const id=title.toLowerCase().replace(/\\s+/g,"-").replace(/[^a-z0-9-]/g,""); state.levels.push({ id, title, credit: credit || undefined, imgUrl: img, boxes: [] }); state.levelIdx=state.levels.length-1; addTitle.value=addImg.value=addCredit.value=""; loadLevel(state.levelIdx); });
+(function init(){ renderLevelPicker(); loadLevel(0); })();
 </script>
 </body>
 </html>
