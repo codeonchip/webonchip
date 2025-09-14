@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Free Photo Demo</title>
+  <meta name="description" content="A minimal web page that displays one free-to-use photo from Unsplash." />
+  <style>
+    :root { --ink:#111827; --muted:#6b7280; --bg:#f6f7f9; --card:#ffffff; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+    .card{ max-width:860px; width:clamp(320px, 92vw, 860px); margin:24px; background:var(--card); border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 6px 16px rgba(0,0,0,.06); padding:18px; }
+    h1{ margin:0 0 10px; font-size:24px; }
+    figure{ margin:0; }
+    img{ display:block; width:100%; height:auto; border-radius:12px; }
+    figcaption{ margin-top:8px; font-size:14px; color:var(--muted); }
+    a{ color:inherit; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Free Photo Showcase</h1>
+    <figure>
+      <img
+        src="https://images.unsplash.com/photo-1515879218367-8466d910aaa4?q=80&w=1600&auto=format&fit=crop"
+        srcset="
+          https://images.unsplash.com/photo-1515879218367-8466d910aaa4?q=80&w=600&auto=format&fit=crop 600w,
+          https://images.unsplash.com/photo-1515879218367-8466d910aaa4?q=80&w=1200&auto=format&fit=crop 1200w,
+          https://images.unsplash.com/photo-1515879218367-8466d910aaa4?q=80&w=1600&auto=format&fit=crop 1600w
+        "
+        sizes="(max-width: 800px) 100vw, 800px"
+        alt="Sunlit developer desk with laptop, headphones and coffee mug."
+        loading="lazy" decoding="async"
+        width="1600" height="1067" />
+      <figcaption>
+        Photo via <a href="https://unsplash.com/" target="_blank" rel="noopener">Unsplash</a> — free to use. Attribution appreciated.
+      </figcaption>
+    </figure>
+  </main>
+</body>
+</html>
