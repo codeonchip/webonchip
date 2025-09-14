@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hidden Object Game</title>
+  <style>
+    body { font-family: sans-serif; background: #f5f5f5; margin: 0; }
+    #game { max-width: 900px; margin: 20px auto; padding: 10px; background: white; border-radius: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
+    #scene { position: relative; overflow: hidden; cursor: crosshair; }
+    #scene img { width: 100%; display: block; }
+    .box { position: absolute; border: 2px solid rgba(255,0,0,0.6); pointer-events: none; }
+    .found { border-color: rgba(0,200,0,0.8); }
+    #targets { margin-top: 10px; }
+    #targets span { display: inline-block; padding: 4px 8px; margin: 4px; border-radius: 6px; background: #333; color: white; }
+    #targets span.found { background: green; }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <h2>🔎 Hidden Object Game</h2>
+    <p>Click on the objects to find them!</p>
+    <div id="scene">
+      <img id="scene-img" src="https://images.unsplash.com/photo-1529078155058-5d716f45d604?q=80&w=1000&auto=format&fit=crop" alt="Scene">
+    </div>
+    <div id="targets"></div>
+    <p id="status"></p>
+  </div>
+
+  <script>
+    // Define target objects with % coordinates (x,y,w,h)
+    const targets = [
+      { name: "Glasses", x: 36.1, y: 62.8, w: 7.4, h: 5.2, found: false },
+      { name: "Book",    x: 51.9, y: 57.0, w: 7.8, h: 6.0, found: false },
+      { name: "Mug",     x: 65.4, y: 70.8, w: 5.3, h: 8.2, found: false },
+    ];
+
+    const scene = document.getElementById("scene");
+    const img = document.getElementById("scene-img");
+    const targetsDiv = document.getElementById("targets");
+    const status = document.getElementById("status");
+
+    // Render target labels
+    function renderTargets() {
+      targetsDiv.innerHTML = "";
+      targets.forEach(t => {
+        const span = document.createElement("span");
+        span.textContent = t.name;
+        if (t.found) span.classList.add("found");
+        targetsDiv.appendChild(span);
+      });
+    }
+
+    function checkClick(event) {
+      const rect = img.getBoundingClientRect();
+      const clickX = ((event.clientX - rect.left) / rect.width) * 100;
+      const clickY = ((event.clientY - rect.top) / rect.height) * 100;
+
+      let hit = false;
+      targets.forEach(t => {
+        if (!t.found &&
+            clickX >= t.x && clickX <= t.x + t.w &&
+            clickY >= t.y && clickY <= t.y + t.h) {
+          t.found = true;
+          hit = true;
+          const box = document.createElement("div");
+          box.className = "box found";
+          box.style.left = t.x + "%";
+          box.style.top = t.y + "%";
+          box.style.width = t.w + "%";
+          box.style.height = t.h + "%";
+          scene.appendChild(box);
+        }
+      });
+
+      renderTargets();
+      if (targets.every(t => t.found)) {
+        status.textContent = "🎉 You found all the objects!";
+      } else if (hit) {
+        status.textContent = "✅ Found one!";
+      } else {
+        status.textContent = "❌ Try again!";
+      }
+    }
+
+    img.addEventListener("click", checkClick);
+    renderTargets();
+  </script>
+</body>
+</html>
