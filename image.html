@@ -3,103 +3,191 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Free Photo Demo — with Next Button</title>
-  <meta name="description" content="A minimal web page that displays one free-to-use photo from Unsplash with a Next button." />
+  <title>Free Photo Demo — Search & Next</title>
+  <meta name="description" content="Search a free photo (Openverse/CC) and display it with Next/Prev navigation." />
   <style>
     :root { --ink:#111827; --muted:#6b7280; --bg:#f6f7f9; --card:#ffffff; --ring: rgba(17,24,39,.08); }
     *{ box-sizing:border-box; }
     body{ margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
-    .card{ max-width:860px; width:clamp(320px, 92vw, 860px); margin:24px; background:var(--card); border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 6px 16px rgba(0,0,0,.06); padding:18px; }
+    .card{ max-width:900px; width:clamp(320px, 94vw, 900px); margin:24px; background:var(--card); border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 6px 16px rgba(0,0,0,.06); padding:18px; }
     h1{ margin:0 0 10px; font-size:24px; }
-    .toolbar{ display:flex; gap:8px; align-items:center; justify-content:flex-end; margin:8px 0 12px; }
+    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .toolbar{ justify-content:space-between; margin:8px 0 12px; }
+    .search{ gap:8px; flex: 1 1 auto; }
+    .spacer{ flex:1; }
     .btn{ appearance:none; cursor:pointer; padding:10px 14px; border-radius:10px; border:1px solid #111827; background:#111827; color:#fff; box-shadow: 0 1px 0 var(--ring); }
+    .btn.secondary{ background:#fff; color:#111827; }
     .btn:active{ transform: translateY(1px); }
+    input[type="text"]{ flex:1 1 260px; padding:10px 12px; border-radius:10px; border:1px solid #d1d5db; font:inherit; }
     figure{ margin:0; }
-    img{ display:block; width:100%; height:auto; border-radius:12px; }
+    img{ display:block; width:100%; height:auto; border-radius:12px; background:#eef2f7; }
     figcaption{ margin-top:8px; font-size:14px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
     .muted{ color:var(--muted); }
     .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    .status{ font-size:14px; color:var(--muted); margin-top:6px; min-height:1.2em; }
   </style>
 </head>
 <body>
   <main class="card">
-    <h1>Free Photo Showcase</h1>
-    <div class="toolbar">
-      <button id="prevBtn" class="btn" aria-label="Previous photo">◀ Prev</button>
-      <button id="nextBtn" class="btn" aria-label="Next photo">Next ▶</button>
+    <h1>Free Photo Finder</h1>
+
+    <!-- Search controls -->
+    <div class="row toolbar">
+      <form id="searchForm" class="row search" autocomplete="off">
+        <label class="sr-only" for="q">Keyword</label>
+        <input id="q" type="text" placeholder="Try: forest at dawn, city skyline, cute cat" />
+        <button type="submit" class="btn">Search</button>
+      </form>
+      <div class="row">
+        <button id="prevBtn" class="btn secondary" aria-label="Previous photo">◀ Prev</button>
+        <button id="nextBtn" class="btn" aria-label="Next photo">Next ▶</button>
+      </div>
     </div>
+
     <figure>
-      <img id="photo" alt="Sunlit developer desk with laptop, headphones and coffee mug." loading="lazy" decoding="async" width="1600" height="1067" />
+      <img id="photo" alt="Search result photo" loading="lazy" decoding="async" />
       <figcaption>
-        <span id="caption">Photo via <a href="https://unsplash.com/" target="_blank" rel="noopener">Unsplash</a> — free to use. Attribution appreciated.</span>
-        <span class="muted" id="counter">1 / 3</span>
+        <span id="caption">Results will appear here.</span>
+        <span class="muted" id="counter">0 / 0</span>
       </figcaption>
     </figure>
-    <p class="muted" style="margin-top:10px;">Tip: press <kbd>→</kbd> for next, <kbd>←</kbd> for previous.</p>
+
+    <div id="status" class="status"></div>
+    <p class="muted" style="margin-top:10px;">Source: <a href="https://openverse.org/" target="_blank" rel="noopener">Openverse</a> (Creative Commons & public-domain images). Please keep the attribution & license info.</p>
   </main>
 
   <script>
-    // A small curated set of free Unsplash photos (fixed IDs).
-    // We generate responsive sizes using the same base photo with different widths.
-    const photos = [
-      {
-        base: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4',
-        alt: 'Sunlit developer desk with laptop, headphones and coffee mug.',
-        credit: 'Unsplash — Workspace'
-      },
-      {
-        base: 'https://images.unsplash.com/photo-1529078155058-5d716f45d604',
-        alt: 'Cozy study with books, clock and a vintage camera.',
-        credit: 'Unsplash — Cozy study'
-      },
-      {
-        base: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e',
-        alt: 'Sunlit forest with tall trees and warm light.',
-        credit: 'Unsplash — Forest'
-      }
-    ];
+    // Openverse image search (no API key required)
+    // Docs: https://api.openverse.engineering/v1/
 
+    const form = document.getElementById('searchForm');
+    const input = document.getElementById('q');
     const img = document.getElementById('photo');
     const caption = document.getElementById('caption');
     const counter = document.getElementById('counter');
+    const statusEl = document.getElementById('status');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
 
+    let results = [];
     let index = 0;
+    let aborter = null;
 
-    function buildSrc(base, w){
-      return `${base}?q=80&w=${w}&auto=format&fit=crop`;
+    function escapeHtml(s){
+      return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
     }
-    function srcsetFor(base){
-      return [600, 1200, 1600].map(w => `${buildSrc(base, w)} ${w}w`).join(', ');
+
+    function setStatus(msg, ok=true){
+      statusEl.textContent = msg || '';
+      statusEl.style.color = ok ? '#6b7280' : '#b91c1c';
+    }
+
+    function buildQueryUrl(q, pageSize=20){
+      const u = new URL('https://api.openverse.engineering/v1/images/');
+      u.searchParams.set('q', q);
+      u.searchParams.set('page_size', pageSize);
+      u.searchParams.set('mature', 'false');
+      u.searchParams.set('license_type', 'all'); // allow any CC/PD; attribution shown below
+      u.searchParams.set('fields', 'id,title,creator,url,thumbnail,license,license_version,license_url,foreign_landing_url,provider');
+      return u.toString();
+    }
+
+    async function search(q){
+      q = (q||'').trim();
+      if (!q){ setStatus('Type a keyword to search.'); return; }
+      // cancel any in-flight request
+      if (aborter) aborter.abort();
+      aborter = new AbortController();
+      setStatus('Searching…');
+      results = []; index = 0; render();
+
+      try {
+        const res = await fetch(buildQueryUrl(q), { signal: aborter.signal });
+        if (!res.ok) throw new Error('Search failed');
+        const data = await res.json();
+        results = Array.isArray(data.results) ? data.results.filter(r=>r.url || r.thumbnail) : [];
+        if (results.length === 0){
+          setStatus('No results found. Try a different keyword.', false);
+        } else {
+          setStatus('');
+          render(0);
+          // Save last query in URL hash for shareability
+          location.hash = '#q=' + encodeURIComponent(q);
+        }
+      } catch (err){
+        if (err.name === 'AbortError') return; // user typed again quickly
+        console.error(err);
+        setStatus('Error: '+ (err.message || 'Request failed'), false);
+      }
+    }
+
+    function progressiveLoad(fullUrl, thumbUrl){
+      // Start with thumbnail (if available) then swap to full once loaded
+      if (thumbUrl) img.src = thumbUrl;
+      if (!fullUrl || fullUrl === thumbUrl) return;
+      const probe = new Image();
+      probe.onload = () => { img.src = fullUrl; };
+      probe.onerror = () => { /* keep thumbnail */ };
+      probe.referrerPolicy = 'no-referrer';
+      probe.src = fullUrl;
     }
 
     function render(i){
-      const total = photos.length;
-      index = (i + total) % total;
-      const p = photos[index];
-      // Update image with responsive sources
-      img.src = buildSrc(p.base, 1600);
-      img.srcset = srcsetFor(p.base);
-      img.sizes = '(max-width: 800px) 100vw, 800px';
-      img.alt = p.alt;
-      // Update caption and counter
-      caption.innerHTML = `Photo via <a href="https://unsplash.com/" target="_blank" rel="noopener">Unsplash</a> — free to use. <span class="muted">${p.credit}</span>`;
+      if (!results.length){
+        img.removeAttribute('src');
+        caption.textContent = 'Results will appear here.';
+        counter.textContent = '0 / 0';
+        return;
+      }
+      const total = results.length;
+      index = (typeof i === 'number') ? ((i % total) + total) % total : index;
+      const r = results[index];
+
+      // Choose URLs
+      const full = r.url || r.thumbnail;
+      const thumb = r.thumbnail || r.url;
+      progressiveLoad(full, thumb);
+
+      const title = escapeHtml(r.title || 'Untitled');
+      const creator = escapeHtml(r.creator || 'Unknown');
+      const licenseCode = (r.license || '').toUpperCase() + (r.license_version ? ' ' + r.license_version : '');
+      const licenseUrl = r.license_url || 'https://creativecommons.org/licenses/';
+      const landing = r.foreign_landing_url || 'https://openverse.org/';
+      const provider = escapeHtml(r.provider || 'Openverse');
+
+      caption.innerHTML = `
+        <a href="${landing}" target="_blank" rel="noopener">${title}</a>
+        by ${creator} · <a href="${licenseUrl}" target="_blank" rel="noopener">${licenseCode}</a>
+        via <span class="muted">${provider}</span>`;
       counter.textContent = `${index + 1} / ${total}`;
     }
 
-    function next(){ render(index + 1); }
-    function prev(){ render(index - 1); }
+    function next(){ if(results.length) render(index + 1); }
+    function prev(){ if(results.length) render(index - 1); }
 
     nextBtn.addEventListener('click', next);
     prevBtn.addEventListener('click', prev);
+
     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') next();
       if (e.key === 'ArrowLeft') prev();
+      if (e.key === 'Enter' && document.activeElement === input) {
+        e.preventDefault(); search(input.value);
+      }
     });
 
-    // Initial render
-    render(0);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      search(input.value);
+    });
+
+    // Hydrate from URL hash if present: #q=keyword
+    (function init(){
+      const m = location.hash.match(/#q=([^&]+)/);
+      const q = m ? decodeURIComponent(m[1]) : 'forest at dawn';
+      input.value = q;
+      search(q);
+    })();
   </script>
 </body>
 </html>
