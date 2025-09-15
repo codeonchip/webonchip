@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sequence Diagram Editor (HTML)</title>
+<style>
+  :root{
+    --bg:#f6f8fb;--panel:#ffffff;--ink:#0f172a;--muted:#64748b;--line:#94a3b8;--accent:#0ea5e9;--border:#e5e7eb;--danger:#ef4444;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,Apple Color Emoji,Segoe UI Emoji}
+  body{background:var(--bg);color:var(--ink)}
+  .app{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;height:100%}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card header{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600}
+  .card .content{padding:12px 16px}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  label{display:block;font-size:12px;color:var(--muted);margin-top:8px;margin-bottom:4px}
+  input,select,button{font:inherit}
+  input[type="text"],input[type="number"],select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#fff}
+  button{padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer}
+  button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  button.secondary{background:#f3f4f6}
+  button.danger{background:#fee2e2;border-color:#fecaca;color:#b91c1c}
+  .hint{color:var(--muted);font-size:12px}
+  .list{max-height:160px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+  .list-item{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:14px}
+  .list-item:last-child{border-bottom:0}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+  .canvas-wrap{height:100%;}
+  .canvas{width:100%;height:100%;display:block;background:#fff;border-radius:12px;border:1px solid var(--border)}
+  .kbd{padding:2px 6px;border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;background:#fff;font-size:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Left panel -->
+  <section class="card" style="min-height:0;display:flex;flex-direction:column;gap:0;">
+    <header>Sequence Diagram</header>
+    <div class="content" style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label>Title</label>
+        <input id="title" type="text" value="Untitled Sequence" />
+      </div>
+
+      <div class="toolbar">
+        <button id="tool-select" class="pill"><span>🖱️</span> Select <span class="kbd">V</span></button>
+        <button id="tool-msg" class="pill"><span>↔️</span> Message <span class="kbd">M</span></button>
+        <button id="tool-life" class="pill"><span>〡</span> Lifeline <span class="kbd">L</span></button>
+      </div>
+
+      <div class="row">
+        <button id="btn-svg">Export SVG</button>
+        <button id="btn-png">Export PNG</button>
+        <button id="btn-json">Export JSON</button>
+        <label class="pill" style="cursor:pointer">
+          <input id="file-json" type="file" accept="application/json" style="display:none" />
+          📥 Import
+        </label>
+      </div>
+
+      <div class="card" style="border:0;background:transparent">
+        <div class="content">
+          <div class="hint">Tip: drag lifelines horizontally and messages vertically. Press <span class="kbd">Delete</span> to remove selection.</div>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1 1 auto;min-height:0">
+        <header>Properties</header>
+        <div class="content" id="props"></div>
+      </div>
+
+      <div class="card" style="flex:1 1 auto;min-height:0;margin-top:12px;">
+        <header>Elements</header>
+        <div class="content" style="display:grid;gap:10px">
+          <div>
+            <div class="hint" style="margin-bottom:6px">Lifelines</div>
+            <div id="list-lifelines" class="list"></div>
+          </div>
+          <div>
+            <div class="hint" style="margin-bottom:6px">Messages</div>
+            <div id="list-messages" class="list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Right canvas -->
+  <section class="card canvas-wrap">
+    <header>Canvas</header>
+    <div class="content" style="height:calc(100% - 49px);">
+      <svg id="svg" class="canvas" viewBox="0 0 1100 800" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </section>
+</div>
+
+<script>
+// ====== Model types ======
+function uid(){return Math.random().toString(36).slice(2,9)}
+const viewport={width:1100,height:800,laneY:80,lifelineHeight:680}
+let state={
+  meta:{title:'Untitled Sequence'},
+  lifelines:[{id:uid(),name:'Client',x:140},{id:uid(),name:'Server',x:420}],
+  messages:[],
+  selected:{type:null,id:null},
+  tool:'select'
+}
+state.messages=[
+  {id:uid(),from:state.lifelines[0].id,to:state.lifelines[1].id,label:'Request k',y:140},
+  {id:uid(),from:state.lifelines[1].id,to:state.lifelines[0].id,label:'Response k',y:200},
+  {id:uid(),from:state.lifelines[0].id,to:state.lifelines[1].id,label:'Request k+1',y:260},
+  {id:uid(),from:state.lifelines[1].id,to:state.lifelines[0].id,label:'Response k+1',y:320},
+]
+
+// ====== DOM refs ======
+const svg=document.getElementById('svg')
+const propsEl=document.getElementById('props')
+const listL=document.getElementById('list-lifelines')
+const listM=document.getElementById('list-messages')
+const titleEl=document.getElementById('title')
+
+// ====== UI wiring ======
+document.getElementById('tool-select').onclick=()=>{state.tool='select';highlightTools()}
+document.getElementById('tool-msg').onclick=()=>{state.tool='addMessage';highlightTools()}
+document.getElementById('tool-life').onclick=()=>{state.tool='addLifeline';highlightTools()}
+
+function highlightTools(){
+  for (const id of ['tool-select','tool-msg','tool-life']) document.getElementById(id).classList.remove('primary')
+  const map={select:'tool-select',addMessage:'tool-msg',addLifeline:'tool-life'}
+  document.getElementById(map[state.tool]).classList.add('primary')
+}
+highlightTools()
+
+document.getElementById('btn-json').onclick=()=>download(new Blob([JSON.stringify({meta:state.meta,lifelines:state.lifelines,messages:state.messages},null,2)],{type:'application/json'}), (state.meta.title||'sequence')+'.json')
+
+document.getElementById('file-json').onchange=(e)=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{const d=JSON.parse(String(r.result));
+      if(!d.lifelines||!d.messages) throw new Error('Invalid JSON');
+      state.meta=d.meta||{title:'Imported'};state.lifelines=d.lifelines;state.messages=d.messages;state.selected={type:null,id:null};titleEl.value=state.meta.title;render()
+    }catch(err){alert('Import failed: '+err.message)}
+  };
+  r.readAsText(f)
+}
+
+// Export SVG
+ document.getElementById('btn-svg').onclick=()=>{
+  const blob=new Blob([svg.outerHTML.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg"')],{type:'image/svg+xml'})
+  download(blob,(state.meta.title||'sequence')+'.svg')
+ }
+// Export PNG
+ document.getElementById('btn-png').onclick=async()=>{
+  const s=svg.outerHTML.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg"')
+  const url=URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}))
+  const img=new Image();
+  img.src=url; await img.decode();
+  const scale=2; const w=viewport.width,h=viewport.height
+  const c=document.createElement('canvas'); c.width=w*scale; c.height=h*scale
+  const ctx=c.getContext('2d'); ctx.scale(scale,scale)
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0)
+  URL.revokeObjectURL(url)
+  c.toBlob(b=>download(b,(state.meta.title||'sequence')+'.png'))
+ }
+
+function download(blob,filename){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),500)
+}
+
+titleEl.oninput=(e)=>{state.meta.title=e.target.value;render()}
+
+// ====== Rendering ======
+function render(){
+  // SVG content
+  svg.innerHTML='';
+  svg.setAttribute('viewBox','0 0 '+viewport.width+' '+viewport.height)
+  const bg=rect(0,0,viewport.width,viewport.height,{fill:'#ffffff'})
+  svg.appendChild(bg)
+  svg.appendChild(text(20,36,state.meta.title,{fontSize:18,fontWeight:600,fill:'#0f172a'}))
+  svg.appendChild(text(20,56,'Time ↓',{fontSize:12,fill:'#475569'}))
+  svg.appendChild(line(80,viewport.laneY-20,80,viewport.laneY+viewport.lifelineHeight+20,{stroke:'#cbd5e1','stroke-dasharray':'4 4'}))
+
+  // Arrow marker
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs')
+  const marker=document.createElementNS('http://www.w3.org/2000/svg','marker')
+  marker.setAttribute('id','arrow')
+  marker.setAttribute('markerWidth','10'); marker.setAttribute('markerHeight','7'); marker.setAttribute('refX','10'); marker.setAttribute('refY','3.5'); marker.setAttribute('orient','auto')
+  const poly=document.createElementNS('http://www.w3.org/2000/svg','polygon'); poly.setAttribute('points','0 0, 10 3.5, 0 7'); poly.setAttribute('fill','#475569')
+  marker.appendChild(poly); defs.appendChild(marker); svg.appendChild(defs)
+
+  // lifeline headers & dashed
+  for(const l of state.lifelines){
+    const isSel=state.selected.type==='lifeline'&&state.selected.id===l.id
+    svg.appendChild(rect(l.x-70,20,140,36,{rx:12,ry:12,fill:'#f1f5f9',stroke:isSel?'#0ea5e9':'#e2e8f0'}))
+    svg.appendChild(text(l.x,44,l.name,{fontSize:14,fill:'#0f172a','text-anchor':'middle'}))
+    svg.appendChild(line(l.x,viewport.laneY,l.x,viewport.laneY+viewport.lifelineHeight,{stroke:'#94a3b8','stroke-dasharray':'6 6'}))
+  }
+  // messages
+  for(const m of state.messages){
+    const fromX = (state.lifelines.find(l=>l.id===m.from)||{x:0}).x
+    const toX   = (state.lifelines.find(l=>l.id===m.to)||{x:0}).x
+    const isSel = state.selected.type==='message'&&state.selected.id===m.id
+    svg.appendChild(line(fromX,m.y,toX,m.y,{stroke:isSel?'#0ea5e9':'#475569','marker-end':'url(#arrow)'}))
+    svg.appendChild(text((fromX+toX)/2 + (fromX<toX?8:-8), m.y-6, m.label, {fontSize:12,'text-anchor':'middle',fill:'#111827'}))
+  }
+  // Interaction layer
+  svg.onpointerdown=onPointerDown
+  svg.onpointermove=onPointerMove
+  svg.onpointerup=()=>drag=null
+
+  renderLists(); renderProps();
+}
+
+// ====== Lists & Props ======
+function renderLists(){
+  listL.innerHTML='';
+  state.lifelines.forEach(l=>{
+    const row=document.createElement('div'); row.className='list-item'
+    const btn=document.createElement('button'); btn.textContent=l.name; btn.onclick=()=>{state.selected={type:'lifeline',id:l.id}; renderProps(); highlightSelection()}
+    const del=document.createElement('button'); del.textContent='✕'; del.className='danger'; del.onclick=()=>{removeLifeline(l.id)}
+    row.append(btn,del); listL.appendChild(row)
+  })
+  listM.innerHTML='';
+  [...state.messages].sort((a,b)=>a.y-b.y).forEach(m=>{
+    const row=document.createElement('div'); row.className='list-item'
+    const btn=document.createElement('button'); btn.textContent=m.label||'(no label)'; btn.onclick=()=>{state.selected={type:'message',id:m.id}; renderProps(); highlightSelection()}
+    const del=document.createElement('button'); del.textContent='✕'; del.className='danger'; del.onclick=()=>{removeMessage(m.id)}
+    row.append(btn,del); listM.appendChild(row)
+  })
+}
+
+function renderProps(){
+  const sel=state.selected; propsEl.innerHTML='';
+  if(!sel.type){ propsEl.innerHTML='<div class="hint">Nothing selected.</div>'; return }
+  if(sel.type==='lifeline'){
+    const l=state.lifelines.find(x=>x.id===sel.id); if(!l) return;
+    propsEl.append(child('label','', 'Name'))
+    const name=inputText(l.name, v=>{l.name=v; render()}); propsEl.append(name)
+    propsEl.append(child('label','', 'X'))
+    const xin=inputNumber(l.x, v=>{l.x=clamp(v,60,viewport.width-60); render()}); propsEl.append(xin)
+    const del=button('Delete lifeline','danger',()=>removeLifeline(l.id)); propsEl.append(del)
+  }
+  if(sel.type==='message'){
+    const m=state.messages.find(x=>x.id===sel.id); if(!m) return;
+    propsEl.append(child('label','', 'Label'))
+    propsEl.append(inputText(m.label, v=>{m.label=v; render()}))
+    // From/To
+    const wrap=document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr 1fr'; wrap.style.gap='8px'
+    const sFrom=select(state.lifelines.map(l=>({value:l.id,text:l.name})), m.from, v=>{m.from=v; render()})
+    const sTo=select(state.lifelines.map(l=>({value:l.id,text:l.name})), m.to, v=>{m.to=v; render()})
+    wrap.append(block('From', sFrom), block('To', sTo)); propsEl.append(wrap)
+    propsEl.append(child('label','', 'Y (time)'))
+    propsEl.append(inputNumber(m.y, v=>{m.y=clamp(v,viewport.laneY+10, viewport.laneY+viewport.lifelineHeight-10); render()}))
+    propsEl.append(button('Delete message','danger',()=>removeMessage(m.id)))
+  }
+}
+
+function block(labelText, el){const d=document.createElement('div'); d.append(child('label','',labelText), el); return d}
+
+function inputText(val,on){const i=document.createElement('input'); i.type='text'; i.value=val; i.oninput=e=>on(e.target.value); return i}
+function inputNumber(val,on){const i=document.createElement('input'); i.type='number'; i.value=val; i.oninput=e=>on(Number(e.target.value)); return i}
+function select(options,val,on){const s=document.createElement('select'); options.forEach(o=>{const op=document.createElement('option'); op.value=o.value; op.textContent=o.text; if(o.value===val) op.selected=true; s.appendChild(op)}); s.onchange=e=>on(e.target.value); return s}
+function button(text_,cls,fn){const b=document.createElement('button'); b.textContent=text_; if(cls) b.classList.add(cls); b.onclick=fn; return b}
+function child(tag,cls,text_){const el=document.createElement(tag); if(cls) el.className=cls; if(text_) el.textContent=text_; return el}
+
+function removeLifeline(id){ state.lifelines=state.lifelines.filter(l=>l.id!==id); state.messages=state.messages.filter(m=>m.from!==id&&m.to!==id); state.selected={type:null,id:null}; render() }
+function removeMessage(id){ state.messages=state.messages.filter(m=>m.id!==id); state.selected={type:null,id:null}; render() }
+
+function highlightSelection(){ render() }
+
+// ====== SVG helpers ======
+function rect(x,y,w,h,attrs){const r=svgEl('rect',{x,y,width:w,height:h,...attrs}); return r}
+function line(x1,y1,x2,y2,attrs){return svgEl('line',{x1,y1,x2,y2,...attrs})}
+function text(x,y,str,attrs){const t=svgEl('text',{x,y,...attrs}); t.textContent=str; return t}
+function svgEl(tag,attrs){const el=document.createElementNS('http://www.w3.org/2000/svg',tag); for(const k in attrs){el.setAttribute(k,String(attrs[k]))} return el}
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+// ====== Interaction ======
+let drag=null
+function svgPoint(evt){ const pt=svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY; const r=pt.matrixTransform(svg.getScreenCTM().inverse()); return {x:r.x,y:r.y} }
+
+function hitLifeline(x,y){ const tol=12; for(const l of state.lifelines){ if(Math.abs(x-l.x)<=tol && y>=viewport.laneY && y<=viewport.laneY+viewport.lifelineHeight) return l } return null }
+function hitMessage(x,y){ const tol=8; for(const m of state.messages){ const fx=(state.lifelines.find(l=>l.id===m.from)||{x:0}).x; const tx=(state.lifelines.find(l=>l.id===m.to)||{x:0}).x; const min=Math.min(fx,tx), max=Math.max(fx,tx); if(y>=m.y-tol && y<=m.y+tol && x>=min-tol && x<=max+tol) return m } return null }
+
+function onPointerDown(e){ const p=svgPoint(e); if(state.tool==='addLifeline'){ state.lifelines.push({id:uid(),name:'L'+(state.lifelines.length+1),x:clamp(p.x,60,viewport.width-60)}); state.tool='select'; render(); return }
+  if(state.tool==='addMessage'){ const sorted=[...state.lifelines].sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x)); if(sorted.length>=2){ const [lA,lB]=[sorted[0],sorted[1]]; state.messages.push({id:uid(),from:lA.id,to:lB.id,label:'',y:clamp(p.y,viewport.laneY+10,viewport.laneY+viewport.lifelineHeight-10)}); state.tool='select'; render(); } return }
+  const lif=hitLifeline(p.x,p.y); const msg=hitMessage(p.x,p.y);
+  if(msg){ state.selected={type:'message',id:msg.id}; drag={kind:'message',id:msg.id,startY:p.y,origY:msg.y}
+  } else if(lif){ state.selected={type:'lifeline',id:lif.id}; drag={kind:'lifeline',id:lif.id,startX:p.x,origX:lif.x}
+  } else { state.selected={type:null,id:null} }
+  renderProps(); highlightSelection();
+}
+
+function onPointerMove(e){ if(!drag) return; const p=svgPoint(e); if(drag.kind==='lifeline'){ const l=state.lifelines.find(x=>x.id===drag.id); if(!l) return; const dx=p.x-drag.startX; l.x=clamp(drag.origX+dx,60,viewport.width-60); render() } else if(drag.kind==='message'){ const m=state.messages.find(x=>x.id===drag.id); if(!m) return; const dy=p.y-drag.startY; m.y=clamp(drag.origY+dy,viewport.laneY+10,viewport.laneY+viewport.lifelineHeight-10); render() } }
+
+window.addEventListener('keydown',e=>{
+  if(e.key==='Delete' || e.key==='Backspace'){
+    if(state.selected.type==='lifeline') removeLifeline(state.selected.id)
+    else if(state.selected.type==='message') removeMessage(state.selected.id)
+  }
+  if(e.key==='v' || e.key==='Escape'){ state.tool='select'; highlightTools() }
+  if(e.key==='m'){ state.tool='addMessage'; highlightTools() }
+  if(e.key==='l'){ state.tool='addLifeline'; highlightTools() }
+})
+
+// Initial render
+render()
+</script>
+</body>
+</html>
