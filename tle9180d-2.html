@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TLE9180 BLDC Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+        }
+
+        h1, h2 {
+            color: #34495e;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin-top: 20px;
+            padding: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 10px;
+            width: 180px;
+        }
+        
+        .control-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .visualization {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .phase-display {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .phase {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 5px solid #ccc;
+            margin: 0 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: white;
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+        }
+        
+        .phase-u { background-color: #e74c3c; }
+        .phase-v { background-color: #2ecc71; }
+        .phase-w { background-color: #3498db; }
+        .phase.low { opacity: 0.3; }
+        .phase.high { transform: scale(1.1); }
+        .phase.floating { background-color: #95a5a6; opacity: 0.5; }
+
+        input[type="range"] {
+            width: 150px;
+        }
+
+        p.info {
+            text-align: center;
+            margin-top: 20px;
+            font-style: italic;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>TLE9180 BLDC Motor Simulator</h1>
+    <p class="info">Adjust the duty cycle and phase shift to simulate PWM control of the motor phases. The colored circles represent the high-side MOSFETs, while low opacity represents low-side activation.</p>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="duty-cycle-u">Phase U Duty Cycle</label>
+            <input type="range" id="duty-cycle-u" min="0" max="100" value="50">
+            <span id="duty-value-u">50%</span>
+        </div>
+        <div class="control-group">
+            <label for="duty-cycle-v">Phase V Duty Cycle</label>
+            <input type="range" id="duty-cycle-v" min="0" max="100" value="50">
+            <span id="duty-value-v">50%</span>
+        </div>
+        <div class="control-group">
+            <label for="duty-cycle-w">Phase W Duty Cycle</label>
+            <input type="range" id="duty-cycle-w" min="0" max="100" value="50">
+            <span id="duty-value-w">50%</span>
+        </div>
+        <div class="control-group">
+            <label for="phase-shift">Phase Shift</label>
+            <input type="range" id="phase-shift" min="0" max="360" value="0">
+            <span id="shift-value">0°</span>
+        </div>
+    </div>
+
+    <div class="visualization">
+        <h2>Simulated Phases</h2>
+        <div class="phase-display">
+            <div id="phase-u" class="phase phase-u">U</div>
+            <div id="phase-v" class="phase phase-v">V</div>
+            <div id="phase-w" class="phase phase-w">W</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dutyCycleU = document.getElementById('duty-cycle-u');
+        const dutyCycleV = document.getElementById('duty-cycle-v');
+        const dutyCycleW = document.getElementById('duty-cycle-w');
+        const phaseShift = document.getElementById('phase-shift');
+
+        const dutyValueU = document.getElementById('duty-value-u');
+        const dutyValueV = document.getElementById('duty-value-v');
+        const dutyValueW = document.getElementById('duty-value-w');
+        const shiftValue = document.getElementById('shift-value');
+
+        const phaseU = document.getElementById('phase-u');
+        const phaseV = document.getElementById('phase-v');
+        const phaseW = document.getElementById('phase-w');
+
+        function updateSimulation() {
+            // Get current values
+            const u = parseInt(dutyCycleU.value);
+            const v = parseInt(dutyCycleV.value);
+            const w = parseInt(dutyCycleW.value);
+            const shift = parseInt(phaseShift.value);
+
+            // Update display values
+            dutyValueU.textContent = `${u}%`;
+            dutyValueV.textContent = `${v}%`;
+            dutyValueW.textContent = `${w}%`;
+            shiftValue.textContent = `${shift}°`;
+            
+            // --- Simplified TLE9180 logic simulation ---
+            // A more complete model would simulate the SPI communication and the timing
+            // of the PWM inputs driving the high-side and low-side MOSFETs.
+            // This example simplifies the visualization by toggling a "high" or "low" state.
+            
+            // Determine "high" or "low" state based on a threshold (e.g., > 50%)
+            const isHighU = u > 50;
+            const isHighV = v > 50;
+            const isHighW = w > 50;
+            
+            // Apply visual classes
+            phaseU.classList.toggle('high', isHighU);
+            phaseU.classList.toggle('low', !isHighU);
+            
+            phaseV.classList.toggle('high', isHighV);
+            phaseV.classList.toggle('low', !isHighV);
+            
+            phaseW.classList.toggle('high', isHighW);
+            phaseW.classList.toggle('low', !isHighW);
+        }
+        
+        // Listen for user input on the controls
+        dutyCycleU.addEventListener('input', updateSimulation);
+        dutyCycleV.addEventListener('input', updateSimulation);
+        dutyCycleW.addEventListener('input', updateSimulation);
+        phaseShift.addEventListener('input', updateSimulation);
+
+        // Initial simulation update
+        updateSimulation();
+    });
+</script>
+
+</body>
+</html>
