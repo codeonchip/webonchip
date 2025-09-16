@@ -35,6 +35,37 @@
 </header>
 <main>
   <section class="card">
+    <h2 style="margin:0 0 6px">TLE9180 Frame Builder (IfxTLE9180_SpiTx_bits)</h2>
+    <div class="hint">Packing: [31:24] unused · [23] C · [22:16] ADDRESS(7) · [15:8] DATA(8) · [7:3] reserved(5) · [2:0] CRC3. CRC is computed over bits 31..3 (CRC excluded), MSB‑first.</div>
+    <div class="row" style="margin-top:10px">
+      <div>
+        <label>ADDRESS (7‑bit, hex)</label>
+        <input id="fldADDR" class="mono" type="text" placeholder="12" maxlength="2" value="12">
+      </div>
+      <div>
+        <label>DATA (8‑bit, hex)</label>
+        <input id="fldDATA" class="mono" type="text" placeholder="34" maxlength="2" value="34">
+      </div>
+      <div>
+        <label>C (read/write, 0/1)</label>
+        <input id="fldC" class="mono" type="text" placeholder="0" maxlength="1" value="1">
+      </div>
+      <div>
+        <label>reserved [7:3] (5 bits, hex)</label>
+        <input id="fldRSV" class="mono" type="text" placeholder="00" maxlength="2" value="00">
+      </div>
+    </div>
+    <div class="row-2" style="margin-top:8px">
+      <div>
+        <label>unused [31:24] (8‑bit, hex)</label>
+        <input id="fldUNU" class="mono" type="text" placeholder="00" maxlength="2" value="00">
+      </div>
+      <div style="align-self:end">
+        <button class="btn" id="btnPackTLE">Build 4‑byte frame & compute CRC</button>
+      </div>
+    </div>
+  </section>
+  <section class="card">
     <label>Bit order on the wire</label>
     <div class="row-2">
       <select id="bitOrder">
@@ -214,6 +245,53 @@ id('btnWord').addEventListener('click', ()=>{
 // Initial demo values
 id('b0').value='12'; id('b1').value='34'; id('b2').value='56'; id('b3').value='78';
 refresh();
+// --- TLE9180 frame builder helpers ---
+function sanitizeHex(el, max){
+  let t = el.value.trim();
+  if(t==='') return null;
+  t = t.replace(/^0x/i,'');
+  const n = parseInt(t,16);
+  if(!Number.isFinite(n)) return null;
+  return (n<0?0:n>max?max:n)|0;
+}
+function clamp01(el){
+  const t = el.value.trim();
+  if(t==='') return null;
+  const n = parseInt(t,10);
+  if(!Number.isFinite(n)) return null;
+  return n?1:0;
+}
+function packTLEFrame(){
+  const UNU = sanitizeHex(id('fldUNU'),0xFF) ?? 0;
+  const C   = clamp01(id('fldC')) ?? 0;
+  const ADDR= sanitizeHex(id('fldADDR'),0x7F) ?? 0;
+  const DATA= sanitizeHex(id('fldDATA'),0xFF) ?? 0;
+  const RSV = sanitizeHex(id('fldRSV'),0x1F) ?? 0; // 5 bits
+  // Assemble word with CRC cleared for now
+  let w = 0;
+  w |= (UNU & 0xFF) << 24;       // [31:24]
+  w |= (C & 0x1) << 23;          // [23]
+  w |= (ADDR & 0x7F) << 16;      // [22:16]
+  w |= (DATA & 0xFF) << 8;       // [15:8]
+  w |= (RSV & 0x1F) << 3;        // [7:3]
+  // Compute CRC over bits 31..3, MSB‑first on wire
+  let reg = 0b101;
+  for(let bit=31; bit>=3; --bit){
+    reg = crc3Step(reg, (w>>>bit)&1);
+  }
+  const crc = reg & 7;
+  w = (w & ~0x7) | crc; // put CRC into [2:0]
+  // Populate the general calculator section
+  id('u32').value = hex2(w>>>0,8);
+  id('b0').value = hex2((w>>>24)&255,2);
+  id('b1').value = hex2((w>>>16)&255,2);
+  id('b2').value = hex2((w>>>8)&255,2);
+  id('b3').value = hex2(w&255,2);
+  id('bitOrder').value = 'msb';
+  refresh();
+}
+
+id('btnPackTLE').addEventListener('click', packTLEFrame);
 </script>
 </body>
 </html>
