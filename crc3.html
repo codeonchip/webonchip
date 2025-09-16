@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>CRC‑3 (x^3+x+1) Calculator for 4‑Byte SPI Frame</title>
+  <style>
+    :root{--fg:#eaeef2;--bg:#0f172a;--muted:#94a3b8;--card:#111827;--accent:#38bdf8;--ok:#22c55e;--err:#ef4444}
+    *{box-sizing:border-box}body{margin:0;font:16px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg)}
+    header{padding:18px 20px;border-bottom:1px solid #1f2937;background:#0b1220;position:sticky;top:0}
+    h1{font-size:20px;margin:0} .sub{color:var(--muted);font-size:13px}
+    main{max-width:980px;margin:24px auto;padding:0 16px 40px}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:14px;padding:16px;margin:14px 0;box-shadow:0 3px 20px rgba(0,0,0,.25)}
+    label{display:block;font-weight:600;margin:8px 0 6px}
+    input[type="text"], select{width:100%;background:#0b1220;color:var(--fg);border:1px solid #1f2937;border-radius:10px;padding:10px 12px;font-size:15px}
+    input[readonly]{opacity:.85}
+    .row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .hint{color:var(--muted);font-size:12px;margin-top:4px}
+    .btn{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:10px;border:1px solid #1f2937;background:#0b1220;color:var(--fg);cursor:pointer}
+    .btn:hover{border-color:#334155}
+    .kvs{display:grid;grid-template-columns:200px 1fr;gap:10px;row-gap:6px}
+    code{background:#0b1220;border:1px solid #1f2937;border-radius:8px;padding:2px 6px}
+    .mono{font-family: ui-monospace, Menlo, Consolas, monospace}
+    .bits{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{padding:4px 8px;border-radius:999px;background:#0b1220;border:1px solid #1f2937}
+    .ok{color:var(--ok)} .err{color:var(--err)}
+    footer{color:var(--muted);font-size:12px;margin-top:16px}
+  </style>
+</head>
+<body>
+<header>
+  <h1>CRC‑3 Calculator · Polynomial <span class="mono">x^3 + x + 1</span> · Seed <span class="mono">101</span></h1>
+  <div class="sub">For 4‑byte SPI frames · MSB‑first or LSB‑first</div>
+</header>
+<main>
+  <section class="card">
+    <label>Bit order on the wire</label>
+    <div class="row-2">
+      <select id="bitOrder">
+        <option value="msb">MSB‑first (bit 31 → 0)</option>
+        <option value="lsb">LSB‑first (bit 0 → 31)</option>
+      </select>
+      <div>
+        <label class="mono">Seed</label>
+        <input type="text" value="0b101 (fixed)" readonly>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <label>Enter frame data (4 bytes = 32 bits)</label>
+    <div class="row">
+      <div>
+        <label>Byte 0</label>
+        <input id="b0" class="mono" type="text" placeholder="e.g. 12" maxlength="2">
+        <div class="hint">First on wire in MSB‑first</div>
+      </div>
+      <div>
+        <label>Byte 1</label>
+        <input id="b1" class="mono" type="text" placeholder="34" maxlength="2">
+      </div>
+      <div>
+        <label>Byte 2</label>
+        <input id="b2" class="mono" type="text" placeholder="56" maxlength="2">
+      </div>
+      <div>
+        <label>Byte 3</label>
+        <input id="b3" class="mono" type="text" placeholder="78" maxlength="2">
+      </div>
+    </div>
+    <div class="row-2" style="margin-top:10px">
+      <div>
+        <label>Or 32‑bit word (hex)</label>
+        <input id="u32" class="mono" type="text" placeholder="12345678" maxlength="8">
+        <div class="hint">No <code>0x</code> prefix. Big‑endian view.</div>
+      </div>
+      <div style="align-self:end">
+        <button class="btn" id="btnFill">Fill bytes from word</button>
+        <button class="btn" id="btnWord">Build word from bytes</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <label>Result</label>
+    <div class="kvs mono">
+      <div>CRC‑3 value</div>
+      <div><span id="crcVal">—</span> <span class="hint">(0..7)</span></div>
+      <div>CRC bits (b2 b1 b0)</div>
+      <div class="bits"><span class="pill" id="b2">—</span><span class="pill" id="b1">—</span><span class="pill" id="b0">—</span></div>
+      <div>TX helper byte</div>
+      <div><span id="crcByte">0x00</span> <span class="hint">CRC left‑aligned in bits 7..5</span></div>
+      <div>Concatenated bit stream</div>
+      <div id="bitStream" class="hint">(data 32 bits) + (CRC 3 bits)</div>
+    </div>
+  </section>
+
+  <footer>
+    Polynomial taps: x^3, x^1, x^0 · LFSR update: <code>fb = din ⊕ b2; b2' = b1; b1' = b0 ⊕ fb; b0' = fb</code> · Seed <code>0b101</code>.
+  </footer>
+</main>
+
+<script>
+// --- CRC‑3 (x^3 + x + 1), 3‑bit LFSR, seed 0b101 ---
+function crc3Step(reg, dinBit){
+  const b2 = (reg >>> 2) & 1;
+  const fb = (dinBit ^ b2) & 1; // taps at x^3 and input
+  const b1 = (reg >>> 1) & 1;
+  const b0 = reg & 1;
+  const n2 = b1;
+  const n1 = b0 ^ fb; // tap at x^1
+  const n0 = fb;      // tap at x^0
+  return ((n2 << 2) | (n1 << 1) | n0) & 0x7;
+}
+
+function crc3WordMSB(u32){
+  let reg = 0b101;
+  for(let bit=31; bit>=0; --bit){
+    reg = crc3Step(reg, (u32>>>bit)&1);
+  }
+  return reg & 7;
+}
+function crc3WordLSB(u32){
+  let reg = 0b101;
+  for(let bit=0; bit<32; ++bit){
+    reg = crc3Step(reg, (u32>>>bit)&1);
+  }
+  return reg & 7;
+}
+
+// --- helpers ---
+const id = s=>document.getElementById(s);
+function hex2(v,len){
+  return (v>>>0).toString(16).padStart(len,'0').toUpperCase();
+}
+function parseByte(el){
+  const t = el.value.trim();
+  if(!t) return null;
+  const n = parseInt(t,16);
+  return (Number.isFinite(n) && n>=0 && n<=255) ? n : null;
+}
+function parseU32(el){
+  const t = el.value.trim().replace(/^0x/i,'');
+  if(!t) return null;
+  const n = parseInt(t,16);
+  return (Number.isFinite(n) && n>=0 && n<=0xFFFFFFFF) ? n>>>0 : null;
+}
+
+function bytesToU32(b0,b1,b2,b3){
+  return ((b0<<24)>>>0) | (b1<<16) | (b2<<8) | b3;
+}
+
+function refresh(){
+  // Prefer 4 bytes; fall back to word if bytes missing
+  let b0=parseByte(id('b0')),
+      b1=parseByte(id('b1')),
+      b2=parseByte(id('b2')),
+      b3=parseByte(id('b3'));
+  let u32 = null;
+  if(b0!==null && b1!==null && b2!==null && b3!==null){
+    u32 = bytesToU32(b0,b1,b2,b3);
+    id('u32').placeholder = hex2(u32,8);
+  } else {
+    u32 = parseU32(id('u32'));
+    if(u32===null){
+      id('crcVal').textContent = '—';
+      id('b2').textContent = id('b1').textContent = id('b0').textContent = '—';
+      id('crcByte').textContent = '0x00';
+      id('bitStream').textContent = '(data 32 bits) + (CRC 3 bits)';
+      return;
+    }
+    // Split word into bytes for display hints
+    b0 = (u32>>>24)&255; b1=(u32>>>16)&255; b2=(u32>>>8)&255; b3=u32&255;
+  }
+
+  const order = id('bitOrder').value;
+  const crc = (order==='msb') ? crc3WordMSB(u32) : crc3WordLSB(u32);
+  id('crcVal').textContent = crc + ' (0b' + ((crc>>>0).toString(2).padStart(3,'0')) + ')';
+  id('b2').textContent = (crc>>>2)&1; id('b1').textContent = (crc>>>1)&1; id('b0').textContent = crc&1;
+  id('crcByte').textContent = '0x' + hex2((crc<<5)&0xE0,2);
+
+  // Bit stream preview (compact)
+  const dataBits = (order==='msb')
+    ? [...Array(32)].map((_,i)=> (u32>>> (31-i)) & 1 ).join('')
+    : [...Array(32)].map((_,i)=> (u32>>> i) & 1 ).join('');
+  const crcBits = ((crc>>>2)&1)+''+((crc>>>1)&1)+''+(crc&1);
+  id('bitStream').textContent = dataBits + '  |  ' + crcBits;
+}
+
+// Event wiring
+['b0','b1','b2','b3','u32','bitOrder'].forEach(k=>{
+  id(k).addEventListener('input', refresh);
+  id(k).addEventListener('change', refresh);
+});
+
+id('btnFill').addEventListener('click', ()=>{
+  const w = parseU32(id('u32')); if(w===null) return;
+  id('b0').value = hex2((w>>>24)&255,2);
+  id('b1').value = hex2((w>>>16)&255,2);
+  id('b2').value = hex2((w>>>8)&255,2);
+  id('b3').value = hex2(w&255,2);
+  refresh();
+});
+
+id('btnWord').addEventListener('click', ()=>{
+  const b0=parseByte(id('b0')), b1=parseByte(id('b1')), b2=parseByte(id('b2')), b3=parseByte(id('b3'));
+  if([b0,b1,b2,b3].some(v=>v===null)) return;
+  const w = bytesToU32(b0,b1,b2,b3);
+  id('u32').value = hex2(w,8);
+  refresh();
+});
+
+// Initial demo values
+id('b0').value='12'; id('b1').value='34'; id('b2').value='56'; id('b3').value='78';
+refresh();
+</script>
+</body>
+</html>
