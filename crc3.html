@@ -1,334 +1,262 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>CRC‑3 (x^3+x+1) Calculator for 4‑Byte SPI Frame</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TLE9180 CRC3 Generator / Checker (32‑bit SPI)</title>
   <style>
-    :root{--fg:#eaeef2;--bg:#0f172a;--muted:#94a3b8;--card:#111827;--accent:#38bdf8;--ok:#22c55e;--err:#ef4444}
-    *{box-sizing:border-box}body{margin:0;font:16px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg)}
-    header{padding:18px 20px;border-bottom:1px solid #1f2937;background:#0b1220;position:sticky;top:0}
-    h1{font-size:20px;margin:0} .sub{color:var(--muted);font-size:13px}
-    main{max-width:980px;margin:24px auto;padding:0 16px 40px}
-    .card{background:var(--card);border:1px solid #1f2937;border-radius:14px;padding:16px;margin:14px 0;box-shadow:0 3px 20px rgba(0,0,0,.25)}
-    label{display:block;font-weight:600;margin:8px 0 6px}
-    input[type="text"], select{width:100%;background:#0b1220;color:var(--fg);border:1px solid #1f2937;border-radius:10px;padding:10px 12px;font-size:15px}
-    input[readonly]{opacity:.85}
-    .row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-    .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .hint{color:var(--muted);font-size:12px;margin-top:4px}
-    .btn{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:10px;border:1px solid #1f2937;background:#0b1220;color:var(--fg);cursor:pointer}
-    .btn:hover{border-color:#334155}
-    .kvs{display:grid;grid-template-columns:200px 1fr;gap:10px;row-gap:6px}
-    code{background:#0b1220;border:1px solid #1f2937;border-radius:8px;padding:2px 6px}
-    .mono{font-family: ui-monospace, Menlo, Consolas, monospace}
-    .bits{display:flex;gap:8px;flex-wrap:wrap}
-    .pill{padding:4px 8px;border-radius:999px;background:#0b1220;border:1px solid #1f2937}
-    .ok{color:var(--ok)} .err{color:var(--err)}
-    footer{color:var(--muted);font-size:12px;margin-top:16px}
+    :root{--bg:#0b1020;--panel:#121930;--ink:#e6ecff;--muted:#9fb0ff33;--accent:#7aa2ff;--good:#32d296;--bad:#ff6b6b}
+    *{box-sizing:border-box}
+    body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial;color:var(--ink);background:radial-gradient(1200px 600px at 80% -10%,#1a2350 0%,#0b1020 60%)}
+    .wrap{max-width:1000px;margin:32px auto;padding:0 16px}
+    h1{font-size:22px;margin:0 0 12px}
+    .card{background:linear-gradient(180deg,#121933 0%,#0f152b 100%);border:1px solid #2b3562;border-radius:16px;padding:16px;box-shadow:0 10px 30px #00000040}
+    .grid{display:grid;gap:14px}
+    @media(min-width:880px){.grid{grid-template-columns:1.2fr 1fr}}
+    label{display:block;font-size:12px;opacity:.85;margin-bottom:6px}
+    input[type="number"],input[type="text"],select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #35407a;background:#0b1230;color:var(--ink)}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
+    .row>.col{grid-column:span 3}
+    .row>.col-2{grid-column:span 2}
+    .row>.col-4{grid-column:span 4}
+    .btn{cursor:pointer;user-select:none;display:inline-flex;gap:8px;align-items:center;padding:10px 14px;border-radius:10px;border:1px solid #3a4aa3;background:linear-gradient(180deg,#22306a,#1a2557);color:#e8eeff;font-weight:600}
+    .btn:active{transform:translateY(1px)}
+    .btn.alt{border-color:#36508c;background:linear-gradient(180deg,#18224d,#121a3a)}
+    .btn.good{border-color:#2b7a5e;background:linear-gradient(180deg,#23684e,#1a4f3b)}
+    .btn.bad{border-color:#8a2f2f;background:linear-gradient(180deg,#512020,#3a1717)}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #3a4aa3;background:#0c1540aa;font-variant-numeric:tabular-nums}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    .muted{opacity:.8}
+    .hl{color:var(--accent)}
+    .out{display:grid;gap:8px}
+    .box{padding:10px 12px;border-radius:10px;border:1px dashed #36508c;background:#0b1230}
+    .bits{display:flex;flex-wrap:wrap;gap:6px}
+    .b{padding:6px 8px;border-radius:8px;border:1px solid #30408a;background:#10194a;min-width:34px;text-align:center}
+    .b.small{min-width:22px;padding:4px 6px}
+    .b.good{border-color:#2f9d72;background:#0f2a23}
+    .b.bad{border-color:#a64545;background:#2a0f0f}
+    .kv{display:grid;grid-template-columns:160px 1fr;gap:8px 12px;align-items:center}
+    footer{margin-top:18px;opacity:.75}
   </style>
 </head>
 <body>
-<header>
-  <h1>CRC‑3 Calculator · Polynomial <span class="mono">x^3 + x + 1</span> · Seed <span class="mono">101</span></h1>
-  <div class="sub">For 4‑byte SPI frames · MSB‑first or LSB‑first</div>
-</header>
-<main>
-  <section class="card">
-    <h2 style="margin:0 0 6px">TLE9180 Frame Builder (IfxTLE9180_SpiTx_bits)</h2>
-    <div class="hint">Packing: [31:24] unused · [23] C · [22:16] ADDRESS(7) · [15:8] DATA(8) · [7:3] reserved(5) · [2:0] CRC3. CRC is computed over bits 31..3 (CRC excluded), MSB‑first.</div>
-    <div class="row" style="margin-top:10px">
-      <div>
-        <label>ADDRESS (7‑bit, hex)</label>
-        <input id="fldADDR" class="mono" type="text" placeholder="12" maxlength="2" value="12">
-      </div>
-      <div>
-        <label>DATA (8‑bit, hex)</label>
-        <input id="fldDATA" class="mono" type="text" placeholder="34" maxlength="2" value="34">
-      </div>
-      <div>
-        <label>C (read/write, 0/1)</label>
-        <input id="fldC" class="mono" type="text" placeholder="0" maxlength="1" value="1">
-      </div>
-      <div>
-        <label>reserved [7:3] (5 bits, hex)</label>
-        <input id="fldRSV" class="mono" type="text" placeholder="00" maxlength="2" value="00">
-      </div>
-    </div>
-    <div class="row-2" style="margin-top:8px">
-      <div>
-        <label>unused [31:24] (8‑bit, hex)</label>
-        <input id="fldUNU" class="mono" type="text" placeholder="00" maxlength="2" value="00">
-      </div>
-      <div style="align-self:end">
-        <button class="btn" id="btnPackTLE">Build 4‑byte frame & compute CRC</button>
-      </div>
-    </div>
-  </section>
-  <section class="card">
-    <label>Bit order on the wire</label>
-    <div class="row-2">
-      <select id="bitOrder">
-        <option value="msb">MSB‑first (bit 31 → 0)</option>
-      </select>
-      <div>
-        <label class="mono">Initial register (after reset)</label>
-        <select id="initReg">
-          <option value="100" selected>0b100 (datasheet note)</option>
-          <option value="101">0b101 (direct seed)</option>
-        </select>
-      </div>
-    </div>
-      <div>
-        <label class="mono">Seed</label>
-        <input type="text" value="0b101 (fixed)" readonly>
-      </div>
-    </div>
-  </section>
+  <div class="wrap">
+    <h1>TLE9180 CRC3 Generator / Checker (32‑bit SPI)</h1>
+    <p class="muted">Polynomial <span class="pill mono">x³ + x + 1</span> (binary <span class="mono">1011</span>), seed <span class="mono">'101'</span> → start value <span class="mono">0b100</span>. CRC is calculated over <strong>bits 3..31</strong> (CRC excluded), default <strong>LSB‑first</strong>.</p>
 
-  <section class="card">
-    <label>Enter frame data (4 bytes = 32 bits)</label>
-    <div class="row">
-      <div>
-        <label>Byte 0</label>
-        <input id="b0" class="mono" type="text" placeholder="e.g. 12" maxlength="2">
-        <div class="hint">First on wire in MSB‑first</div>
-      </div>
-      <div>
-        <label>Byte 1</label>
-        <input id="b1" class="mono" type="text" placeholder="34" maxlength="2">
-      </div>
-      <div>
-        <label>Byte 2</label>
-        <input id="b2" class="mono" type="text" placeholder="56" maxlength="2">
-      </div>
-      <div>
-        <label>Byte 3</label>
-        <input id="b3" class="mono" type="text" placeholder="78" maxlength="2">
-      </div>
+    <div class="grid">
+      <!-- Left: Builder -->
+      <section class="card">
+        <h2 style="margin:0 0 10px">Build TX Frame & Compute CRC</h2>
+        <div class="row" style="margin-top:8px">
+          <div class="col-4">
+            <label>DATA (8‑bit, 0x00–0xFF)</label>
+            <input id="inData" type="text" placeholder="e.g. 0x81 or 129" value="0x81" />
+          </div>
+          <div class="col-4">
+            <label>ADDRESS (7‑bit, 0x00–0x7F)</label>
+            <input id="inAddr" type="text" placeholder="e.g. 0x01 or 1" value="0x01" />
+          </div>
+          <div class="col-2">
+            <label>Control C (bit)</label>
+            <select id="inC">
+              <option value="0">0 (Write)</option>
+              <option value="1" selected>1 (Read)</option>
+            </select>
+          </div>
+          <div class="col-2">
+            <label>Bit order</label>
+            <select id="inOrder">
+              <option value="lsb" selected>LSB‑first</option>
+              <option value="msb">MSB‑first</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button class="btn" id="btnBuild">Compute & Build Frame</button>
+          <button class="btn alt" id="btnExample">Load Example</button>
+        </div>
+        <div class="out" style="margin-top:14px">
+          <div class="kv">
+            <div>CRC3 result</div>
+            <div class="mono" id="outCrc">—</div>
+            <div>Frame (HEX)</div>
+            <div class="mono" id="outHex">—</div>
+            <div>Frame (BIN)</div>
+            <div class="box mono" id="outBin">—</div>
+          </div>
+          <div>
+            <div class="muted" style="margin:8px 0 6px">Bit fields (LSB on left, bit 0 first):</div>
+            <div class="bits" id="fieldBar"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Checker -->
+      <section class="card">
+        <h2 style="margin:0 0 10px">Check RX Frame</h2>
+        <label>Paste full 32‑bit frame (hex like <span class="mono">0xAABBCCDD</span> or decimal)</label>
+        <input id="inFrameHex" type="text" placeholder="0xAABBCCDD" />
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button class="btn" id="btnCheck">Check CRC</button>
+          <button class="btn alt" id="btnClear">Clear</button>
+        </div>
+        <div class="out" style="margin-top:14px">
+          <div class="kv">
+            <div>CRC (in frame)</div>
+            <div class="mono" id="rxCrcIn">—</div>
+            <div>CRC (recomputed)</div>
+            <div class="mono" id="rxCrcCalc">—</div>
+            <div>Status</div>
+            <div id="rxStatus">—</div>
+          </div>
+          <div class="box mono" id="rxBin">—</div>
+        </div>
+      </section>
     </div>
-    <div class="row-2" style="margin-top:10px">
-      <div>
-        <label>Or 32‑bit word (hex)</label>
-        <input id="u32" class="mono" type="text" placeholder="12345678" maxlength="8">
-        <div class="hint">No <code>0x</code> prefix. Big‑endian view.</div>
-      </div>
-      <div style="align-self:end">
-        <button class="btn" id="btnFill">Fill bytes from word</button>
-        <button class="btn" id="btnWord">Build word from bytes</button>
-      </div>
-    </div>
-  </section>
 
-  <section class="card">
-    <label>Result</label>
-    <div class="kvs mono">
-      <div>CRC to append (computed over bits [31..3], MSB‑first)</div>
-      <div><span id="crcToAppend">—</span> <span class="hint">put this into [2:0]</span></div>
-
-      <div>Frame's lower 3 bits [2:0]</div>
-      <div class="bits"><span class="pill" id="fcrc2">—</span><span class="pill" id="fcrc1">—</span><span class="pill" id="fcrc0">—</span></div>
-
-      <div>Frame validity (compare computed vs. [2:0])</div>
-      <div id="frameOK" class="pill">—</div>
-
-      <div>Check remainder over full 32 bits</div>
-      <div><span id="checkRem">—</span> <span class="hint">For a correct frame this becomes 0 (with this seed).</span></div>
-
-      <div>Bit stream preview (split at CRC)</div>
-      <div id="bitStream" class="hint">[31..3] data  |  [2..0] CRC</div>
-    </div>
-  </section>
-
-  <footer>
-    Polynomial taps: x^3, x^1, x^0 · LFSR update: <code>fb = din ⊕ b2; b2' = b1; b1' = b0 ⊕ fb; b0' = fb</code> · Seed <code>0b101</code>.
-  </footer>
-</main>
+    <footer>
+      <span class="muted">Layout (LSB→MSB):</span>
+      <span class="pill mono">[0..2] CRC</span>
+      <span class="pill mono">[3..7] Reserved</span>
+      <span class="pill mono">[8..15] DATA</span>
+      <span class="pill mono">[16..22] ADDRESS</span>
+      <span class="pill mono">[23] C</span>
+      <span class="pill mono">[24..31] Unused</span>
+    </footer>
+  </div>
 
 <script>
-// --- CRC‑3 (x^3 + x + 1), 3‑bit LFSR, seed 0b101 ---
-function crc3Step(reg, dinBit){
-  const b2 = (reg >>> 2) & 1;
-  const fb = (dinBit ^ b2) & 1; // taps at x^3 and input
-  const b1 = (reg >>> 1) & 1;
-  const b0 = reg & 1;
-  const n2 = b1;
-  const n1 = b0 ^ fb; // tap at x^1
-  const n0 = fb;      // tap at x^0
-  return ((n2 << 2) | (n1 << 1) | n0) & 0x7;
-}
-
-function crc3WordMSB(u32, init){
-  let reg = init;
-  for(let bit=31; bit>=0; --bit){
-    reg = crc3Step(reg, (u32>>>bit)&1);
+  // ------- Helpers -------
+  function parseNum(s){
+    if(typeof s !== 'string') return 0;
+    s = s.trim();
+    if(!s) return 0;
+    if(/^0x/i.test(s)) return Number.parseInt(s,16)>>>0;
+    if(/^0b/i.test(s)) return Number.parseInt(s.slice(2),2)>>>0;
+    return Number.parseInt(s,10)>>>0;
   }
-  return reg & 7;
-}
-  return reg & 7;
-}
-function crc3WordLSB(u32){
-  let reg = 0b101;
-  for(let bit=0; bit<32; ++bit){
-    reg = crc3Step(reg, (u32>>>bit)&1);
-  }
-  return reg & 7;
-}
-function crc3RangeMSB(u32, hi, lo, init){
-  let reg = init;
-  for(let bit=hi; bit>=lo; --bit){
-    reg = crc3Step(reg, (u32>>>bit)&1);
-  }
-  return reg & 7;
-}
+  function toHex32(x){return '0x'+(x>>>0).toString(16).padStart(8,'0').toUpperCase()}
+  function toBin32(x){return (x>>>0).toString(2).padStart(32,'0')}
 
-// --- helpers ---
-const id = s=>document.getElementById(s);
-function hex2(v,len){
-  return (v>>>0).toString(16).padStart(len,'0').toUpperCase();
-}
-function parseByte(el){
-  const t = el.value.trim();
-  if(!t) return null;
-  const n = parseInt(t,16);
-  return (Number.isFinite(n) && n>=0 && n<=255) ? n : null;
-}
-function parseU32(el){
-  const t = el.value.trim().replace(/^0x/i,'');
-  if(!t) return null;
-  const n = parseInt(t,16);
-  return (Number.isFinite(n) && n>=0 && n<=0xFFFFFFFF) ? n>>>0 : null;
-}
-
-function bytesToU32(b0,b1,b2,b3){
-  return ((b0<<24)>>>0) | (b1<<16) | (b2<<8) | b3;
-}
-
-function refresh(){
-  let b0=parseByte(id('b0')),
-      b1=parseByte(id('b1')),
-      b2=parseByte(id('b2')),
-      b3=parseByte(id('b3'));
-  let u32 = null;
-  if(b0!==null && b1!==null && b2!==null && b3!==null){
-    u32 = bytesToU32(b0,b1,b2,b3);
-    id('u32').placeholder = hex2(u32,8);
-  } else {
-    u32 = parseU32(id('u32'));
-    if(u32===null){
-      id('crcToAppend').textContent = '—';
-      ['fcrc2','fcrc1','fcrc0'].forEach(k=>id(k).textContent='—');
-      id('frameOK').textContent='—'; id('frameOK').classList.remove('ok','err');
-      id('checkRem').textContent='—';
-      id('bitStream').textContent='[31..3] data  |  [2..0] CRC';
-      return;
+  // ------- CRC engines -------
+  // Polynomial x^3 + x + 1  (binary 1011). Start value = 0b100
+  function crc3_lsb_first(frame_wo_crc){
+    let r2=1,r1=0,r0=0; // start 0b100
+    for(let i=3;i<=31;i++){
+      const bit=(frame_wo_crc>>>i)&1;
+      const fb = bit ^ r0;   // feedback
+      const nr0 = r1 ^ fb;   // tap at x^1
+      const nr1 = r2;
+      const nr2 = fb;        // tap at x^3
+      r0=nr0; r1=nr1; r2=nr2;
     }
-    b0 = (u32>>>24)&255; b1=(u32>>>16)&255; b2=(u32>>>8)&255; b3=u32&255;
+    return ((r2<<2)|(r1<<1)|r0) & 0x7;
+  }
+  // Optional MSB-first (for comparison/testing only)
+  function crc3_msb_first(frame_wo_crc){
+    let r2=1,r1=0,r0=0; // 0b100
+    for(let i=31;i>=3;i--){
+      const bit=(frame_wo_crc>>>i)&1;
+      const fb = bit ^ r2;   // when MSB-first, tap at highest reg bit
+      const nr2 = r1;
+      const nr1 = r0 ^ fb;   // tap at x^1
+      const nr0 = fb;        // tap at x^3
+      r0=nr0; r1=nr1; r2=nr2;
+    }
+    return ((r2<<2)|(r1<<1)|r0) & 0x7;
   }
 
-  const order = id('bitOrder').value; // used for preview only
-
-  // --- CRC over data‑only [31..3], MSB‑first as per TLE9180 timing ---
-  const initSel = id('initReg').value === '100' ? 0b100 : 0b101;
-  const crcData = crc3RangeMSB(u32,31,3, initSel);
-  id('crcToAppend').textContent = `${crcData} (0b${crcData.toString(2).padStart(3,'0')})`;
-
-  // Frame's CRC bits currently in the word
-  const fcrc = u32 & 0x7;
-  id('fcrc2').textContent = (fcrc>>>2)&1; id('fcrc1').textContent=(fcrc>>>1)&1; id('fcrc0').textContent=fcrc&1;
-
-  // Validity
-  const ok = (crcData === fcrc);
-  id('frameOK').textContent = ok ? 'VALID' : 'INVALID';
-  id('frameOK').classList.toggle('ok', ok);
-  id('frameOK').classList.toggle('err', !ok);
-
-  // Check remainder over full 32 bits (should be 0 for a correct frame)
-  const rem32 = crc3WordMSB(u32, initSel);
-  id('checkRem').textContent = `${rem32}`;
-
-  // Bit stream preview (wire order selectable for visualization only)
-  const seq = (order==='msb')
-    ? [...Array(32)].map((_,i)=> (u32>>> (31-i)) & 1 ).join('')
-    : [...Array(32)].map((_,i)=> (u32>>> i) & 1 ).join('');
-  const s = seq.slice(0,29) + ' | ' + seq.slice(29);
-  id('bitStream').textContent = s;
-}
-
-// Event wiring
-['b0','b1','b2','b3','u32','bitOrder'].forEach(k=>{
-  id(k).addEventListener('input', refresh);
-  id(k).addEventListener('change', refresh);
-});
-
-id('btnFill').addEventListener('click', ()=>{
-  const w = parseU32(id('u32')); if(w===null) return;
-  id('b0').value = hex2((w>>>24)&255,2);
-  id('b1').value = hex2((w>>>16)&255,2);
-  id('b2').value = hex2((w>>>8)&255,2);
-  id('b3').value = hex2(w&255,2);
-  refresh();
-});
-
-id('btnWord').addEventListener('click', ()=>{
-  const b0=parseByte(id('b0')), b1=parseByte(id('b1')), b2=parseByte(id('b2')), b3=parseByte(id('b3'));
-  if([b0,b1,b2,b3].some(v=>v===null)) return;
-  const w = bytesToU32(b0,b1,b2,b3);
-  id('u32').value = hex2(w,8);
-  refresh();
-});
-
-// Initial demo values
-id('b0').value='12'; id('b1').value='34'; id('b2').value='56'; id('b3').value='78';
-refresh();
-// --- TLE9180 frame builder helpers ---
-function sanitizeHex(el, max){
-  let t = el.value.trim();
-  if(t==='') return null;
-  t = t.replace(/^0x/i,'');
-  const n = parseInt(t,16);
-  if(!Number.isFinite(n)) return null;
-  return (n<0?0:n>max?max:n)|0;
-}
-function clamp01(el){
-  const t = el.value.trim();
-  if(t==='') return null;
-  const n = parseInt(t,10);
-  if(!Number.isFinite(n)) return null;
-  return n?1:0;
-}
-function packTLEFrame(){
-  const UNU = sanitizeHex(id('fldUNU'),0xFF) ?? 0;
-  const C   = clamp01(id('fldC')) ?? 0;
-  const ADDR= sanitizeHex(id('fldADDR'),0x7F) ?? 0;
-  const DATA= sanitizeHex(id('fldDATA'),0xFF) ?? 0;
-  const RSV = sanitizeHex(id('fldRSV'),0x1F) ?? 0; // 5 bits
-  // Assemble word with CRC cleared for now
-  let w = 0;
-  w |= (UNU & 0xFF) << 24;       // [31:24]
-  w |= (C & 0x1) << 23;          // [23]
-  w |= (ADDR & 0x7F) << 16;      // [22:16]
-  w |= (DATA & 0xFF) << 8;       // [15:8]
-  w |= (RSV & 0x1F) << 3;        // [7:3]
-  // Compute CRC over bits 31..3, MSB‑first on wire
-  let reg = 0b101;
-  for(let bit=31; bit>=3; --bit){
-    reg = crc3Step(reg, (w>>>bit)&1);
+  function buildFrame(data, addr, cbit){
+    let f=0>>>0;
+    f |= (data & 0xFF) << 8;     // DATA [8..15]
+    f |= (addr & 0x7F) << 16;    // ADDRESS [16..22]
+    f |= (cbit & 0x1) << 23;     // C [23]
+    return f>>>0; // CRC bits [0..2] left 0 for now
   }
-  const crc = reg & 7;
-  w = (w & ~0x7) | crc; // put CRC into [2:0]
-  // Populate the general calculator section
-  id('u32').value = hex2(w>>>0,8);
-  id('b0').value = hex2((w>>>24)&255,2);
-  id('b1').value = hex2((w>>>16)&255,2);
-  id('b2').value = hex2((w>>>8)&255,2);
-  id('b3').value = hex2(w&255,2);
-  id('bitOrder').value = 'msb';
-  refresh();
-}
 
-id('btnPackTLE').addEventListener('click', packTLEFrame);
-['initReg'].forEach(k=>{ id(k).addEventListener('change', refresh); });
+  function computeCRC(frame_wo_crc, order){
+    return order==='msb' ? crc3_msb_first(frame_wo_crc) : crc3_lsb_first(frame_wo_crc);
+  }
+
+  // ------- UI wiring -------
+  const inData = document.getElementById('inData');
+  const inAddr = document.getElementById('inAddr');
+  const inC    = document.getElementById('inC');
+  const inOrder= document.getElementById('inOrder');
+
+  const outCrc = document.getElementById('outCrc');
+  const outHex = document.getElementById('outHex');
+  const outBin = document.getElementById('outBin');
+  const fieldBar = document.getElementById('fieldBar');
+
+  const inFrameHex = document.getElementById('inFrameHex');
+  const rxCrcIn = document.getElementById('rxCrcIn');
+  const rxCrcCalc = document.getElementById('rxCrcCalc');
+  const rxStatus = document.getElementById('rxStatus');
+  const rxBin = document.getElementById('rxBin');
+
+  function renderFieldBar(frame){
+    fieldBar.innerHTML='';
+    // show first 24 bits compact (0..23) and then group remaining
+    for(let i=0;i<24;i++){
+      const val=(frame>>>i)&1; const el=document.createElement('div');
+      el.className='b small'; el.textContent=val; el.title='bit '+i;
+      if(i<=2) el.style.outline='1px solid #5b74ff'; // CRC
+      if(i>=3&&i<=7) el.style.outline='1px solid #4e5e9a'; // res
+      if(i>=8&&i<=15) el.style.outline='1px solid #6b8cff'; // data
+      if(i>=16&&i<=22) el.style.outline='1px solid #9bb0ff'; // addr
+      if(i===23) el.style.outline='1px solid #42d6a4'; // C
+      fieldBar.appendChild(el);
+    }
+    const more=document.createElement('div');
+    more.className='b'; more.textContent='[24..31]'; more.title='unused 8 bits';
+    fieldBar.appendChild(more);
+  }
+
+  function computeAndShow(){
+    const d=parseNum(inData.value)&0xFF;
+    const a=parseNum(inAddr.value)&0x7F;
+    const c=parseNum(inC.value)&1;
+    const order=inOrder.value;
+
+    let base=buildFrame(d,a,c); // CRC cleared
+    const crc=computeCRC(base, order);
+    const frame=(base | crc)>>>0;
+
+    outCrc.textContent=`bin ${crc.toString(2).padStart(3,'0')}  |  dec ${crc}  |  hex 0x${crc.toString(16).toUpperCase()}`;
+    outHex.textContent=toHex32(frame);
+    outBin.textContent=toBin32(frame);
+    renderFieldBar(frame);
+  }
+
+  function checkFrame(){
+    const x=parseNum(inFrameHex.value)>>>0;
+    if(!Number.isFinite(x)){return}
+    const crcIn = x & 0x7;
+    const withoutCrc = x & ~0x7;
+    const order=inOrder.value;
+    const crcCalc=computeCRC(withoutCrc, order);
+    rxCrcIn.textContent = '0b'+crcIn.toString(2).padStart(3,'0')+`  (dec ${crcIn})`;
+    rxCrcCalc.textContent='0b'+crcCalc.toString(2).padStart(3,'0')+`  (dec ${crcCalc})`;
+    const ok = (crcIn===crcCalc);
+    rxStatus.innerHTML = ok
+      ? `<span class="pill" style="border-color:#2f9d72;background:#0f2a23">OK ✓</span>`
+      : `<span class="pill" style="border-color:#a64545;background:#2a0f0f">CRC Mismatch ✗ — discard & retry</span>`;
+    rxBin.textContent = toBin32(x);
+  }
+
+  document.getElementById('btnBuild').addEventListener('click', computeAndShow);
+  document.getElementById('btnExample').addEventListener('click', ()=>{
+    inData.value='0x81'; inAddr.value='0x01'; inC.value='1'; inOrder.value='lsb'; computeAndShow();
+  });
+  document.getElementById('btnCheck').addEventListener('click', checkFrame);
+  document.getElementById('btnClear').addEventListener('click', ()=>{
+    inFrameHex.value=''; rxCrcIn.textContent='—'; rxCrcCalc.textContent='—'; rxStatus.textContent='—'; rxBin.textContent='—';
+  });
+
+  // initial compute (with defaults)
+  computeAndShow();
 </script>
 </body>
 </html>
