@@ -1,262 +1,220 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TLE9180 CRC3 Generator / Checker (32‑bit SPI)</title>
+  <title>TLE9180 CRC3 Calculator • 24‑bit SPI TX (bits 23..0)</title>
   <style>
-    :root{--bg:#0b1020;--panel:#121930;--ink:#e6ecff;--muted:#9fb0ff33;--accent:#7aa2ff;--good:#32d296;--bad:#ff6b6b}
+    :root{
+      --bg:#0b1020;--panel:#121a33;--muted:#93a4c5;--fg:#e7edff;--accent:#7aa2ff;--ok:#30d158;--bad:#ff453a;--chip:#1f2a4d;
+      --mono:"Fira Code",ui-monospace,Menlo,Consolas,monospace;--sans:Inter,system-ui,Segoe UI,Arial,sans-serif;
+    }
     *{box-sizing:border-box}
-    body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial;color:var(--ink);background:radial-gradient(1200px 600px at 80% -10%,#1a2350 0%,#0b1020 60%)}
-    .wrap{max-width:1000px;margin:32px auto;padding:0 16px}
-    h1{font-size:22px;margin:0 0 12px}
-    .card{background:linear-gradient(180deg,#121933 0%,#0f152b 100%);border:1px solid #2b3562;border-radius:16px;padding:16px;box-shadow:0 10px 30px #00000040}
-    .grid{display:grid;gap:14px}
-    @media(min-width:880px){.grid{grid-template-columns:1.2fr 1fr}}
-    label{display:block;font-size:12px;opacity:.85;margin-bottom:6px}
-    input[type="number"],input[type="text"],select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #35407a;background:#0b1230;color:var(--ink)}
-    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
-    .row>.col{grid-column:span 3}
-    .row>.col-2{grid-column:span 2}
-    .row>.col-4{grid-column:span 4}
-    .btn{cursor:pointer;user-select:none;display:inline-flex;gap:8px;align-items:center;padding:10px 14px;border-radius:10px;border:1px solid #3a4aa3;background:linear-gradient(180deg,#22306a,#1a2557);color:#e8eeff;font-weight:600}
-    .btn:active{transform:translateY(1px)}
-    .btn.alt{border-color:#36508c;background:linear-gradient(180deg,#18224d,#121a3a)}
-    .btn.good{border-color:#2b7a5e;background:linear-gradient(180deg,#23684e,#1a4f3b)}
-    .btn.bad{border-color:#8a2f2f;background:linear-gradient(180deg,#512020,#3a1717)}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #3a4aa3;background:#0c1540aa;font-variant-numeric:tabular-nums}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-    .muted{opacity:.8}
-    .hl{color:var(--accent)}
-    .out{display:grid;gap:8px}
-    .box{padding:10px 12px;border-radius:10px;border:1px dashed #36508c;background:#0b1230}
-    .bits{display:flex;flex-wrap:wrap;gap:6px}
-    .b{padding:6px 8px;border-radius:8px;border:1px solid #30408a;background:#10194a;min-width:34px;text-align:center}
-    .b.small{min-width:22px;padding:4px 6px}
-    .b.good{border-color:#2f9d72;background:#0f2a23}
-    .b.bad{border-color:#a64545;background:#2a0f0f}
-    .kv{display:grid;grid-template-columns:160px 1fr;gap:8px 12px;align-items:center}
-    footer{margin-top:18px;opacity:.75}
+    body{margin:0;background:linear-gradient(180deg,#0b1020,#0d1430 40%,#0b1020);color:var(--fg);font-family:var(--sans);}
+    header{padding:22px 16px 8px;text-align:center}
+    h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:13px;margin-top:6px}
+    main{max-width:1100px;margin:16px auto;padding:0 16px 40px;display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    .card{background:var(--panel);border:1px solid #1e2a4f;border-radius:14px;box-shadow:0 10px 30px #0006;}
+    .card h2{margin:0;padding:12px 14px;border-bottom:1px solid #1e2a4f;font-size:15px;font-weight:700;letter-spacing:.2px}
+    .content{padding:14px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    .row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    input,select,button,textarea{border-radius:10px;border:1px solid #2a3a6a;background:#0f1733;color:var(--fg);padding:10px;font-family:var(--mono);font-size:14px}
+    input::placeholder{color:#6f86bf}
+    button{cursor:pointer;background:linear-gradient(180deg,#273b74,#1e2e61);border:1px solid #2f4aa1}
+    button:hover{filter:brightness(1.05)}
+    .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+    .mono{font-family:var(--mono);font-size:13.5px}
+    .bits{display:flex;flex-wrap:wrap;gap:4px}
+    .bit{background:var(--chip);border:1px solid #2b3a6b;border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:70px}
+    .bit .t{font-size:11px;color:var(--muted)}
+    .bit .v{font-family:var(--mono);font-size:14px}
+    .out{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .k{color:var(--muted);font-size:12px}
+    .good{color:var(--ok)}
+    .bad{color:var(--bad)}
+    .small{font-size:12px;color:var(--muted)}
+    .tbl{width:100%;border-collapse:collapse}
+    .tbl th,.tbl td{border-bottom:1px solid #243465;padding:8px 6px;font-size:13px;text-align:left}
+    .tbl th{color:#c9d6ff;font-weight:600}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #2f4aa1;background:#0e1a3a;font-size:11px;color:#cfe0ff}
+    .footer{padding:8px 14px;color:var(--muted);font-size:12px}
+    @media (max-width:900px){main{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>TLE9180 CRC3 Generator / Checker (32‑bit SPI)</h1>
-    <p class="muted">Polynomial <span class="pill mono">x³ + x + 1</span> (binary <span class="mono">1011</span>), seed <span class="mono">'101'</span> → start value <span class="mono">0b100</span>. CRC is calculated over <strong>bits 3..31</strong> (CRC excluded), default <strong>LSB‑first</strong>.</p>
-
-    <div class="grid">
-      <!-- Left: Builder -->
-      <section class="card">
-        <h2 style="margin:0 0 10px">Build TX Frame & Compute CRC</h2>
-        <div class="row" style="margin-top:8px">
-          <div class="col-4">
-            <label>DATA (8‑bit, 0x00–0xFF)</label>
-            <input id="inData" type="text" placeholder="e.g. 0x81 or 129" value="0x81" />
-          </div>
-          <div class="col-4">
-            <label>ADDRESS (7‑bit, 0x00–0x7F)</label>
-            <input id="inAddr" type="text" placeholder="e.g. 0x01 or 1" value="0x01" />
-          </div>
-          <div class="col-2">
-            <label>Control C (bit)</label>
-            <select id="inC">
-              <option value="0">0 (Write)</option>
-              <option value="1" selected>1 (Read)</option>
-            </select>
-          </div>
-          <div class="col-2">
-            <label>Bit order</label>
-            <select id="inOrder">
-              <option value="lsb" selected>LSB‑first</option>
-              <option value="msb">MSB‑first</option>
-            </select>
-          </div>
+<header>
+  <h1>TLE9180 CRC3 Calculator</h1>
+  <div class="sub">24‑bit SPI TX frame • Compute CRC over bits <b>23..3</b> • Poly <span class="mono">x^3 + x + 1</span> • Seed “101” ⇒ start <span class="mono">100</span> • MSB‑first</div>
+</header>
+<main>
+  <section class="card">
+    <h2>Input</h2>
+    <div class="content">
+      <div class="row" style="margin-bottom:10px">
+        <div>
+          <label>CONTROL C (bit 23) — 0:Write, 1:Read</label>
+          <select id="c"><option value="0">0 (Write)</option><option value="1" selected>1 (Read)</option></select>
         </div>
-        <div style="display:flex;gap:10px;margin-top:12px">
-          <button class="btn" id="btnBuild">Compute & Build Frame</button>
-          <button class="btn alt" id="btnExample">Load Example</button>
+        <div>
+          <label>ADDRESS [22:16] (7‑bit, hex)</label>
+          <input id="addr" placeholder="01" value="01" />
         </div>
-        <div class="out" style="margin-top:14px">
-          <div class="kv">
-            <div>CRC3 result</div>
-            <div class="mono" id="outCrc">—</div>
-            <div>Frame (HEX)</div>
-            <div class="mono" id="outHex">—</div>
-            <div>Frame (BIN)</div>
-            <div class="box mono" id="outBin">—</div>
-          </div>
-          <div>
-            <div class="muted" style="margin:8px 0 6px">Bit fields (LSB on left, bit 0 first):</div>
-            <div class="bits" id="fieldBar"></div>
-          </div>
+        <div>
+          <label>DATA [15:8] (8‑bit, hex)</label>
+          <input id="data" placeholder="81" value="81" />
         </div>
-      </section>
-
-      <!-- Right: Checker -->
-      <section class="card">
-        <h2 style="margin:0 0 10px">Check RX Frame</h2>
-        <label>Paste full 32‑bit frame (hex like <span class="mono">0xAABBCCDD</span> or decimal)</label>
-        <input id="inFrameHex" type="text" placeholder="0xAABBCCDD" />
-        <div style="display:flex;gap:10px;margin-top:12px">
-          <button class="btn" id="btnCheck">Check CRC</button>
-          <button class="btn alt" id="btnClear">Clear</button>
+      </div>
+      <div class="btn-row" style="margin-bottom:12px">
+        <button id="compute">Compute CRC</button>
+        <button id="clear">Clear</button>
+        <span class="pill">Reserved [7..3] = 0</span>
+        <span class="pill">CRC field [2..0] excluded from calculation</span>
+      </div>
+      <div class="bits" id="bits"></div>
+      <div class="out" style="margin-top:12px">
+        <div>
+          <div class="k">CRC (MSB‑first over 23..3)</div>
+          <div class="mono" id="crcHex">0x?</div>
+          <div class="small" id="crcBin">(bin)</div>
         </div>
-        <div class="out" style="margin-top:14px">
-          <div class="kv">
-            <div>CRC (in frame)</div>
-            <div class="mono" id="rxCrcIn">—</div>
-            <div>CRC (recomputed)</div>
-            <div class="mono" id="rxCrcCalc">—</div>
-            <div>Status</div>
-            <div id="rxStatus">—</div>
-          </div>
-          <div class="box mono" id="rxBin">—</div>
+        <div>
+          <div class="k">Packed 24‑bit word (CRC inserted)</div>
+          <div class="mono" id="wordHex">0x????????</div>
+          <div class="small" id="wordBin">(bin)</div>
         </div>
-      </section>
+      </div>
     </div>
+    <div class="footer">Tip: Type hex without 0x. Values clamp to valid bit‑widths.</div>
+  </section>
 
-    <footer>
-      <span class="muted">Layout (LSB→MSB):</span>
-      <span class="pill mono">[0..2] CRC</span>
-      <span class="pill mono">[3..7] Reserved</span>
-      <span class="pill mono">[8..15] DATA</span>
-      <span class="pill mono">[16..22] ADDRESS</span>
-      <span class="pill mono">[23] C</span>
-      <span class="pill mono">[24..31] Unused</span>
-    </footer>
-  </div>
+  <section class="card">
+    <h2>Verify against your table</h2>
+    <div class="content">
+      <div class="btn-row" style="margin-bottom:8px">
+        <button id="runTable">Run test on all entries</button>
+      </div>
+      <table class="tbl" id="resultTable">
+        <thead>
+          <tr><th>#</th><th>C</th><th>ADDR</th><th>DATA</th><th>Given CRC</th><th>Computed</th><th>Match</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
 
 <script>
-  // ------- Helpers -------
-  function parseNum(s){
-    if(typeof s !== 'string') return 0;
-    s = s.trim();
-    if(!s) return 0;
-    if(/^0x/i.test(s)) return Number.parseInt(s,16)>>>0;
-    if(/^0b/i.test(s)) return Number.parseInt(s.slice(2),2)>>>0;
-    return Number.parseInt(s,10)>>>0;
-  }
-  function toHex32(x){return '0x'+(x>>>0).toString(16).padStart(8,'0').toUpperCase()}
-  function toBin32(x){return (x>>>0).toString(2).padStart(32,'0')}
-
-  // ------- CRC engines -------
-  // Polynomial x^3 + x + 1  (binary 1011). Start value = 0b100
-  function crc3_lsb_first(frame_wo_crc){
-    let r2=1,r1=0,r0=0; // start 0b100
-    for(let i=3;i<=31;i++){
-      const bit=(frame_wo_crc>>>i)&1;
-      const fb = bit ^ r0;   // feedback
-      const nr0 = r1 ^ fb;   // tap at x^1
-      const nr1 = r2;
-      const nr2 = fb;        // tap at x^3
-      r0=nr0; r1=nr1; r2=nr2;
+  // --- CRC3: polynomial x^3 + x + 1 ; seed "101" => start value 0b100 ; MSB-first over bits 23..3
+  function crc3_tle9180(frame_wo_crc24){
+    let lfsr = 0b100; // start value
+    for(let i=23;i>=3;--i){
+      const bit = (frame_wo_crc24 >>> i) & 1;
+      const fb = bit ^ ((lfsr >>> 2) & 1); // xor with MSB tap (x^3)
+      const b2 = (lfsr >>> 1) & 1;
+      const b1 = (lfsr & 1) ^ fb; // tap at x^1
+      const b0 = fb;              // tap at x^0
+      lfsr = (b2<<2) | (b1<<1) | b0;
     }
-    return ((r2<<2)|(r1<<1)|r0) & 0x7;
-  }
-  // Optional MSB-first (for comparison/testing only)
-  function crc3_msb_first(frame_wo_crc){
-    let r2=1,r1=0,r0=0; // 0b100
-    for(let i=31;i>=3;i--){
-      const bit=(frame_wo_crc>>>i)&1;
-      const fb = bit ^ r2;   // when MSB-first, tap at highest reg bit
-      const nr2 = r1;
-      const nr1 = r0 ^ fb;   // tap at x^1
-      const nr0 = fb;        // tap at x^3
-      r0=nr0; r1=nr1; r2=nr2;
-    }
-    return ((r2<<2)|(r1<<1)|r0) & 0x7;
+    return lfsr & 0x7;
   }
 
-  function buildFrame(data, addr, cbit){
-    let f=0>>>0;
-    f |= (data & 0xFF) << 8;     // DATA [8..15]
-    f |= (addr & 0x7F) << 16;    // ADDRESS [16..22]
-    f |= (cbit & 0x1) << 23;     // C [23]
-    return f>>>0; // CRC bits [0..2] left 0 for now
+  function pack24_wo_crc(c, addr, data){
+    c    &= 0x1;
+    addr &= 0x7F;
+    data &= 0xFF;
+    return (c<<23) | (addr<<16) | (data<<8); // [7..3]=0, [2..0]=CRC
   }
 
-  function computeCRC(frame_wo_crc, order){
-    return order==='msb' ? crc3_msb_first(frame_wo_crc) : crc3_lsb_first(frame_wo_crc);
+  function toHex(v, width=2){
+    return '0x'+(v>>>0).toString(16).toUpperCase().padStart(width,'0');
+  }
+  function toBin(v, width){
+    return (v>>>0).toString(2).padStart(width,'0');
   }
 
-  // ------- UI wiring -------
-  const inData = document.getElementById('inData');
-  const inAddr = document.getElementById('inAddr');
-  const inC    = document.getElementById('inC');
-  const inOrder= document.getElementById('inOrder');
-
-  const outCrc = document.getElementById('outCrc');
-  const outHex = document.getElementById('outHex');
-  const outBin = document.getElementById('outBin');
-  const fieldBar = document.getElementById('fieldBar');
-
-  const inFrameHex = document.getElementById('inFrameHex');
-  const rxCrcIn = document.getElementById('rxCrcIn');
-  const rxCrcCalc = document.getElementById('rxCrcCalc');
-  const rxStatus = document.getElementById('rxStatus');
-  const rxBin = document.getElementById('rxBin');
-
-  function renderFieldBar(frame){
-    fieldBar.innerHTML='';
-    // show first 24 bits compact (0..23) and then group remaining
-    for(let i=0;i<24;i++){
-      const val=(frame>>>i)&1; const el=document.createElement('div');
-      el.className='b small'; el.textContent=val; el.title='bit '+i;
-      if(i<=2) el.style.outline='1px solid #5b74ff'; // CRC
-      if(i>=3&&i<=7) el.style.outline='1px solid #4e5e9a'; // res
-      if(i>=8&&i<=15) el.style.outline='1px solid #6b8cff'; // data
-      if(i>=16&&i<=22) el.style.outline='1px solid #9bb0ff'; // addr
-      if(i===23) el.style.outline='1px solid #42d6a4'; // C
-      fieldBar.appendChild(el);
-    }
-    const more=document.createElement('div');
-    more.className='b'; more.textContent='[24..31]'; more.title='unused 8 bits';
-    fieldBar.appendChild(more);
+  function renderBits(c, addr, data, crc){
+    const el = document.getElementById('bits');
+    const pieces = [
+      {t:'C [23]', v: c & 1},
+      {t:'ADDR [22:16]', v: toHex(addr,2)+` ("${toBin(addr,7)}")`},
+      {t:'DATA [15:8]', v: toHex(data,2)+` ("${toBin(data,8)}")`},
+      {t:'RES [7:3]', v: toBin(0,5)},
+      {t:'CRC [2:0]', v: toBin(crc,3)}
+    ];
+    el.innerHTML = pieces.map(p=>`<div class="bit"><div class="t">${p.t}</div><div class="v">${p.v}</div></div>`).join('');
   }
 
-  function computeAndShow(){
-    const d=parseNum(inData.value)&0xFF;
-    const a=parseNum(inAddr.value)&0x7F;
-    const c=parseNum(inC.value)&1;
-    const order=inOrder.value;
+  function computeOnce(){
+    let c = parseInt(document.getElementById('c').value,10) || 0;
+    let addr = parseInt(document.getElementById('addr').value || '0', 16) || 0;
+    let data = parseInt(document.getElementById('data').value || '0', 16) || 0;
 
-    let base=buildFrame(d,a,c); // CRC cleared
-    const crc=computeCRC(base, order);
-    const frame=(base | crc)>>>0;
+    const base = pack24_wo_crc(c, addr, data);
+    const crc = crc3_tle9180(base);
+    const word = base | crc; // insert CRC into [2:0]
 
-    outCrc.textContent=`bin ${crc.toString(2).padStart(3,'0')}  |  dec ${crc}  |  hex 0x${crc.toString(16).toUpperCase()}`;
-    outHex.textContent=toHex32(frame);
-    outBin.textContent=toBin32(frame);
-    renderFieldBar(frame);
+    renderBits(c, addr, data, crc);
+
+    document.getElementById('crcHex').textContent = toHex(crc,1);
+    document.getElementById('crcBin').textContent = toBin(crc,3);
+
+    document.getElementById('wordHex').textContent = toHex(word,6);
+    document.getElementById('wordBin').textContent = toBin(word,24).replace(/(.{4})/g,'$1 ').trim();
   }
 
-  function checkFrame(){
-    const x=parseNum(inFrameHex.value)>>>0;
-    if(!Number.isFinite(x)){return}
-    const crcIn = x & 0x7;
-    const withoutCrc = x & ~0x7;
-    const order=inOrder.value;
-    const crcCalc=computeCRC(withoutCrc, order);
-    rxCrcIn.textContent = '0b'+crcIn.toString(2).padStart(3,'0')+`  (dec ${crcIn})`;
-    rxCrcCalc.textContent='0b'+crcCalc.toString(2).padStart(3,'0')+`  (dec ${crcCalc})`;
-    const ok = (crcIn===crcCalc);
-    rxStatus.innerHTML = ok
-      ? `<span class="pill" style="border-color:#2f9d72;background:#0f2a23">OK ✓</span>`
-      : `<span class="pill" style="border-color:#a64545;background:#2a0f0f">CRC Mismatch ✗ — discard & retry</span>`;
-    rxBin.textContent = toBin32(x);
-  }
-
-  document.getElementById('btnBuild').addEventListener('click', computeAndShow);
-  document.getElementById('btnExample').addEventListener('click', ()=>{
-    inData.value='0x81'; inAddr.value='0x01'; inC.value='1'; inOrder.value='lsb'; computeAndShow();
-  });
-  document.getElementById('btnCheck').addEventListener('click', checkFrame);
-  document.getElementById('btnClear').addEventListener('click', ()=>{
-    inFrameHex.value=''; rxCrcIn.textContent='—'; rxCrcCalc.textContent='—'; rxStatus.textContent='—'; rxBin.textContent='—';
+  document.getElementById('compute').addEventListener('click', computeOnce);
+  document.getElementById('clear').addEventListener('click', ()=>{
+    document.getElementById('c').value = '1';
+    document.getElementById('addr').value = '';
+    document.getElementById('data').value = '';
+    document.getElementById('bits').innerHTML = '';
+    document.getElementById('crcHex').textContent = '0x?';
+    document.getElementById('crcBin').textContent = '(bin)';
+    document.getElementById('wordHex').textContent = '0x????????';
+    document.getElementById('wordBin').textContent = '(bin)';
   });
 
-  // initial compute (with defaults)
-  computeAndShow();
+  // ---- Verification against the provided table ----
+  const table = [
+    {C:1, A:0x01, D:0x81, CRC:0x4},
+    {C:1, A:0x02, D:0x0F, CRC:0x0},
+    {C:1, A:0x06, D:0x70, CRC:0x6},
+    {C:1, A:0x07, D:0x9A, CRC:0x6},
+    {C:1, A:0x08, D:0x32, CRC:0x1},
+    {C:1, A:0x0A, D:0x2A, CRC:0x3},
+    {C:1, A:0x0B, D:0x4A, CRC:0x3},
+    {C:1, A:0x13, D:0x2A, CRC:0x5},
+    {C:1, A:0x00, D:0xAC, CRC:0x2},
+    {C:1, A:0x20, D:0x44, CRC:0x3},
+    {C:1, A:0x21, D:0x44, CRC:0x7},
+    {C:1, A:0x22, D:0x44, CRC:0x0},
+    {C:1, A:0x23, D:0x9F, CRC:0x0}
+  ];
+
+  document.getElementById('runTable').addEventListener('click', ()=>{
+    const tbody = document.querySelector('#resultTable tbody');
+    tbody.innerHTML='';
+    table.forEach((e,idx)=>{
+      const base = pack24_wo_crc(e.C, e.A, e.D);
+      const crc = crc3_tle9180(base);
+      const ok = (crc & 7) === (e.CRC & 7);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${idx}</td>
+        <td>${e.C}</td>
+        <td>0x${e.A.toString(16).toUpperCase().padStart(2,'0')}</td>
+        <td>0x${e.D.toString(16).toUpperCase().padStart(2,'0')}</td>
+        <td>0x${(e.CRC&7).toString(16).toUpperCase()}</td>
+        <td>0x${crc.toString(16).toUpperCase()}</td>
+        <td class="${ok?'good':'bad'}">${ok?'PASS':'FAIL'}</td>`;
+      tbody.appendChild(tr);
+    });
+  });
+
+  // Auto-compute once on load for the default values
+  computeOnce();
 </script>
 </body>
 </html>
