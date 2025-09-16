@@ -70,8 +70,15 @@
     <div class="row-2">
       <select id="bitOrder">
         <option value="msb">MSB‑first (bit 31 → 0)</option>
-        <option value="lsb">LSB‑first (bit 0 → 31)</option>
       </select>
+      <div>
+        <label class="mono">Initial register (after reset)</label>
+        <select id="initReg">
+          <option value="100" selected>0b100 (datasheet note)</option>
+          <option value="101">0b101 (direct seed)</option>
+        </select>
+      </div>
+    </div>
       <div>
         <label class="mono">Seed</label>
         <input type="text" value="0b101 (fixed)" readonly>
@@ -151,11 +158,13 @@ function crc3Step(reg, dinBit){
   return ((n2 << 2) | (n1 << 1) | n0) & 0x7;
 }
 
-function crc3WordMSB(u32){
-  let reg = 0b101;
+function crc3WordMSB(u32, init){
+  let reg = init;
   for(let bit=31; bit>=0; --bit){
     reg = crc3Step(reg, (u32>>>bit)&1);
   }
+  return reg & 7;
+}
   return reg & 7;
 }
 function crc3WordLSB(u32){
@@ -165,8 +174,8 @@ function crc3WordLSB(u32){
   }
   return reg & 7;
 }
-function crc3RangeMSB(u32, hi, lo){
-  let reg = 0b101;
+function crc3RangeMSB(u32, hi, lo, init){
+  let reg = init;
   for(let bit=hi; bit>=lo; --bit){
     reg = crc3Step(reg, (u32>>>bit)&1);
   }
@@ -220,7 +229,8 @@ function refresh(){
   const order = id('bitOrder').value; // used for preview only
 
   // --- CRC over data‑only [31..3], MSB‑first as per TLE9180 timing ---
-  const crcData = crc3RangeMSB(u32,31,3);
+  const initSel = id('initReg').value === '100' ? 0b100 : 0b101;
+  const crcData = crc3RangeMSB(u32,31,3, initSel);
   id('crcToAppend').textContent = `${crcData} (0b${crcData.toString(2).padStart(3,'0')})`;
 
   // Frame's CRC bits currently in the word
@@ -234,7 +244,7 @@ function refresh(){
   id('frameOK').classList.toggle('err', !ok);
 
   // Check remainder over full 32 bits (should be 0 for a correct frame)
-  const rem32 = crc3WordMSB(u32);
+  const rem32 = crc3WordMSB(u32, initSel);
   id('checkRem').textContent = `${rem32}`;
 
   // Bit stream preview (wire order selectable for visualization only)
@@ -318,6 +328,7 @@ function packTLEFrame(){
 }
 
 id('btnPackTLE').addEventListener('click', packTLEFrame);
+['initReg'].forEach(k=>{ id(k).addEventListener('change', refresh); });
 </script>
 </body>
 </html>
