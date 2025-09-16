@@ -116,14 +116,20 @@
   <section class="card">
     <label>Result</label>
     <div class="kvs mono">
-      <div>CRC‑3 value</div>
-      <div><span id="crcVal">—</span> <span class="hint">(0..7)</span></div>
-      <div>CRC bits (b2 b1 b0)</div>
-      <div class="bits"><span class="pill" id="b2">—</span><span class="pill" id="b1">—</span><span class="pill" id="b0">—</span></div>
-      <div>TX helper byte</div>
-      <div><span id="crcByte">0x00</span> <span class="hint">CRC left‑aligned in bits 7..5</span></div>
-      <div>Concatenated bit stream</div>
-      <div id="bitStream" class="hint">(data 32 bits) + (CRC 3 bits)</div>
+      <div>CRC to append (computed over bits [31..3], MSB‑first)</div>
+      <div><span id="crcToAppend">—</span> <span class="hint">put this into [2:0]</span></div>
+
+      <div>Frame's lower 3 bits [2:0]</div>
+      <div class="bits"><span class="pill" id="fcrc2">—</span><span class="pill" id="fcrc1">—</span><span class="pill" id="fcrc0">—</span></div>
+
+      <div>Frame validity (compare computed vs. [2:0])</div>
+      <div id="frameOK" class="pill">—</div>
+
+      <div>Check remainder over full 32 bits</div>
+      <div><span id="checkRem">—</span> <span class="hint">For a correct frame this becomes 0 (with this seed).</span></div>
+
+      <div>Bit stream preview (split at CRC)</div>
+      <div id="bitStream" class="hint">[31..3] data  |  [2..0] CRC</div>
     </div>
   </section>
 
@@ -159,6 +165,13 @@ function crc3WordLSB(u32){
   }
   return reg & 7;
 }
+function crc3RangeMSB(u32, hi, lo){
+  let reg = 0b101;
+  for(let bit=hi; bit>=lo; --bit){
+    reg = crc3Step(reg, (u32>>>bit)&1);
+  }
+  return reg & 7;
+}
 
 // --- helpers ---
 const id = s=>document.getElementById(s);
@@ -183,7 +196,6 @@ function bytesToU32(b0,b1,b2,b3){
 }
 
 function refresh(){
-  // Prefer 4 bytes; fall back to word if bytes missing
   let b0=parseByte(id('b0')),
       b1=parseByte(id('b1')),
       b2=parseByte(id('b2')),
@@ -195,28 +207,42 @@ function refresh(){
   } else {
     u32 = parseU32(id('u32'));
     if(u32===null){
-      id('crcVal').textContent = '—';
-      id('b2').textContent = id('b1').textContent = id('b0').textContent = '—';
-      id('crcByte').textContent = '0x00';
-      id('bitStream').textContent = '(data 32 bits) + (CRC 3 bits)';
+      id('crcToAppend').textContent = '—';
+      ['fcrc2','fcrc1','fcrc0'].forEach(k=>id(k).textContent='—');
+      id('frameOK').textContent='—'; id('frameOK').classList.remove('ok','err');
+      id('checkRem').textContent='—';
+      id('bitStream').textContent='[31..3] data  |  [2..0] CRC';
       return;
     }
-    // Split word into bytes for display hints
     b0 = (u32>>>24)&255; b1=(u32>>>16)&255; b2=(u32>>>8)&255; b3=u32&255;
   }
 
-  const order = id('bitOrder').value;
-  const crc = (order==='msb') ? crc3WordMSB(u32) : crc3WordLSB(u32);
-  id('crcVal').textContent = crc + ' (0b' + ((crc>>>0).toString(2).padStart(3,'0')) + ')';
-  id('b2').textContent = (crc>>>2)&1; id('b1').textContent = (crc>>>1)&1; id('b0').textContent = crc&1;
-  id('crcByte').textContent = '0x' + hex2((crc<<5)&0xE0,2);
+  const order = id('bitOrder').value; // used for preview only
 
-  // Bit stream preview (compact)
-  const dataBits = (order==='msb')
+  // --- CRC over data‑only [31..3], MSB‑first as per TLE9180 timing ---
+  const crcData = crc3RangeMSB(u32,31,3);
+  id('crcToAppend').textContent = `${crcData} (0b${crcData.toString(2).padStart(3,'0')})`;
+
+  // Frame's CRC bits currently in the word
+  const fcrc = u32 & 0x7;
+  id('fcrc2').textContent = (fcrc>>>2)&1; id('fcrc1').textContent=(fcrc>>>1)&1; id('fcrc0').textContent=fcrc&1;
+
+  // Validity
+  const ok = (crcData === fcrc);
+  id('frameOK').textContent = ok ? 'VALID' : 'INVALID';
+  id('frameOK').classList.toggle('ok', ok);
+  id('frameOK').classList.toggle('err', !ok);
+
+  // Check remainder over full 32 bits (should be 0 for a correct frame)
+  const rem32 = crc3WordMSB(u32);
+  id('checkRem').textContent = `${rem32}`;
+
+  // Bit stream preview (wire order selectable for visualization only)
+  const seq = (order==='msb')
     ? [...Array(32)].map((_,i)=> (u32>>> (31-i)) & 1 ).join('')
     : [...Array(32)].map((_,i)=> (u32>>> i) & 1 ).join('');
-  const crcBits = ((crc>>>2)&1)+''+((crc>>>1)&1)+''+(crc&1);
-  id('bitStream').textContent = dataBits + '  |  ' + crcBits;
+  const s = seq.slice(0,29) + ' | ' + seq.slice(29);
+  id('bitStream').textContent = s;
 }
 
 // Event wiring
