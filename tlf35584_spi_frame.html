@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SPI Frame Builder — CMD / ADDR / DATA / Parity</title>
+  <title>TLF35584 SPI Frame Builder — CMD / ADDR / DATA / Parity</title>
   <style>
     :root {
       --bg: #0b0f14; --card: #121820; --ink: #e6edf3; --muted:#9fb0c0; --accent:#6aa2ff; --ok:#3bd671;
@@ -53,8 +53,8 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>SPI Frame Builder</h1>
-    <div class="sub">Interactive single‑word (16‑bit) frame with <b>CMD</b> (1b), <b>ADDR</b> (6b), <b>DATA</b> (8b), and <b>PARITY</b> (1b at LSB). Visualize bits and copy HEX/BIN quickly.</div>
+    <h1>TLF35584 SPI Frame Builder</h1>
+    <div class="sub">Interactive 16‑bit frame for <b>TLF35584</b> with <b>CMD</b> (1b), <b>ADDR</b> (6b, hex), <b>DATA</b> (8b, hex), and <b>PARITY</b> (LSB). Switch between Write and Read‑response parity models.</div>
 
     <div class="panel" id="app">
       <div class="row" style="margin-bottom:12px">
@@ -74,15 +74,15 @@
         </div>
 
         <div class="field" style="grid-column: span 3">
-          <label id="addrLbl">ADDR (6 bits)</label>
-          <input id="addr" type="number" min="0" max="63" step="1" value="0" />
-          <div class="help">0 – 63 (A5 is MSB).</div>
+          <label id="addrLbl">ADDR (6 bits, hex)</label>
+          <input id="addr" type="text" inputmode="latin" spellcheck="false" placeholder="0x00" value="0x00" />
+          <div class="help">0x00 – 0x3F (A5 is MSB). You can enter with or without <code>0x</code>.</div>
         </div>
 
         <div class="field" style="grid-column: span 3">
-          <label id="dataLbl">DATA (8 bits)</label>
-          <input id="data" type="number" min="0" max="255" step="1" value="0" />
-          <div class="help">0 – 255 (D7 is MSB).</div>
+          <label id="dataLbl">DATA (8 bits, hex)</label>
+          <input id="data" type="text" inputmode="latin" spellcheck="false" placeholder="0x00" value="0x00" />
+          <div class="help">0x00 – 0xFF (D7 is MSB). Hex input accepted with or without <code>0x</code>.</div>
         </div>
 
         <div class="field" style="grid-column: span 3">
@@ -131,9 +131,13 @@
     const el = (id)=>document.getElementById(id);
     const bitsEl = el('bits');
 
-    function ones(n){
-      // count bits without using popcount (portable)
-      let c=0; while(n){ c += n & 1; n >>>= 1; } return c;
+    function parseHex(s, mask){
+      if(typeof s !== 'string') return 0;
+      const trimmed = s.trim();
+      const m = /^0x([0-9a-f]+)$/i.exec(trimmed) || /^([0-9a-f]+)$/i.exec(trimmed);
+      if(!m) return 0;
+      const v = parseInt(m[1], 16);
+      return v & mask;
     }
 
     function computeParity({mode, cmd, addr, data, status, ptype}){
@@ -178,14 +182,25 @@
     function update(){
       const mode = document.querySelector('input[name="mode"]:checked').value;
       const cmd = parseInt(el('cmd').value,10)|0;
-      const addr = parseInt(el('addr').value,10)|0;
-      const data = parseInt(el('data').value,10)|0;
+      const addr = parseHex(el('addr').value, 0x3F);
+      const data = parseHex(el('data').value, 0xFF);
       const status = parseInt(el('status').value,10)|0;
       const ptype = el('ptype').value;
 
       el('statusBox').hidden = (mode!== 'read');
 
       const {p, desc} = computeParity({mode, cmd, addr, data, status, ptype});
+      const word = wordFrom({cmd, addr, data, p});
+
+      renderBits(word);
+      el('hex').textContent = '0x' + word.toString(16).toUpperCase().padStart(4,'0');
+      el('bin').textContent = fmtBin16(word);
+      el('pdesc').textContent = `P=${p}  ·  ${desc}`;
+
+      // Normalize field display to uppercase hex
+      el('addr').value = '0x' + (addr & 0x3F).toString(16).toUpperCase().padStart(2,'0');
+      el('data').value = '0x' + (data & 0xFF).toString(16).toUpperCase().padStart(2,'0');
+    } = computeParity({mode, cmd, addr, data, status, ptype});
       const word = wordFrom({cmd, addr, data, p});
 
       renderBits(word);
