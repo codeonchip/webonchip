@@ -12,7 +12,6 @@
   button { margin-top: 15px; padding: 5px 12px; }
   pre { background: #fff; padding: 10px; border-radius: 6px; margin-top: 20px; border: 1px solid #ccc; }
   .bit { display: inline-block; width: 28px; text-align: center; border: 1px solid #999; margin: 1px; border-radius: 4px; }
-  .label { font-weight: bold; }
 </style>
 </head>
 <body>
@@ -41,25 +40,29 @@
 
     function buildFrame() {
       const cmd = parseInt(document.getElementById("cmd").value) & 0x1;
-      const addr = parseInt(document.getElementById("addr").value, 16) & 0x3F;
-      const data = parseInt(document.getElementById("data").value, 16) & 0xFF;
+      const addrHex = document.getElementById("addr").value;
+      const addr = parseInt(addrHex, 16) & 0x3F;
+      const dataHex = document.getElementById("data").value;
+      const data = parseInt(dataHex, 16) & 0xFF;
 
       const frame = (cmd << 14) | (addr << 8) | data;
-      const parity = evenParity(frame, 15);  // parity over CMD+ADDR+DATA bits
+      const parity = evenParity(frame, 15);
       const fullFrame = (frame << 1) | parity;
 
       const bin = fullFrame.toString(2).padStart(16, "0");
       const hex = "0x" + fullFrame.toString(16).toUpperCase().padStart(4, "0");
 
-      let bitsHTML = "";
       const labels = ["CMD","A5","A4","A3","A2","A1","A0","D7","D6","D5","D4","D3","D2","D1","D0","P"];
-      for (let i = 0; i < 16; i++) {
-        bitsHTML += `<span class="bit">${bin[i]}</span>`;
-      }
 
-      document.getElementById("output").innerHTML =
-        `Binary: ${bin}\nHex: ${hex}\n\nBits:\n` +
-        labels.map((l, i) => `${l.padEnd(3)}: ${bin[i]}`).join("  ");
+      let info = "";
+      info += `CMD: ${cmd} (${cmd === 0 ? "Read" : "Write"})\n`;
+      info += `Address: 0x${addrHex.toUpperCase()} (${addr} decimal)\n`;
+      info += `Data: 0x${dataHex.toUpperCase()} (${data} decimal)\n`;
+      info += `Parity: ${parity} (even parity)\n\n`;
+      info += `Binary Frame: ${bin}\nHex Frame: ${hex}\n\n`;
+      info += "Bits:\n" + labels.map((l, i) => `${l.padEnd(3)}: ${bin[i]}`).join("  ");
+
+      document.getElementById("output").textContent = info;
     }
   </script>
 </body>
