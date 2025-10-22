@@ -196,6 +196,19 @@
       el('hex').textContent = '0x' + word.toString(16).toUpperCase().padStart(4,'0');
       el('bin').textContent = fmtBin16(word);
       el('pdesc').textContent = `P=${p}  ·  ${desc}`;
+    }
+
+    function formatHexField(id, mask, digits){
+      const v = parseHex(el(id).value, mask);
+      el(id).value = '0x' + (v & mask).toString(16).toUpperCase().padStart(digits,'0');
+      update();
+    } = computeParity({mode, cmd, addr, data, status, ptype});
+      const word = wordFrom({cmd, addr, data, p});
+
+      renderBits(word);
+      el('hex').textContent = '0x' + word.toString(16).toUpperCase().padStart(4,'0');
+      el('bin').textContent = fmtBin16(word);
+      el('pdesc').textContent = `P=${p}  ·  ${desc}`;
 
       // Normalize field display to uppercase hex
       el('addr').value = '0x' + (addr & 0x3F).toString(16).toUpperCase().padStart(2,'0');
@@ -211,10 +224,15 @@
 
     // Wire events
     ['cmd','addr','data','status','ptype'].forEach(id=>{
-      el(id).addEventListener('input', update);
+      const ev = (id==='addr' || id==='data') ? 'input' : 'input';
+      el(id).addEventListener(ev, update);
       el(id).addEventListener('change', update);
     });
     document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener('change', update));
+
+    // Normalize hex on blur so we don't fight the user's typing
+    el('addr').addEventListener('blur', ()=>formatHexField('addr', 0x3F, 2));
+    el('data').addEventListener('blur', ()=>formatHexField('data', 0xFF, 2));
 
     // Copy helpers
     function copyText(t){ navigator.clipboard?.writeText(t).then(()=>{}); }
