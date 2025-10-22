@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SPI Frame Builder — CMD / ADDR / DATA / Parity</title>
+  <style>
+    :root {
+      --bg: #0b0f14; --card: #121820; --ink: #e6edf3; --muted:#9fb0c0; --accent:#6aa2ff; --ok:#3bd671;
+      --grid:#1e2732; --chip:#1a2330; --badge:#243246; --edge:#10161e;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; background: var(--bg); color: var(--ink); }
+    .wrap { max-width: 1100px; margin: 32px auto 120px; padding: 0 20px; }
+    h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.2px; margin: 0 0 14px; }
+    .sub { color: var(--muted); margin-bottom: 16px; }
+
+    .panel { background: linear-gradient(180deg, var(--card), var(--edge)); border: 1px solid #1a2430; border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+
+    .field { background: var(--chip); border: 1px solid #233041; border-radius: 12px; padding: 12px; }
+    .field label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+    .field input[type="number"], .field input[type="text"], .field select { width: 100%; background:#0f141c; color: var(--ink); border: 1px solid #2a3a4e; border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .radio { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: #0f1620; border: 1px solid #233041; color: var(--ink); cursor: pointer; }
+    .radio input { accent-color: var(--accent); }
+
+    .bits { display: grid; grid-template-columns: repeat(16, minmax(36px, 1fr)); gap: 6px; margin-top: 14px; }
+    .bit { background: var(--badge); border: 1px solid #2b3a50; border-radius: 10px; padding: 8px 4px; text-align: center; position: relative; }
+    .bit .v { font-weight: 700; font-feature-settings: "tnum" 1; }
+    .bit .t { position: absolute; bottom: 6px; left: 0; right: 0; font-size: 10px; color: var(--muted); }
+    .bit.parity { outline: 2px dashed var(--accent); outline-offset: 2px; }
+    .bit.cmd { background: #23344a; }
+    .kvs { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; }
+
+    .out { background: var(--chip); border:1px solid #233041; border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
+    code { background:#0f141c; border: 1px solid #2a3a4e; padding: 6px 10px; border-radius: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; }
+
+    button { appearance: none; background: var(--accent); color:#071019; border: none; border-radius: 10px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+    button.ghost { background: #1b2433; color: var(--ink); border: 1px solid #2c3b51; }
+    .tag { font-size: 12px; color: var(--muted); }
+    .ok { color: var(--ok); font-weight: 700; }
+
+    .help { color: var(--muted); font-size: 12px; }
+    .footer { margin-top: 20px; color: var(--muted); font-size: 12px; }
+
+    @media (max-width: 840px) {
+      .grid { grid-template-columns: 1fr; }
+      .kvs { grid-template-columns: 1fr; }
+      .bits { grid-template-columns: repeat(8, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>SPI Frame Builder</h1>
+    <div class="sub">Interactive single‑word (16‑bit) frame with <b>CMD</b> (1b), <b>ADDR</b> (6b), <b>DATA</b> (8b), and <b>PARITY</b> (1b at LSB). Visualize bits and copy HEX/BIN quickly.</div>
+
+    <div class="panel" id="app">
+      <div class="row" style="margin-bottom:12px">
+        <label class="radio"><input type="radio" name="mode" value="write" checked> Write frame (parity over CMD+ADDR+DATA)</label>
+        <label class="radio"><input type="radio" name="mode" value="read"> Read response (parity over 1 + STATUS + DATA)</label>
+        <span class="tag">Bit order: <b>CMD · A5…A0 · D7…D0 · P</b> (P = LSB)</span>
+      </div>
+
+      <div class="grid">
+        <div class="field" style="grid-column: span 3">
+          <label>CMD (1 bit)</label>
+          <select id="cmd">
+            <option value="1">1 (Write)</option>
+            <option value="0">0 (Read)</option>
+          </select>
+          <div class="help">Typical convention shown; adjust if your device flips semantics.</div>
+        </div>
+
+        <div class="field" style="grid-column: span 3">
+          <label id="addrLbl">ADDR (6 bits)</label>
+          <input id="addr" type="number" min="0" max="63" step="1" value="0" />
+          <div class="help">0 – 63 (A5 is MSB).</div>
+        </div>
+
+        <div class="field" style="grid-column: span 3">
+          <label id="dataLbl">DATA (8 bits)</label>
+          <input id="data" type="number" min="0" max="255" step="1" value="0" />
+          <div class="help">0 – 255 (D7 is MSB).</div>
+        </div>
+
+        <div class="field" style="grid-column: span 3">
+          <label>Parity type</label>
+          <select id="ptype">
+            <option value="even" selected>Even parity (sets P=1 if ones count is odd)</option>
+            <option value="odd">Odd parity (sets P=1 if ones count is even)</option>
+          </select>
+          <div class="help">Matches many PMICs (even). Switch if your target expects odd.</div>
+        </div>
+
+        <div class="field" style="grid-column: span 12" id="statusBox" hidden>
+          <label>STATUS (6 bits) — for Read response parity</label>
+          <input id="status" type="number" min="0" max="63" step="1" value="0" />
+          <div class="help">Used only when <b>Read response</b> mode is selected. Parity is computed over 1 + STATUS + DATA.</div>
+        </div>
+
+        <div class="field" style="grid-column: span 12">
+          <div class="row" style="justify-content: space-between; align-items: flex-end">
+            <div>
+              <label>Frame preview (MSB → LSB)</label>
+            </div>
+            <div class="help">MSB = CMD. LSB = PARITY.</div>
+          </div>
+          <div class="bits" id="bits"></div>
+        </div>
+
+        <div class="out" style="grid-column: span 12">
+          <div class="kvs">
+            <div><div class="tag">HEX (16-bit)</div><code id="hex">0x0000</code></div>
+            <div><div class="tag">BIN (16-bit)</div><code id="bin">0000 0000 0000 0000</code></div>
+            <div><div class="tag">PARITY</div><span id="pdesc" class="ok">P=0</span></div>
+          </div>
+          <div class="row">
+            <button id="copyHex">Copy HEX</button>
+            <button class="ghost" id="copyBin">Copy BIN</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="footer">Notes: parity is placed in bit0. Word layout used here: <code>[15]=CMD</code>, <code>[14:9]=ADDR</code>, <code>[8:1]=DATA</code>, <code>[0]=PARITY</code>. Adjust to your controller if its shift order differs.</div>
+    </div>
+  </div>
+
+  <script>
+    const el = (id)=>document.getElementById(id);
+    const bitsEl = el('bits');
+
+    function ones(n){
+      // count bits without using popcount (portable)
+      let c=0; while(n){ c += n & 1; n >>>= 1; } return c;
+    }
+
+    function computeParity({mode, cmd, addr, data, status, ptype}){
+      // Return parity bit and text per selected model
+      let count;
+      if(mode==='write'){
+        // CMD(1) + ADDR(6) + DATA(8)
+        count = (cmd&1) + ones(addr & 0x3f) + ones(data & 0xff);
+      } else {
+        // Read response: 1'b1 + STATUS(6) + DATA(8)
+        count = 1 + ones(status & 0x3f) + ones(data & 0xff);
+      }
+      const evenWanted = (ptype==='even');
+      const isOdd = (count % 2) === 1;
+      const p = evenWanted ? (isOdd ? 1 : 0) : (isOdd ? 0 : 1);
+      const desc = (evenWanted? 'even' : 'odd') + ` parity → ones=${count}, P=${p}`;
+      return {p, desc};
+    }
+
+    function wordFrom({cmd, addr, data, p}){
+      // [15]=cmd, [14:9]=addr, [8:1]=data, [0]=parity
+      return ((cmd & 1) << 15) | ((addr & 0x3F) << 9) | ((data & 0xFF) << 1) | (p & 1);
+    }
+
+    function renderBits(w){
+      const labels = ['CMD','A5','A4','A3','A2','A1','A0','D7','D6','D5','D4','D3','D2','D1','D0','P'];
+      bitsEl.innerHTML = '';
+      for(let i=15;i>=0;i--){
+        const b = (w>>i)&1;
+        const div = document.createElement('div');
+        div.className = 'bit' + (i===15? ' cmd':'') + (i===0? ' parity':'');
+        div.innerHTML = `<div class="v">${b}</div><div class="t">${labels[15-i]}</div>`;
+        bitsEl.appendChild(div);
+      }
+    }
+
+    function fmtBin16(w){
+      const s = w.toString(2).padStart(16,'0');
+      return s.replace(/(.{4})/g, '$1 ').trim();
+    }
+
+    function update(){
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const cmd = parseInt(el('cmd').value,10)|0;
+      const addr = parseInt(el('addr').value,10)|0;
+      const data = parseInt(el('data').value,10)|0;
+      const status = parseInt(el('status').value,10)|0;
+      const ptype = el('ptype').value;
+
+      el('statusBox').hidden = (mode!== 'read');
+
+      const {p, desc} = computeParity({mode, cmd, addr, data, status, ptype});
+      const word = wordFrom({cmd, addr, data, p});
+
+      renderBits(word);
+      el('hex').textContent = '0x' + word.toString(16).toUpperCase().padStart(4,'0');
+      el('bin').textContent = fmtBin16(word);
+      el('pdesc').textContent = `P=${p}  ·  ${desc}`;
+    }
+
+    // Wire events
+    ['cmd','addr','data','status','ptype'].forEach(id=>{
+      el(id).addEventListener('input', update);
+      el(id).addEventListener('change', update);
+    });
+    document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener('change', update));
+
+    // Copy helpers
+    function copyText(t){ navigator.clipboard?.writeText(t).then(()=>{}); }
+    el('copyHex').addEventListener('click', ()=> copyText(el('hex').textContent));
+    el('copyBin').addEventListener('click', ()=> copyText(el('bin').textContent));
+
+    // Init
+    update();
+  </script>
+</body>
+</html>
