@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TLE9180D CRC-8 Calculator (poly 0x4D)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 1.5rem;
+      background: #f5f7fb;
+      color: #222;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.6rem;
+    }
+    .subtitle {
+      font-size: 0.95rem;
+      color: #555;
+      margin-bottom: 1rem;
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-top: 1rem;
+      margin-bottom: 0.25rem;
+    }
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.6rem 0.7rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 0.9rem;
+      font-family: monospace;
+      resize: vertical;
+      min-height: 90px;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.55rem 1.3rem;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+    }
+    button:hover {
+      filter: brightness(1.05);
+    }
+    .result {
+      margin-top: 1.2rem;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      background: #f0f4ff;
+      font-family: monospace;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+    }
+    .muted {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 0.25rem;
+    }
+    code {
+      background: #f1f1f1;
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .example {
+      margin-top: 1.2rem;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      background: #faf5ff;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TLE9180D CRC-8 Calculator</h1>
+    <div class="subtitle">
+      CRC-8 with <b>polynomial</b> <code>P(x) = x⁸ + x⁶ + x³ + x² + 1</code> (0x4D),
+      <b>init = 0x00</b>, <b>xor out = 0x00</b>, MSB-first (non-reflected).
+    </div>
+
+    <label for="dataBytes">Data bytes (hex)</label>
+    <textarea id="dataBytes"></textarea>
+    <div class="muted">
+      - Enter bytes in hex, separated by spaces, commas, or newlines.<br />
+      - Example frame used by TLE9180D (pre-filled below).
+    </div>
+
+    <button id="calcBtn">Calculate CRC-8</button>
+
+    <div id="resultBox" class="result" style="display:none;"></div>
+
+    <div class="example">
+      <b>Example (CRC should be 0xBA):</b><br />
+      <code>
+80 03 1C 56 07 A0 95 30 70 10 20 60 0E 0E 85 50 0E 02 00
+      </code><br />
+      Paste this into the input above to verify.
+    </div>
+
+    <div class="muted" style="margin-top: 1rem;">
+      Algorithm (non-reflected, MSB-first):<br />
+      <code>
+crc = 0x00;
+for each byte:
+    crc ^= byte;
+    repeat 8 times:
+        if (crc & 0x80) crc = (crc &lt;&lt; 1) ^ 0x4D;
+        else            crc = (crc &lt;&lt; 1);
+crc &amp;= 0xFF;
+      </code>
+    </div>
+  </div>
+
+  <script>
+    function parseHexByte(str) {
+      str = str.trim().replace(/^0x/i, "");
+      if (!str) return null;
+      const n = parseInt(str, 16);
+      if (Number.isNaN(n) || n < 0 || n > 0xFF) return null;
+      return n;
+    }
+
+    function parseHexBytes(input) {
+      const tokens = input
+        .replace(/\s+/g, " ")
+        .replace(/,/g, " ")
+        .trim()
+        .split(" ")
+        .filter(t => t.length > 0);
+
+      const bytes = [];
+      for (const t of tokens) {
+        const b = parseHexByte(t);
+        if (b === null) {
+          throw new Error("Invalid hex byte: '" + t + "'");
+        }
+        bytes.push(b);
+      }
+      return bytes;
+    }
+
+    // TLE9180D CRC-8: poly 0x4D, init 0x00, xorOut 0x00, MSB-first
+    function crc8_tle9180d(bytes) {
+      let crc = 0x00;
+      const poly = 0x4D;
+
+      for (const b of bytes) {
+        crc ^= (b & 0xFF);
+        for (let i = 0; i < 8; i++) {
+          if (crc & 0x80) {
+            crc = ((crc << 1) ^ poly) & 0xFF;
+          } else {
+            crc = (crc << 1) & 0xFF;
+          }
+        }
+      }
+      return crc & 0xFF;
+    }
+
+    document.getElementById("calcBtn").addEventListener("click", () => {
+      const dataInput = document.getElementById("dataBytes").value;
+      const resultBox = document.getElementById("resultBox");
+      resultBox.style.display = "block";
+
+      try {
+        if (!dataInput.trim()) {
+          throw new Error("Please enter at least one data byte.");
+        }
+
+        const bytes = parseHexBytes(dataInput);
+        const crc = crc8_tle9180d(bytes);
+        const crcHex = "0x" + crc.toString(16).toUpperCase().padStart(2, "0");
+
+        resultBox.textContent =
+          "Input bytes (" + bytes.length + "): " +
+          bytes.map(b => b.toString(16).toUpperCase().padStart(2, "0")).join(" ") +
+          "\nCRC-8 (TLE9180D): " + crcHex +
+          " (decimal " + crc + ")";
+      } catch (err) {
+        resultBox.textContent =
+          "Error: " + (err && err.message ? err.message : String(err));
+      }
+    });
+
+    // Pre-fill example when page loads
+    document.addEventListener("DOMContentLoaded", () => {
+      const example =
+        "80 03 1C 56 07 A0 95 30 70 10 20 60 0E 0E 85 50 0E 02 00";
+      document.getElementById("dataBytes").value = example;
+    });
+  </script>
+</body>
+</html>
