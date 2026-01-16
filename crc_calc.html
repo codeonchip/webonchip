@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CRC Calculator (simple)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; background: #0b0f19; color: #e9eefc; }
+    header { padding: 16px 20px; border-bottom: 1px solid #1e2a44; background:#0e1424; }
+    header h1 { margin: 0; font-size: 18px; letter-spacing: .2px; }
+    main { padding: 18px 20px; max-width: 1050px; margin: 0 auto; }
+    .grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
+    @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } }
+    .card { background: #0e1424; border: 1px solid #1e2a44; border-radius: 14px; padding: 14px; }
+    .row { display:flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    .field { display:flex; flex-direction: column; gap: 6px; min-width: 170px; flex: 1; }
+    label { font-size: 12px; color: #b9c6ea; }
+    input, select, textarea, button {
+      background: #0b1020; color: #e9eefc;
+      border: 1px solid #223152; border-radius: 10px;
+      padding: 10px 10px; font-size: 14px;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color:#3b61ff; box-shadow: 0 0 0 3px rgba(59,97,255,.15); }
+    textarea { width: 100%; min-height: 120px; resize: vertical; line-height: 1.35; }
+    .checks { display:flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+    .checks label { display:flex; gap: 8px; align-items:center; font-size: 13px; color:#d5ddf6; }
+    .checks input { width: 16px; height: 16px; padding:0; }
+    .actions { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
+    button { cursor:pointer; border-color:#2b3d6b; }
+    button.primary { background:#1a2dff; border-color:#1a2dff; }
+    button.primary:hover { filter: brightness(1.05); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .result {
+      font-size: 18px; padding: 10px 12px; border-radius: 12px;
+      background:#0b1020; border:1px dashed #2b3d6b;
+    }
+    .hint { color:#b9c6ea; font-size: 12px; line-height: 1.35; margin-top: 8px; }
+    pre { margin: 10px 0 0; padding: 12px; border-radius: 12px; overflow:auto;
+      background:#070b14; border:1px solid #1e2a44; }
+    .pill { display:inline-block; padding: 3px 8px; border-radius: 999px; border:1px solid #223152; background:#0b1020; font-size: 12px; color:#b9c6ea;}
+  </style>
+</head>
+<body>
+<header>
+  <h1>CRC Calculator (simple mimic)</h1>
+</header>
+
+<main class="grid">
+  <section class="card">
+    <div class="row">
+      <div class="field" style="min-width:240px; flex: 2;">
+        <label>Predefined</label>
+        <select id="preset">
+          <option value="custom">Custom</option>
+          <option value="crc8">CRC-8 (ATM/ITU)</option>
+          <option value="crc16_arc">CRC-16/ARC (IBM)</option>
+          <option value="crc16_ccitt_false">CRC-16/CCITT-FALSE</option>
+          <option value="crc32_ieee">CRC-32 (IEEE/ADCCP)</option>
+          <option value="crc32_mpeg2">CRC-32/MPEG-2</option>
+          <option value="crc64_ecma">CRC-64/ECMA-182</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Width (bits)</label>
+        <select id="width">
+          <option>8</option>
+          <option>16</option>
+          <option selected>32</option>
+          <option>64</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Polynomial (hex)</label>
+        <input id="poly" class="mono" value="0x04C11DB7" />
+      </div>
+
+      <div class="field">
+        <label>Init (hex)</label>
+        <input id="init" class="mono" value="0xFFFFFFFF" />
+      </div>
+
+      <div class="field">
+        <label>XorOut (hex)</label>
+        <input id="xorout" class="mono" value="0xFFFFFFFF" />
+      </div>
+    </div>
+
+    <div class="checks">
+      <label><input type="checkbox" id="refin" checked /> Input reflected (RefIn)</label>
+      <label><input type="checkbox" id="refout" checked /> Result reflected (RefOut)</label>
+      <label><input type="checkbox" id="showTable" /> Show lookup table</label>
+    </div>
+
+    <hr style="border:0;border-top:1px solid #1e2a44;margin:14px 0;">
+
+    <div class="row">
+      <div class="field" style="min-width:220px;">
+        <label>Input mode</label>
+        <select id="mode">
+          <option value="string">String (UTF-8)</option>
+          <option value="hex">Hex bytes (e.g. 0x31 32 0A)</option>
+          <option value="bin">Binary string (groups of 8)</option>
+        </select>
+      </div>
+
+      <div class="field" style="min-width:220px;">
+        <label>Quick sample</label>
+        <select id="sample">
+          <option value="">(none)</option>
+          <option value="s:123456789">"123456789"</option>
+          <option value="h:0x31 0x32 0x33 0x34 0x35 0x36 0x37 0x38 0x39">0x31..0x39</option>
+          <option value="b:00110001 00110010 00110011">binary for "123"</option>
+        </select>
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="calcBtn">Calculate CRC</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label>Input</label>
+      <textarea id="input" class="mono" placeholder='Example (hex): 0x31 0x32 0x33'></textarea>
+      <div class="hint">
+        Tips:
+        <span class="pill">hex</span> accepts <span class="mono">0xAA</span>, <span class="mono">AA</span>, commas, spaces, newlines.
+        <span class="pill">bin</span> expects only 0/1 and spaces; total bits must be a multiple of 8.
+      </div>
+    </div>
+  </section>
+
+  <aside class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <div style="color:#b9c6ea;font-size:12px;">Result CRC value</div>
+        <div id="result" class="result mono">-</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#b9c6ea;font-size:12px;">Bytes used</div>
+        <div id="bytesUsed" class="mono" style="font-size:12px;color:#d5ddf6;">0</div>
+      </div>
+    </div>
+
+    <div id="errors" style="margin-top:10px; color:#ffb4b4;"></div>
+
+    <div id="tableWrap" style="display:none;">
+      <div style="margin-top:14px; color:#b9c6ea; font-size:12px;">Lookup table (256 entries)</div>
+      <pre id="table" class="mono">-</pre>
+    </div>
+
+    <div class="hint" style="margin-top:12px;">
+      This follows the usual CRC parameter set: width, poly, init, xorout, refin, refout (like Sunshine2k). :contentReference[oaicite:1]{index=1}
+    </div>
+  </aside>
+</main>
+
+<script>
+/** ---------- Utilities ---------- **/
+function parseHexBigInt(s) {
+  const t = (s || "").trim().toLowerCase();
+  if (!t) throw new Error("Empty hex value.");
+  const cleaned = t.startsWith("0x") ? t.slice(2) : t;
+  if (!/^[0-9a-f]+$/i.test(cleaned)) throw new Error(`Invalid hex: "${s}"`);
+  return BigInt("0x" + cleaned);
+}
+
+function toHexPadded(x, widthBits) {
+  const hexDigits = Math.ceil(widthBits / 4);
+  let h = x.toString(16).toUpperCase();
+  if (h.length < hexDigits) h = "0".repeat(hexDigits - h.length) + h;
+  return "0x" + h;
+}
+
+function reflectBits(value, widthBits) {
+  let v = BigInt(value);
+  let out = 0n;
+  for (let i = 0; i < widthBits; i++) {
+    out = (out << 1n) | (v & 1n);
+    v >>= 1n;
+  }
+  return out;
+}
+
+function getMask(widthBits) {
+  return (1n << BigInt(widthBits)) - 1n;
+}
+
+function bytesFromInput(mode, text) {
+  const raw = (text || "");
+  if (mode === "string") {
+    return Array.from(new TextEncoder().encode(raw));
+  }
+  if (mode === "hex") {
+    // Accept: "0x31 32,0A\nFF" etc.
+    const tokens = raw
+      .replace(/[,;]/g, " ")
+      .split(/\s+/)
+      .map(t => t.trim())
+      .filter(Boolean);
+
+    const out = [];
+    for (const tok of tokens) {
+      const t = tok.toLowerCase().startsWith("0x") ? tok.slice(2) : tok;
+      if (!/^[0-9a-f]{1,2}$/i.test(t)) {
+        throw new Error(`Bad hex byte token: "${tok}" (use 00..FF)`);
+      }
+      out.push(parseInt(t, 16));
+    }
+    return out;
+  }
+  if (mode === "bin") {
+    // Allow spaces/newlines; must be multiple of 8 bits
+    const bits = raw.replace(/\s+/g, "");
+    if (!bits) return [];
+    if (!/^[01]+$/.test(bits)) throw new Error("Binary input can contain only 0 and 1 (and spaces).");
+    if (bits.length % 8 !== 0) throw new Error(`Binary length must be multiple of 8 (got ${bits.length} bits).`);
+    const out = [];
+    for (let i = 0; i < bits.length; i += 8) {
+      out.push(parseInt(bits.slice(i, i + 8), 2));
+    }
+    return out;
+  }
+  throw new Error("Unknown input mode.");
+}
+
+/** ---------- CRC core (BigInt, supports 8/16/32/64) ---------- **/
+function crcCompute(bytes, params) {
+  const width = params.width;
+  const mask = getMask(width);
+
+  let poly = params.poly & mask;
+  let crc  = params.init & mask;
+
+  const refin = params.refin;
+  const refout = params.refout;
+
+  if (refin) {
+    // LSB-first: use reflected polynomial
+    const polyR = reflectBits(poly, width);
+
+    for (const b of bytes) {
+      crc ^= BigInt(b);
+      for (let i = 0; i < 8; i++) {
+        if (crc & 1n) crc = (crc >> 1n) ^ polyR;
+        else crc >>= 1n;
+        crc &= mask;
+      }
+    }
+  } else {
+    // MSB-first
+    const topBit = 1n << BigInt(width - 1);
+    for (const b of bytes) {
+      crc ^= (BigInt(b) << BigInt(width - 8));
+      for (let i = 0; i < 8; i++) {
+        if (crc & topBit) crc = (crc << 1n) ^ poly;
+        else crc <<= 1n;
+        crc &= mask;
+      }
+    }
+  }
+
+  // If refin != refout, reflect at the end (matches common CRC conventions)
+  if (refin !== refout) {
+    crc = reflectBits(crc, width);
+  }
+
+  crc = (crc ^ (params.xorout & mask)) & mask;
+  return crc;
+}
+
+function crcMakeTable(params) {
+  const width = params.width;
+  const mask = getMask(width);
+  const refin = params.refin;
+
+  const poly = params.poly & mask;
+  const table = new Array(256);
+
+  if (refin) {
+    const polyR = reflectBits(poly, width);
+    for (let i = 0; i < 256; i++) {
+      let c = BigInt(i);
+      for (let b = 0; b < 8; b++) {
+        if (c & 1n) c = (c >> 1n) ^ polyR;
+        else c >>= 1n;
+      }
+      table[i] = c & mask;
+    }
+  } else {
+    const topBit = 1n << BigInt(width - 1);
+    for (let i = 0; i < 256; i++) {
+      let c = BigInt(i) << BigInt(width - 8);
+      for (let b = 0; b < 8; b++) {
+        if (c & topBit) c = (c << 1n) ^ poly;
+        else c <<= 1n;
+      }
+      table[i] = c & mask;
+    }
+  }
+  return table;
+}
+
+/** ---------- Presets ---------- **/
+const PRESETS = {
+  // Common, widely-used parameter sets
+  crc8: {
+    width: 8,  poly: 0x07n,       init: 0x00n,       xorout: 0x00n,       refin: false, refout: false
+  },
+  crc16_arc: {
+    width: 16, poly: 0x8005n,     init: 0x0000n,     xorout: 0x0000n,     refin: true,  refout: true
+  },
+  crc16_ccitt_false: {
+    width: 16, poly: 0x1021n,     init: 0xFFFFn,     xorout: 0x0000n,     refin: false, refout: false
+  },
+  crc32_ieee: {
+    width: 32, poly: 0x04C11DB7n, init: 0xFFFFFFFFn, xorout: 0xFFFFFFFFn, refin: true,  refout: true
+  },
+  crc32_mpeg2: {
+    width: 32, poly: 0x04C11DB7n, init: 0xFFFFFFFFn, xorout: 0x00000000n, refin: false, refout: false
+  },
+  crc64_ecma: {
+    width: 64, poly: 0x42F0E1EBA9EA3693n, init: 0x0000000000000000n, xorout: 0x0000000000000000n, refin: false, refout: false
+  }
+};
+
+/** ---------- UI Wiring ---------- **/
+const el = (id) => document.getElementById(id);
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+
+  el("width").value = String(p.width);
+  el("poly").value = "0x" + p.poly.toString(16).toUpperCase();
+  el("init").value = "0x" + p.init.toString(16).toUpperCase();
+  el("xorout").value = "0x" + p.xorout.toString(16).toUpperCase();
+  el("refin").checked = p.refin;
+  el("refout").checked = p.refout;
+}
+
+function getParamsFromUI() {
+  const width = parseInt(el("width").value, 10);
+  if (![8,16,32,64].includes(width)) throw new Error("Width must be 8, 16, 32, or 64.");
+
+  const poly = parseHexBigInt(el("poly").value);
+  const init = parseHexBigInt(el("init").value);
+  const xorout = parseHexBigInt(el("xorout").value);
+
+  return {
+    width,
+    poly,
+    init,
+    xorout,
+    refin: el("refin").checked,
+    refout: el("refout").checked
+  };
+}
+
+function showError(msg) {
+  el("errors").textContent = msg || "";
+}
+
+function setResult(text) {
+  el("result").textContent = text;
+}
+
+function formatTable(table, width) {
+  const perRow = 4;
+  const lines = [];
+  for (let i = 0; i < table.length; i += perRow) {
+    const row = [];
+    for (let j = 0; j < perRow; j++) {
+      const idx = i + j;
+      if (idx >= table.length) break;
+      row.push(`${idx.toString().padStart(3," ")}: ${toHexPadded(table[idx], width)}`);
+    }
+    lines.push(row.join("    "));
+  }
+  return lines.join("\n");
+}
+
+function calculate() {
+  showError("");
+  el("tableWrap").style.display = "none";
+  el("table").textContent = "-";
+
+  try {
+    const params = getParamsFromUI();
+    const mode = el("mode").value;
+    const inputText = el("input").value;
+
+    const bytes = bytesFromInput(mode, inputText);
+    el("bytesUsed").textContent = String(bytes.length);
+
+    const crc = crcCompute(bytes, params);
+    setResult(toHexPadded(crc, params.width));
+
+    if (el("showTable").checked) {
+      const table = crcMakeTable(params);
+      el("table").textContent = formatTable(table, params.width);
+      el("tableWrap").style.display = "block";
+    }
+  } catch (e) {
+    setResult("-");
+    el("bytesUsed").textContent = "0";
+    showError(e && e.message ? e.message : String(e));
+  }
+}
+
+function resetAll() {
+  el("preset").value = "crc32_ieee";
+  applyPreset("crc32_ieee");
+  el("mode").value = "string";
+  el("input").value = "";
+  el("sample").value = "";
+  el("showTable").checked = false;
+  setResult("-");
+  el("bytesUsed").textContent = "0";
+  showError("");
+  el("tableWrap").style.display = "none";
+}
+
+el("preset").addEventListener("change", () => {
+  const v = el("preset").value;
+  if (v !== "custom") applyPreset(v);
+});
+
+el("sample").addEventListener("change", () => {
+  const v = el("sample").value;
+  if (!v) return;
+  const [kind, payload] = v.split(":", 2);
+  if (kind === "s") { el("mode").value = "string"; el("input").value = payload; }
+  if (kind === "h") { el("mode").value = "hex";    el("input").value = payload; }
+  if (kind === "b") { el("mode").value = "bin";    el("input").value = payload; }
+});
+
+el("calcBtn").addEventListener("click", calculate);
+el("resetBtn").addEventListener("click", resetAll);
+
+// Auto-calc on Enter (while in single-line inputs)
+["poly","init","xorout"].forEach(id => {
+  el(id).addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") calculate();
+  });
+});
+
+// Start with CRC-32 preset like most online tools
+resetAll();
+</script>
+</body>
+</html>
